@@ -7,7 +7,7 @@ class Shop {
                 price: 1, 
                 level: 1, 
                 equation: price => price * 1.1 + 1,
-                getValue: function() { return (this.level-1) * 2; }
+                getValue: function() { return (this.level) +1; }
             },
             { 
                 name: "Increase Ball Size Range Min", 
