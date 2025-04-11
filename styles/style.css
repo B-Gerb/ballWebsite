@@ -63,6 +63,7 @@ label {
     font-size: 14px;
 }
 
+
 .slider {
     width: 100%;
     height: 8px;
@@ -71,7 +72,6 @@ label {
     appearance: none;
     outline: none;
 }
-
 .slider::-webkit-slider-thumb {
     appearance: none;
     width: 18px;

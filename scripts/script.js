@@ -14,12 +14,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
     const toggleAnimationButton = document.getElementById('toggleAnimation');
+
+    const smallBallSpeedMinSlider = document.getElementById('ballSpeedMin');
+    const smallBallSpeedMaxSlider = document.getElementById('ballSpeedMax');
+    const smallBallSpeedValue = document.getElementById('smallBallSpeedValue');
+
     
     // Animation settings
     let ballCount = parseInt(ballCountSlider.value);
     let minBallSize = parseInt(ballSizeMinSlider.value);
     let maxBallSize = parseInt(ballSizeMaxSlider.value);
     let minDimension = parseInt(largeBallSizeSlider.value);
+    let minBallSpeed = parseInt(smallBallSpeedMinSlider.value);
+    let maxBallSpeed = parseInt(smallBallSpeedMaxSlider.value);
     let isRunning = true;
     let animationFrameId;
     
@@ -56,8 +63,8 @@ document.addEventListener('DOMContentLoaded', () => {
         
         for (let i = 0; i < ballCount; i++) {
             // Random size within the specified range
-            const radius = minBallSize + Math.random() * (maxBallSize - minBallSize);
-            const maxSpeed = 2;
+            const radius = minBallSize + (Math.random() * (maxBallSize - minBallSize));
+            const speed = minBallSpeed + (Math.random() * (maxBallSpeed - minBallSpeed));
             
             // Simple placement - we'll manually prevent overlap later
             const angle = Math.random() * Math.PI * 2;
@@ -69,8 +76,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 x: x,
                 y: y,
                 radius: radius,
-                dx: (Math.random() - 0.5) * maxSpeed,
-                dy: (Math.random() - 0.5) * maxSpeed,
+                dx: (Math.random() - 0.5) * speed,
+                dy: (Math.random() - 0.5) * speed,
                 color: `rgb(${Math.floor(Math.random() * 255)}, ${Math.floor(Math.random() * 255)}, ${Math.floor(Math.random() * 255)})`
             });
         }
@@ -260,6 +267,42 @@ document.addEventListener('DOMContentLoaded', () => {
             track.style.background = `linear-gradient(to right, #ddd ${percentage1}%, #3498db ${percentage1}%, #3498db ${percentage2}%, #ddd ${percentage2}%)`;
         }
     }
+    smallBallSpeedMinSlider.addEventListener('input', () => {
+        minBallSpeed = parseInt(smallBallSpeedMinSlider.value);
+        
+        // Ensure min doesn't exceed max
+        if (minBallSpeed > maxBallSpeed) {
+            maxBallSpeed = minBallSpeed;
+            smallBallSpeedMaxSlider.value = minBallSpeed;
+        }
+        updateBallSpeedDisplay();
+        initBalls();
+    });
+    smallBallSpeedMaxSlider.addEventListener('input', () => {
+        maxBallSpeed = parseInt(smallBallSpeedMaxSlider.value);
+        
+        // Ensure max doesn't go below min
+        if (maxBallSpeed < minBallSpeed) {
+            minBallSpeed = maxBallSpeed;
+            smallBallSpeedMinSlider.value = maxBallSpeed;
+        }
+        updateBallSpeedDisplay();
+        initBalls();
+    });
+    function updateBallSpeedDisplay(){
+        smallBallSpeedMaxSlider.textContent = `${minBallSize}-${maxBallSize}`;
+        
+        // Update the slider track visual
+        const percentage1 = ((minBallSize - smallBallSpeedMinSlider.min) / (smallBallSpeedMinSlider.max - smallBallSpeedMinSlider.min)) * 100;
+        const percentage2 = ((maxBallSize - smallBallSpeedMaxSlider.min) / (smallBallSpeedMaxSlider.max - smallBallSpeedMaxSlider.min)) * 100;
+        const track = document.querySelector('.range-slider-track');
+        
+        if (track) {
+            track.style.background = `linear-gradient(to right, #ddd ${percentage1}%, #3498db ${percentage1}%, #3498db ${percentage2}%, #ddd ${percentage2}%)`;
+        }
+
+    }
+
     
     // Event listeners
     ballCountSlider.addEventListener('input', () => {

@@ -54,6 +54,29 @@
                 </div>
             </div>
 
+            <div class="control-group">
+                <label for="smallBallSpeed"> Small Ball Speed Range: <span id="smallBallSpeedValue">5-15</span></label>
+                <div class="range-slider-container">
+                    <input 
+                        type="range" 
+                        id="ballSpeedMin" 
+                        min="5" 
+                        max="50" 
+                        value="5"
+                        class="slider min-slider"
+                    >
+                    <input 
+                        type="range" 
+                        id="ballSpeedMax" 
+                        min="5" 
+                        max="50" 
+                        value="15"
+                        class="slider max-slider"
+                    >
+                    <div class="range-slider-track"></div>
+                </div>
+            </div>
+
 
             <div class = "control-group">
                 <label for="largeBallMin">Large Ball Size: <span id="largeBallSizeValue">100</span></label>
@@ -62,7 +85,7 @@
                     id="largeBallMin" 
                     min="100" 
                     max="1000" 
-                    value="100"
+                    value="500"
                     class="slider"
                 >
             
