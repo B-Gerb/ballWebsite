@@ -26,11 +26,8 @@ class Server {
             shopBalanceDisplay: document.getElementById('shopBalance')
         };
         
-        // Last time energy was converted to balance
-        this.lastEnergyConversionTime = Date.now();
         
-        // Energy to balance conversion rate (balance earned per energy unit per second)
-        this.energyConversionRate = 0.01;
+        
         
         // Initialize the values from DOM elements if they exist
         this.initializeFromDOM();
