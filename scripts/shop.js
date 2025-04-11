@@ -1,13 +1,13 @@
 class Shop {
     constructor() {
-        this.balance = 0;
+        this.balance = 0.00;
         this.items = [
             { 
                 name: "Add Ball", 
                 price: 1, 
                 level: 1, 
                 equation: price => price * 1.1 + 1,
-                getValue: function() { return this.level * 2; }
+                getValue: function() { return (this.level-1) * 2; }
             },
             { 
                 name: "Increase Ball Size Range Min", 

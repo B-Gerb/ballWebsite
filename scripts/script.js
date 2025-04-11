@@ -16,7 +16,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 <h3>${item.name}</h3>
                 <p>Level: <span id="${item.name.replace(/\s+/g, '-')}-level">${item.level}</span></p>
                 <p>Cost: <span id="${item.name.replace(/\s+/g, '-')}-cost">${item.price.toFixed(2)}</span></p>
-                <p>Value: <span id="${item.name.replace(/\s+/g, '-')}-value">${item.getValue()}</span></p>
             `;
             
             button.addEventListener('click', () => {
@@ -26,11 +25,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     // Update button text after purchase
                     const levelSpan = button.querySelector(`#${item.name.replace(/\s+/g, '-')}-level`);
                     const costSpan = button.querySelector(`#${item.name.replace(/\s+/g, '-')}-cost`);
-                    const valueSpan = button.querySelector(`#${item.name.replace(/\s+/g, '-')}-value`);
                     
                     if (levelSpan) levelSpan.textContent = item.level;
                     if (costSpan) costSpan.textContent = item.price.toFixed(2);
-                    if (valueSpan) valueSpan.textContent = item.getValue();
                 } else {
                     // Show message if not enough balance
                     alert(`Not enough balance to buy ${item.name}. Need ${gameServer.shop.itemCost(item, 1)[0].toFixed(2)}, have ${gameServer.shop.balance.toFixed(2)}`);

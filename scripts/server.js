@@ -65,104 +65,7 @@ class Server {
     
     // Set up all event listeners
     setupEventListeners() {
-        // Ball count slider
-        if (this.elements.ballCountSlider) {
-            this.elements.ballCountSlider.addEventListener('input', () => {
-                this.circleBoard.ballCount = parseInt(this.elements.ballCountSlider.value);
-                if (this.elements.ballCountValue) {
-                    this.elements.ballCountValue.textContent = this.circleBoard.ballCount;
-                }
-                this.circleBoard.initBalls();
-                this.updateEnergyDisplay();
-            });
-        }
         
-        // Ball size sliders
-        if (this.elements.ballSizeMinSlider) {
-            this.elements.ballSizeMinSlider.addEventListener('input', () => {
-                this.circleBoard.minBallSize = parseInt(this.elements.ballSizeMinSlider.value);
-                
-                // Ensure min doesn't exceed max
-                if (this.circleBoard.minBallSize > this.circleBoard.maxBallSize) {
-                    this.circleBoard.maxBallSize = this.circleBoard.minBallSize;
-                    if (this.elements.ballSizeMaxSlider) {
-                        this.elements.ballSizeMaxSlider.value = this.circleBoard.minBallSize;
-                    }
-                }
-                
-                this.updateBallSizeDisplay();
-                this.circleBoard.initBalls();
-                this.updateEnergyDisplay();
-            });
-        }
-        
-        if (this.elements.ballSizeMaxSlider) {
-            this.elements.ballSizeMaxSlider.addEventListener('input', () => {
-                this.circleBoard.maxBallSize = parseInt(this.elements.ballSizeMaxSlider.value);
-                
-                // Ensure max doesn't go below min
-                if (this.circleBoard.maxBallSize < this.circleBoard.minBallSize) {
-                    this.circleBoard.minBallSize = this.circleBoard.maxBallSize;
-                    if (this.elements.ballSizeMinSlider) {
-                        this.elements.ballSizeMinSlider.value = this.circleBoard.maxBallSize;
-                    }
-                }
-                
-                this.updateBallSizeDisplay();
-                this.circleBoard.initBalls();
-                this.updateEnergyDisplay();
-            });
-        }
-        
-        // Large ball size slider
-        if (this.elements.largeBallSizeSlider) {
-            this.elements.largeBallSizeSlider.addEventListener('input', () => {
-                this.circleBoard.minDimension = parseInt(this.elements.largeBallSizeSlider.value);
-                if (this.elements.largeBallSizeValue) {
-                    this.elements.largeBallSizeValue.textContent = this.circleBoard.minDimension;
-                }
-                this.circleBoard.initContainer();
-                this.circleBoard.initBalls();
-                this.updateEnergyDisplay();
-            });
-        }
-        
-        // Ball speed sliders
-        if (this.elements.smallBallSpeedMinSlider) {
-            this.elements.smallBallSpeedMinSlider.addEventListener('input', () => {
-                this.circleBoard.minBallSpeed = parseInt(this.elements.smallBallSpeedMinSlider.value);
-                
-                // Ensure min doesn't exceed max
-                if (this.circleBoard.minBallSpeed > this.circleBoard.maxBallSpeed) {
-                    this.circleBoard.maxBallSpeed = this.circleBoard.minBallSpeed;
-                    if (this.elements.smallBallSpeedMaxSlider) {
-                        this.elements.smallBallSpeedMaxSlider.value = this.circleBoard.minBallSpeed;
-                    }
-                }
-                
-                this.updateBallSpeedDisplay();
-                this.circleBoard.initBalls();
-                this.updateEnergyDisplay();
-            });
-        }
-        
-        if (this.elements.smallBallSpeedMaxSlider) {
-            this.elements.smallBallSpeedMaxSlider.addEventListener('input', () => {
-                this.circleBoard.maxBallSpeed = parseInt(this.elements.smallBallSpeedMaxSlider.value);
-                
-                // Ensure max doesn't go below min
-                if (this.circleBoard.maxBallSpeed < this.circleBoard.minBallSpeed) {
-                    this.circleBoard.minBallSpeed = this.circleBoard.maxBallSpeed;
-                    if (this.elements.smallBallSpeedMinSlider) {
-                        this.elements.smallBallSpeedMinSlider.value = this.circleBoard.maxBallSpeed;
-                    }
-                }
-                
-                this.updateBallSpeedDisplay();
-                this.circleBoard.initBalls();
-                this.updateEnergyDisplay();
-            });
-        }
         
         // Toggle animation button
         if (this.elements.toggleAnimationButton) {
@@ -177,82 +80,17 @@ class Server {
             this.circleBoard.resizeCanvas();
         });
         
-        // Setup passive income by intercepting animation frame
         const originalAnimate = this.circleBoard.animate;
-        this.circleBoard.animate = () => {
-            // Call the original animate method
-            originalAnimate.call(this.circleBoard);
+        this.circleBoard.animate = (shop) => {
+            originalAnimate.call(this.circleBoard, this.shop);
             
-            // Convert energy to balance
-            this.convertEnergyToBalance();
-            
-            // Update UI displays
             this.updateEnergyDisplay();
             this.updateBalanceDisplay();
         };
     }
     
-    // Convert energy to balance (passive income)
-    convertEnergyToBalance() {
-        const now = Date.now();
-        const elapsed = (now - this.lastEnergyConversionTime) / 1000; // in seconds
-        this.lastEnergyConversionTime = now;
-        
-        if (this.circleBoard.totalEnergy > 0 && elapsed > 0) {
-            const balanceToAdd = this.circleBoard.totalEnergy * this.energyConversionRate * elapsed;
-            this.shop.addBalance(balanceToAdd);
-        }
-    }
+
     
-    // Update the ball size display
-    updateBallSizeDisplay() {
-        if (this.elements.ballSizeValue) {
-            this.elements.ballSizeValue.textContent = 
-                `${this.circleBoard.minBallSize}-${this.circleBoard.maxBallSize}`;
-        }
-        
-        // Update the slider track visual if applicable
-        const percentage1 = ((this.circleBoard.minBallSize - this.elements.ballSizeMinSlider.min) / 
-            (this.elements.ballSizeMinSlider.max - this.elements.ballSizeMinSlider.min)) * 100;
-        
-        const percentage2 = ((this.circleBoard.maxBallSize - this.elements.ballSizeMaxSlider.min) / 
-            (this.elements.ballSizeMaxSlider.max - this.elements.ballSizeMaxSlider.min)) * 100;
-        
-        const track = document.querySelector('.range-slider-track');
-        
-        if (track) {
-            track.style.background = `linear-gradient(to right, 
-                                     #ddd ${percentage1}%, 
-                                     #3498db ${percentage1}%, 
-                                     #3498db ${percentage2}%, 
-                                     #ddd ${percentage2}%)`;
-        }
-    }
-    
-    // Update the ball speed display
-    updateBallSpeedDisplay() {
-        if (this.elements.smallBallSpeedValue) {
-            this.elements.smallBallSpeedValue.textContent = 
-                `${this.circleBoard.minBallSpeed}-${this.circleBoard.maxBallSpeed}`;
-        }
-        
-        // Update the slider track visual if applicable
-        const percentage1 = ((this.circleBoard.minBallSpeed - this.elements.smallBallSpeedMinSlider.min) / 
-            (this.elements.smallBallSpeedMinSlider.max - this.elements.smallBallSpeedMinSlider.min)) * 100;
-        
-        const percentage2 = ((this.circleBoard.maxBallSpeed - this.elements.smallBallSpeedMaxSlider.min) / 
-            (this.elements.smallBallSpeedMaxSlider.max - this.elements.smallBallSpeedMaxSlider.min)) * 100;
-        
-        const track = document.querySelector('.range-slider-track');
-        
-        if (track) {
-            track.style.background = `linear-gradient(to right, 
-                                     #ddd ${percentage1}%, 
-                                     #3498db ${percentage1}%, 
-                                     #3498db ${percentage2}%, 
-                                     #ddd ${percentage2}%)`;
-        }
-    }
     
     // Update the energy display
     updateEnergyDisplay() {
@@ -306,7 +144,9 @@ class Server {
                 if (this.elements.ballSizeMinSlider) {
                     this.elements.ballSizeMinSlider.value = this.circleBoard.minBallSize;
                 }
-                this.updateBallSizeDisplay();
+                if (this.elements.ballSizeValue) {
+                    this.elements.ballSizeValue.textContent = this.circleBoard.minBallSize;
+                }
                 break;
                 
             case "Increase Ball Size Range Max":
@@ -314,7 +154,9 @@ class Server {
                 if (this.elements.ballSizeMaxSlider) {
                     this.elements.ballSizeMaxSlider.value = this.circleBoard.maxBallSize;
                 }
-                this.updateBallSizeDisplay();
+                if (this.elements.ballSizeValue) {
+                    this.elements.ballSizeValue.textContent = this.circleBoard.maxBallSize;
+                }
                 break;
                 
             case "Increase Ball Speed Min":
@@ -322,7 +164,9 @@ class Server {
                 if (this.elements.smallBallSpeedMinSlider) {
                     this.elements.smallBallSpeedMinSlider.value = this.circleBoard.minBallSpeed;
                 }
-                this.updateBallSpeedDisplay();
+                if (this.elements.smallBallSpeedValue) {
+                    this.elements.smallBallSpeedValue.textContent = this.circleBoard.minBallSpeed;
+                }
                 break;
                 
             case "Increase Ball Speed Max":
@@ -330,7 +174,9 @@ class Server {
                 if (this.elements.smallBallSpeedMaxSlider) {
                     this.elements.smallBallSpeedMaxSlider.value = this.circleBoard.maxBallSpeed;
                 }
-                this.updateBallSpeedDisplay();
+                if( this.elements.smallBallSpeedValue) {
+                    this.elements.smallBallSpeedValue.textContent = this.circleBoard.maxBallSpeed;
+                }
                 break;
                 
             case "Decrease Large Circle Size":
@@ -351,6 +197,7 @@ class Server {
     
     // Save game state to localStorage
     saveGameState() {
+        console.log(this.circleBoard.container.x, this.circleBoard.container.y);
         const gameState = {
             circleBoard: {
                 ballCount: this.circleBoard.ballCount,
@@ -358,7 +205,34 @@ class Server {
                 maxBallSize: this.circleBoard.maxBallSize,
                 minDimension: this.circleBoard.minDimension,
                 minBallSpeed: this.circleBoard.minBallSpeed,
-                maxBallSpeed: this.circleBoard.maxBallSpeed
+                maxBallSpeed: this.circleBoard.maxBallSpeed,
+                totalEnergy: this.circleBoard.totalEnergy,
+                balls: this.circleBoard.balls.map(ball => ({
+                    size: ball.radius,  // Using radius as size
+                    position: {
+                        x: ball.x,
+                        y: ball.y
+                    },
+                    velocity: {
+                        x: ball.dx,
+                        y: ball.dy
+                    },
+                    color: ball.color,
+                    mass: ball.mass
+                })),
+                rng: this.circleBoard.rng,
+                container: {
+                    x: this.circleBoard.container.x,
+                    y: this.circleBoard.container.y,
+                    radius: this.circleBoard.container.radius,
+                    thickness : this.circleBoard.container.thickness,
+                    color: this.circleBoard.container.color,
+                    borderColor: this.circleBoard.container.borderColor,
+
+                },
+
+
+
             },
             shop: {
                 balance: this.shop.balance,
@@ -394,6 +268,20 @@ class Server {
                 this.circleBoard.minDimension = gameState.circleBoard.minDimension || this.circleBoard.minDimension;
                 this.circleBoard.minBallSpeed = gameState.circleBoard.minBallSpeed || this.circleBoard.minBallSpeed;
                 this.circleBoard.maxBallSpeed = gameState.circleBoard.maxBallSpeed || this.circleBoard.maxBallSpeed;
+                this.circleBoard.totalEnergy = gameState.circleBoard.totalEnergy || this.circleBoard.totalEnergy;
+                this.circleBoard.balls = gameState.circleBoard.balls.map(ballData => ({
+                    x: ballData.position.x,
+                    y: ballData.position.y,
+                    radius: ballData.size,
+                    mass: ballData.mass,
+                    dx: ballData.velocity.x,
+                    dy: ballData.velocity.y,
+                    color: ballData.color
+                
+                })),
+                this.circleBoard.rng = gameState.circleBoard.rng || this.circleBoard.rng;
+                this.circleBoard.container = gameState.circleBoard.container || this.circleBoard.container;
+
                 
                 // Update UI sliders
                 if (this.elements.ballCountSlider) {
@@ -423,8 +311,6 @@ class Server {
                     this.elements.largeBallSizeValue.textContent = this.circleBoard.minDimension;
                 }
                 
-                this.updateBallSizeDisplay();
-                this.updateBallSpeedDisplay();
             }
             
             // Load Shop state
@@ -444,9 +330,7 @@ class Server {
                 this.updateBalanceDisplay();
             }
             
-            // Reinitialize
-            this.circleBoard.initContainer();
-            this.circleBoard.initBalls();
+            this.circleBoard.start();
             
             console.log('Game state loaded successfully');
             return true;
@@ -501,8 +385,6 @@ class Server {
             this.elements.smallBallSpeedMaxSlider.value = this.circleBoard.maxBallSpeed;
         }
         
-        this.updateBallSizeDisplay();
-        this.updateBallSpeedDisplay();
         this.updateBalanceDisplay();
         
         // Reinitialize

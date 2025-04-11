@@ -6,44 +6,64 @@ class CircleBoard {
         
         // Animation settings
         this.ballCount = 1;
-        this.minBallSize = 5;
-        this.maxBallSize = 15;
-        this.minDimension = 750;
-        this.minBallSpeed = 5;
-        this.maxBallSpeed = 15;
+        this.baseMinBallSize = 5;      // Base sizes that will be scaled
+        this.baseMaxBallSize = 15;
+        this.baseContainerThickness = 5;
+        this.baseReferenceSize = 750;  // Reference size for scaling
+        this.baseMinBallSpeed = 5;
+        this.baseMaxBallSpeed = 15;
         this.isRunning = true;
         this.animationFrameId = null;
         this.totalEnergy = 0;
         this.rng = new Math.seedrandom('userInput');
         
-        // Create a clearly visible container
+        // Scaled properties (will be calculated during init)
+        this.minBallSize = this.baseMinBallSize;
+        this.maxBallSize = this.baseMaxBallSize;
+        this.minBallSpeed = this.baseMinBallSpeed;
+        this.maxBallSpeed = this.baseMaxBallSpeed;
+        
+        // Create container
         this.container = {
             x: 0,
             y: 0,
             radius: 0,
             color: '#3498db',
             borderColor: '#2c3e50',
-            thickness: 5
+            thickness: this.baseContainerThickness
         };
         
         // Array to store balls
         this.balls = [];
         
-        // Previous container radius for resizing
-        this.previousContainerRadius = 0;
+        // Scale factor based on screen size
+        this.scaleFactor = 1;
+    }
+    
+    // Calculate scale factor based on canvas size
+    calculateScaleFactor() {
+        const smallerDimension = Math.min(this.canvas.width, this.canvas.height);
+        this.scaleFactor = smallerDimension / this.baseReferenceSize;
+        
+        // Update scaled properties
+        this.minBallSize = this.baseMinBallSize * this.scaleFactor;
+        this.maxBallSize = this.baseMaxBallSize * this.scaleFactor;
+        this.minBallSpeed = this.baseMinBallSpeed * this.scaleFactor;
+        this.maxBallSpeed = this.baseMaxBallSpeed * this.scaleFactor;
     }
     
     // Initialize container
     initContainer() {
-        const padding = 20;
+        const padding = 20 * this.scaleFactor;
+        const smallerDimension = Math.min(this.canvas.width, this.canvas.height);
         
         this.container = {
             x: this.canvas.width / 2,
             y: this.canvas.height / 2,
-            radius: (this.minDimension / 2) - padding,
+            radius: (smallerDimension / 2) - padding,
             color: '#3498db',
             borderColor: '#2c3e50',
-            thickness: 5
+            thickness: this.baseContainerThickness * this.scaleFactor
         };
     }
     
@@ -64,7 +84,7 @@ class CircleBoard {
             
             // Simple placement - we'll manually prevent overlap later
             const angle = this.rng() * Math.PI * 2;
-            const distance = this.rng() * (this.container.radius - radius - this.container.thickness - 5);
+            const distance = this.rng() * (this.container.radius - radius - this.container.thickness - 5 * this.scaleFactor);
             const x = this.container.x + Math.cos(angle) * distance;
             const y = this.container.y + Math.sin(angle) * distance;
             
@@ -91,7 +111,7 @@ class CircleBoard {
         this.ctx.fillStyle = this.container.color;
         this.ctx.fill();
         this.ctx.strokeStyle = this.container.borderColor;
-        this.ctx.lineWidth = 5;
+        this.ctx.lineWidth = this.container.thickness;
         this.ctx.stroke();
         this.ctx.closePath();
         
@@ -113,7 +133,7 @@ class CircleBoard {
     }
     
     // Update ball positions and handle collisions
-    updateBall(ball, index) {
+    updateBall(ball, index, shop) {
         // Calculate distance from ball center to container center
         const dx = ball.x - this.container.x;
         const dy = ball.y - this.container.y;
@@ -121,6 +141,7 @@ class CircleBoard {
         
         // Handle container collision
         if (distance + ball.radius > this.container.radius - this.container.thickness) {
+            shop.addBalance(1); // Add 1 to balance for each collision with the container
             // Calculate normal vector from container center to ball center
             const nx = dx / distance;
             const ny = dy / distance;
@@ -187,7 +208,7 @@ class CircleBoard {
     }
     
     // Animation loop
-    animate() {
+    animate(shop) {
         if (!this.isRunning) return;
         
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
@@ -198,7 +219,7 @@ class CircleBoard {
         // Update and draw all balls
         this.totalEnergy = 0; // Reset total energy for this frame
         this.balls.forEach((ball, index) => {
-            this.updateBall(ball, index);
+            this.updateBall(ball, index, shop);
             this.drawBall(ball);
             this.totalEnergy += this.energyOfBall(ball);
         });
@@ -209,54 +230,65 @@ class CircleBoard {
     // Resize canvas to fit parent
     resizeCanvas() {
         const newWidth = this.canvas.parentElement.clientWidth;
-        const newHeight = 500;
+        const newHeight = this.canvas.parentElement.clientHeight;
         
         // Save the state of balls relative to container
         const ballStates = this.balls.map(ball => {
             const relX = (ball.x - this.container.x) / this.container.radius;
             const relY = (ball.y - this.container.y) / this.container.radius;
+            const relRadius = ball.radius / this.container.radius;
+            const relDx = ball.dx / this.container.radius;
+            const relDy = ball.dy / this.container.radius;
             
             return {
-                relX: relX,
-                relY: relY,
-                radius: ball.radius,
+                relX,
+                relY,
+                relRadius,
                 mass: ball.mass,
-                dx: ball.dx,
-                dy: ball.dy,
+                relDx,
+                relDy,
                 color: ball.color
             };
         });
         
-        this.previousContainerRadius = this.container.radius;
-        
+        // Update canvas size
         this.canvas.width = newWidth;
         this.canvas.height = newHeight;
         
+        // Calculate new scale factor and update container
+        this.calculateScaleFactor();
         this.initContainer();
         
-        // Restore balls with proper positioning
+        // Restore balls with proper positioning and scaling
         this.balls = ballStates.map(state => {
+            const newRadius = state.relRadius * this.container.radius;
             const newX = this.container.x + (state.relX * this.container.radius);
             const newY = this.container.y + (state.relY * this.container.radius);
-            
-            let scaledDx = state.dx;
-            let scaledDy = state.dy;
-            
-            if (this.previousContainerRadius > 0) {
-                const sizeRatio = this.container.radius / this.previousContainerRadius;
-                // Can apply scaling to velocity if needed
-            }
+            const newDx = state.relDx * this.container.radius;
+            const newDy = state.relDy * this.container.radius;
             
             return {
                 x: newX,
                 y: newY,
-                radius: state.radius,
-                mass: state.mass,
-                dx: scaledDx,
-                dy: scaledDy,
+                radius: newRadius,
+                mass: newRadius * newRadius * Math.PI, // Recalculate mass based on new radius
+                dx: newDx,
+                dy: newDy,
                 color: state.color
             };
         });
+        
+        // Force a redraw
+        if (this.isRunning) {
+            this.draw();
+        }
+    }
+    
+    // Draw a single frame without animation
+    draw() {
+        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        this.drawContainer();
+        this.balls.forEach(ball => this.drawBall(ball));
     }
     
     // Start the animation
@@ -285,9 +317,18 @@ class CircleBoard {
     
     // Initialize and start the simulation
     initialize() {
-        this.resizeCanvas();
+        this.canvas.width = this.canvas.parentElement.clientWidth;
+        this.canvas.height = this.canvas.parentElement.clientHeight;
+        
+        this.calculateScaleFactor();
+        
         this.initContainer();
         this.initBalls();
+        
         this.start();
+        
+        window.addEventListener('resize', () => {
+            this.resizeCanvas();
+        });
     }
 }
