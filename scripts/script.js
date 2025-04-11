@@ -19,6 +19,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const smallBallSpeedMaxSlider = document.getElementById('ballSpeedMax');
     const smallBallSpeedValue = document.getElementById('smallBallSpeedValue');
 
+    const totalSpeedValue = document.getElementById('totalSpeed');
+
     
     // Animation settings
     let ballCount = parseInt(ballCountSlider.value);
@@ -29,6 +31,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let maxBallSpeed = parseInt(smallBallSpeedMaxSlider.value);
     let isRunning = true;
     let animationFrameId;
+    let totalSpeed = 0;
     
     // Create a clearly visible container
     let container = {
@@ -80,6 +83,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 dy: (Math.random() - 0.5) * speed,
                 color: `rgb(${Math.floor(Math.random() * 255)}, ${Math.floor(Math.random() * 255)}, ${Math.floor(Math.random() * 255)})`
             });
+            totalSpeed+=(balls[balls.length - 1].dx**2 + balls[balls.length - 1].dy**2)**0.5;
         }
     }
     
@@ -119,7 +123,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const dy = ball.y - container.y;
         const distance = Math.sqrt(dx * dx + dy * dy);
         
-        // Check if ball hits container wall (account for the border thickness)
         if (distance + ball.radius > container.radius - container.thickness) {
             // Calculate normal vector from container center to ball center
             const nx = dx / distance;
@@ -137,9 +140,7 @@ document.addEventListener('DOMContentLoaded', () => {
             ball.dx -= 2 * dotProduct * nx;
             ball.dy -= 2 * dotProduct * ny;
             
-            // Add slight damping
-            ball.dx *= 0.98;
-            ball.dy *= 0.98;
+
         }
         
         // Check for collisions with other balls
@@ -173,14 +174,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 // Calculate impulse scalar
                 // For simplicity, assume equal masses
-                const impulse = speedInNormal * 1.8; // 1.8 for bouncier collisions
                 
                 // Apply impulse
-                ball.dx += nx * impulse * 0.5;
-                ball.dy += ny * impulse * 0.5;
-                otherBall.dx -= nx * impulse * 0.5;
-                otherBall.dy -= ny * impulse * 0.5;
-                
+                ball.dx += nx*speedInNormal;
+                ball.dy += ny*speedInNormal;
+                otherBall.dx -= nx*speedInNormal;
+                otherBall.dy -= ny*speedInNormal;
+
                 // Resolve overlap
                 const overlap = minDistance - ballDistance;
                 const moveX = nx * overlap * 0.5;
@@ -196,6 +196,9 @@ document.addEventListener('DOMContentLoaded', () => {
         // Update position
         ball.x += ball.dx;
         ball.y += ball.dy;
+        totalSpeed+=(ball.dx**2 + ball.dy**2)**0.5;
+
+
     }
     
     // Animation loop
@@ -208,14 +211,20 @@ document.addEventListener('DOMContentLoaded', () => {
         drawContainer();
         
         // Update and draw all balls
+        totalSpeed = 0; // Reset total speed for this frame
         balls.forEach((ball, index) => {
             updateBall(ball, index);
             drawBall(ball);
         });
+        setSpeedDisplay();
         
         animationFrameId = window.requestAnimationFrame(animate);
     }
-    
+    function setSpeedDisplay() {
+        totalSpeedValue.textContent = `Total Speed: ${totalSpeed.toFixed(2)}`;
+
+    }
+
     // Resize canvas to fit parent
     function resizeCanvas() {
         canvas.width = canvas.parentElement.clientWidth;
@@ -226,6 +235,8 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // Initialize balls AFTER container is initialized
         initBalls();
+
+        setSpeedDisplay();
     }
     
     // Handle the min and max ball size sliders
@@ -240,6 +251,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         updateBallSizeDisplay();
         initBalls();
+        setSpeedDisplay();
     });
     
     ballSizeMaxSlider.addEventListener('input', () => {
@@ -253,6 +265,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         updateBallSizeDisplay();
         initBalls();
+        setSpeedDisplay();
     });
     
     function updateBallSizeDisplay() {
@@ -275,8 +288,11 @@ document.addEventListener('DOMContentLoaded', () => {
             maxBallSpeed = minBallSpeed;
             smallBallSpeedMaxSlider.value = minBallSpeed;
         }
+        smallBallSpeedValue.textContent = `${minBallSpeed}-${maxBallSpeed}`;
+
         updateBallSpeedDisplay();
         initBalls();
+        setSpeedDisplay();
     });
     smallBallSpeedMaxSlider.addEventListener('input', () => {
         maxBallSpeed = parseInt(smallBallSpeedMaxSlider.value);
@@ -286,8 +302,10 @@ document.addEventListener('DOMContentLoaded', () => {
             minBallSpeed = maxBallSpeed;
             smallBallSpeedMinSlider.value = maxBallSpeed;
         }
+        smallBallSpeedValue.textContent = `${minBallSpeed}-${maxBallSpeed}`;
         updateBallSpeedDisplay();
         initBalls();
+        setSpeedDisplay();
     });
     function updateBallSpeedDisplay(){
         smallBallSpeedMaxSlider.textContent = `${minBallSize}-${maxBallSize}`;
@@ -309,6 +327,7 @@ document.addEventListener('DOMContentLoaded', () => {
         ballCount = parseInt(ballCountSlider.value);
         ballCountValue.textContent = ballCount;
         initBalls();
+        setSpeedDisplay();
     });
     
     largeBallSize.addEventListener('input', () => {
@@ -316,6 +335,7 @@ document.addEventListener('DOMContentLoaded', () => {
         largeBallSizeValue.textContent = minDimension;
         initContainer();
         initBalls();
+        setSpeedDisplay();
     });
     
     toggleAnimationButton.addEventListener('click', () => {
