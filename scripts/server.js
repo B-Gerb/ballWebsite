@@ -26,9 +26,6 @@ class Server {
             shopBalanceDisplay: document.getElementById('shopBalance')
         };
         
-        
-        
-        
         // Initialize the values from DOM elements if they exist
         this.initializeFromDOM();
         
@@ -65,8 +62,6 @@ class Server {
     
     // Set up all event listeners
     setupEventListeners() {
-        
-        
         // Toggle animation button
         if (this.elements.toggleAnimationButton) {
             this.elements.toggleAnimationButton.addEventListener('click', () => {
@@ -88,9 +83,6 @@ class Server {
             this.updateBalanceDisplay();
         };
     }
-    
-
-    
     
     // Update the energy display
     updateEnergyDisplay() {
@@ -174,7 +166,7 @@ class Server {
                 if (this.elements.smallBallSpeedMaxSlider) {
                     this.elements.smallBallSpeedMaxSlider.value = this.circleBoard.maxBallSpeed;
                 }
-                if( this.elements.smallBallSpeedValue) {
+                if(this.elements.smallBallSpeedValue) {
                     this.elements.smallBallSpeedValue.textContent = this.circleBoard.maxBallSpeed;
                 }
                 break;
@@ -197,7 +189,6 @@ class Server {
     
     // Save game state to localStorage
     saveGameState() {
-        console.log(this.circleBoard.container.x, this.circleBoard.container.y);
         const gameState = {
             circleBoard: {
                 ballCount: this.circleBoard.ballCount,
@@ -208,7 +199,7 @@ class Server {
                 maxBallSpeed: this.circleBoard.maxBallSpeed,
                 totalEnergy: this.circleBoard.totalEnergy,
                 balls: this.circleBoard.balls.map(ball => ({
-                    size: ball.radius,  // Using radius as size
+                    size: ball.radius,
                     position: {
                         x: ball.x,
                         y: ball.y
@@ -220,19 +211,14 @@ class Server {
                     color: ball.color,
                     mass: ball.mass
                 })),
-                rng: this.circleBoard.rng,
                 container: {
                     x: this.circleBoard.container.x,
                     y: this.circleBoard.container.y,
                     radius: this.circleBoard.container.radius,
-                    thickness : this.circleBoard.container.thickness,
+                    thickness: this.circleBoard.container.thickness,
                     color: this.circleBoard.container.color,
-                    borderColor: this.circleBoard.container.borderColor,
-
-                },
-
-
-
+                    borderColor: this.circleBoard.container.borderColor
+                }
             },
             shop: {
                 balance: this.shop.balance,
@@ -269,19 +255,35 @@ class Server {
                 this.circleBoard.minBallSpeed = gameState.circleBoard.minBallSpeed || this.circleBoard.minBallSpeed;
                 this.circleBoard.maxBallSpeed = gameState.circleBoard.maxBallSpeed || this.circleBoard.maxBallSpeed;
                 this.circleBoard.totalEnergy = gameState.circleBoard.totalEnergy || this.circleBoard.totalEnergy;
-                this.circleBoard.balls = gameState.circleBoard.balls.map(ballData => ({
-                    x: ballData.position.x,
-                    y: ballData.position.y,
-                    radius: ballData.size,
-                    mass: ballData.mass,
-                    dx: ballData.velocity.x,
-                    dy: ballData.velocity.y,
-                    color: ballData.color
                 
-                })),
-                this.circleBoard.rng = gameState.circleBoard.rng || this.circleBoard.rng;
-                this.circleBoard.container = gameState.circleBoard.container || this.circleBoard.container;
-
+                // Initialize container first
+                this.circleBoard.canvas.width = this.circleBoard.canvas.parentElement.clientWidth;
+                this.circleBoard.canvas.height = this.circleBoard.canvas.parentElement.clientHeight;
+                this.circleBoard.calculateScaleFactor();
+                this.circleBoard.initContainer();
+                
+                // Load container properties if they exist
+                if (gameState.circleBoard.container) {
+                    // Only override specific container properties, keeping the initialized structure
+                    this.circleBoard.container.color = gameState.circleBoard.container.color || this.circleBoard.container.color;
+                    this.circleBoard.container.borderColor = gameState.circleBoard.container.borderColor || this.circleBoard.container.borderColor;
+                }
+                
+                // Load balls properly
+                if (gameState.circleBoard.balls && Array.isArray(gameState.circleBoard.balls)) {
+                    this.circleBoard.balls = gameState.circleBoard.balls.map(ballData => ({
+                        x: ballData.position.x,
+                        y: ballData.position.y,
+                        radius: ballData.size,
+                        mass: ballData.mass,
+                        dx: ballData.velocity.x,
+                        dy: ballData.velocity.y,
+                        color: ballData.color
+                    }));
+                } else {
+                    // If no saved balls, initialize them
+                    this.circleBoard.initBalls();
+                }
                 
                 // Update UI sliders
                 if (this.elements.ballCountSlider) {
@@ -307,10 +309,15 @@ class Server {
                 if (this.elements.ballCountValue) {
                     this.elements.ballCountValue.textContent = this.circleBoard.ballCount;
                 }
+                if (this.elements.ballSizeValue) {
+                    this.elements.ballSizeValue.textContent = `${this.circleBoard.minBallSize} - ${this.circleBoard.maxBallSize}`;
+                }
                 if (this.elements.largeBallSizeValue) {
                     this.elements.largeBallSizeValue.textContent = this.circleBoard.minDimension;
                 }
-                
+                if (this.elements.smallBallSpeedValue) {
+                    this.elements.smallBallSpeedValue.textContent = `${this.circleBoard.minBallSpeed} - ${this.circleBoard.maxBallSpeed}`;
+                }
             }
             
             // Load Shop state
@@ -330,6 +337,7 @@ class Server {
                 this.updateBalanceDisplay();
             }
             
+            // Start animation
             this.circleBoard.start();
             
             console.log('Game state loaded successfully');
