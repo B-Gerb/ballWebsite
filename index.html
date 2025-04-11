@@ -1,5 +1,9 @@
 <!DOCTYPE html>
 <html lang="en">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/seedrandom/3.0.5/seedrandom.min.js"></script>
+<script src="scripts/circleboard.js"></script>
+<script src="scripts/shop.js"></script>
+<script src="scripts/server.js"></script>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -10,7 +14,7 @@
     <div class="stats">
         <h3>Total amount of speed of small balls</h3>
         <div class="stat">
-            <label for="totalBallSpeed"> Total speed of balls: <span id="totalSpeed">0</span></label>
+            <label for="totalBallEnergy"> Total energy of balls: <span id="totalBallEnergy">0</span></label>
         </div>
     </div>
     <div class="container">
@@ -85,7 +89,7 @@
 
 
             <div class = "control-group">
-                <label for="largeBallMin">Large Ball Size: <span id="largeBallSizeValue">100</span></label>
+                <label for="largeBallMin">Large Ball Size: <span id="largeBallSizeValue">500</span></label>
                 <input 
                     type="range" 
                     id="largeBallMin" 
