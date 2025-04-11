@@ -1,0 +1,18 @@
+{
+    "name": "bouncing-balls",
+    "version": "1.0.0",
+    "description": "A website that displays bouncing balls inside larger balls",
+    "main": "server.js",
+    "scripts": {
+        "start": "node server.js"
+    },
+    "keywords": [
+        "animation",
+        "canvas",
+        "javascript"
+    ],
+    "author": "me",
+    "dependencies": {
+        "express": "^4.21.2"
+    }
+}

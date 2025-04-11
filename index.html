@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bouncing Balls Inside Circle</title>
+    <link rel="stylesheet" href="styles/style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Bouncing Balls Inside Circle</h1>
+        
+        <div class="canvas-container">
+            <canvas id="bouncingBallsCanvas"></canvas>
+        </div>
+        
+        <div class="controls">
+            <div class="control-group">
+                <label for="ballCount">Number of Balls: <span id="ballCountValue">20</span></label>
+                <input 
+                    type="range" 
+                    id="ballCount" 
+                    min="1" 
+                    max="100" 
+                    value="20"
+                    class="slider"
+                >
+            </div>
+            
+
+            <div class="control-group">
+                <button id="toggleAnimation" class="button">Pause</button>
+            </div>
+            <div class="control-group">
+                <label for="ballSizeMin">Ball Size Range: <span id="ballSizeValue">5-15</span></label>
+                <div class="range-slider-container">
+                    <input 
+                        type="range" 
+                        id="ballSizeMin" 
+                        min="5" 
+                        max="50" 
+                        value="5"
+                        class="slider min-slider"
+                    >
+                    <input 
+                        type="range" 
+                        id="ballSizeMax" 
+                        min="5" 
+                        max="50" 
+                        value="15"
+                        class="slider max-slider"
+                    >
+                    <div class="range-slider-track"></div>
+                </div>
+            </div>
+
+
+            <div class = "control-group">
+                <label for="largeBallMin">Large Ball Size: <span id="largeBallSizeValue">100</span></label>
+                <input 
+                    type="range" 
+                    id="largeBallMin" 
+                    min="100" 
+                    max="1000" 
+                    value="100"
+                    class="slider"
+                >
+            
+            </div>
+
+            </div>
+        </div>
+    </div>
+    
+    <script src="scripts/script.js"></script>
+</body>
+</html>
