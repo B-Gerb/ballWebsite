@@ -110,9 +110,7 @@ function popUps(contents, isClass = false, spot, backDrop = true) {
             });
             document.body.appendChild(backDropElement); 
         }
-        document.body.appendChild(popUp); 
-        return popUp;
-       
+        document.body.appendChild(popUp);        
     }
 
 }
@@ -454,33 +452,36 @@ class Server {
     // Reset the game state
     resetGameState() {
         // Reset CircleBoard
-        this.circleBoard.ballCount = 1;
-        this.circleBoard.baseMinBallSize = 5;
-        this.circleBoard.baseMaxBallSize = 15;
-        this.circleBoard.baseReferenceSize = 750;
-        this.circleBoard.baseMinBallSpeed = 5;
-        this.circleBoard.baseMaxBallSpeed = 15;
+        localStorage.removeItem('circleBoardGameState');
+        this.circleBoard = new CircleBoard(this.circleBoard.canvas.id);
+        this.shop   = new Shop();
+        // this.circleBoard.ballCount = 1;
+        // this.circleBoard.baseMinBallSize = 5;
+        // this.circleBoard.baseMaxBallSize = 15;
+        // this.circleBoard.baseReferenceSize = 750;
+        // this.circleBoard.baseMinBallSpeed = 5;
+        // this.circleBoard.baseMaxBallSpeed = 15;
         
         // Update scaled properties
         this.circleBoard.calculateScaleFactor();
         
         // Reset Shop
-        this.shop.balance = 0;
-        this.shop.items.forEach(item => {
-            item.level = 1;
-            item.price = item.name === "Add Ball" ? 1 : 
-                        (item.name.includes("Ball Size") ? 20 : 
-                        (item.name.includes("Ball Speed") ? 30 : 50));
-        });
+        // this.shop.balance = 0;
+        // this.shop.items.forEach(item => {
+        //     item.level = 1;
+        //     item.price = item.name === "Add Ball" ? 1 : 
+        //                 (item.name.includes("Ball Size") ? 20 : 
+        //                 (item.name.includes("Ball Speed") ? 30 : 50));
+        // });
         
         this.updateBalanceDisplay();
+        this.setupShopUI();
         
         // Reinitialize
         this.circleBoard.initContainer();
         this.circleBoard.initBalls();
         
         // Remove from localStorage
-        localStorage.removeItem('circleBoardGameState');
         
         console.log('Game state reset successfully');
     }
