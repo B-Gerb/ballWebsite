@@ -1,3 +1,121 @@
+//if class draws pop up in spot based on class.draw
+//if not a class draws pop up contents will contains a dictionary
+/*
+contents {
+    message
+    buttons: [
+        button1: function(){}
+        button2: function(){}
+    ]
+}
+
+*/
+function popUps(contents, isClass = false, spot, backDrop = true) {
+    if(!isClass){
+        const popUp = document.createElement('div');
+        popUp.className = 'pop-up';
+
+        const backDropElement = document.createElement('div');
+        backDropElement.className = 'backdrop';
+                
+        const message = document.createElement('p');
+        message.textContent = contents.message;
+        message.style.fontSize = '16px';
+        message.style.margin = '0';
+        message.style.padding = '10px';
+        popUp.appendChild(message);
+
+        const buttons = document.createElement('div');
+        buttons.className = 'buttons';
+        contents.buttons.forEach((button) => {
+            const buttonText = button.text;
+            const buttonFunction = button.function;
+
+            const buttonElement = document.createElement('button');
+            buttonElement.textContent = buttonText;
+            buttonElement.className = 'pop-up-button';
+            buttonElement.addEventListener('click', () => {
+                buttonFunction();
+                document.body.removeChild(popUp);
+                if(backDrop){
+                    document.body.removeChild(backDropElement);
+                }
+            } );
+            buttonElement.style.margin = '5px';
+            buttons.appendChild(buttonElement);
+        })
+        popUp.appendChild(buttons);
+
+        // check if it exists
+        if (spot) {
+            // If spot is an element, position near it
+            if (spot instanceof HTMLElement) {
+                const rect = spot.getBoundingClientRect();
+                popUp.style.top = `${rect.bottom + 10}px`;
+                popUp.style.left = `${rect.left}px`;
+            }
+            // If spot is an object with x,y coordinates
+            else if (typeof spot === 'object' && 'x' in spot && 'y' in spot) {
+                popUp.style.top = `${spot.y}px`;
+                popUp.style.left = `${spot.x}px`;
+            }
+            // If spot is a string describing position
+            else if (typeof spot === 'string') {
+                switch (spot.toLowerCase()) {
+                    case 'center':
+                        popUp.style.top = '50%';
+                        popUp.style.left = '50%';
+                        popUp.style.transform = 'translate(-50%, -50%)';
+                        break;
+                    case 'top':
+                        popUp.style.top = '20px';
+                        popUp.style.left = '50%';
+                        popUp.style.transform = 'translateX(-50%)';
+                        break;
+                    case 'bottom':
+                        popUp.style.bottom = '20px';
+                        popUp.style.left = '50%';
+                        popUp.style.transform = 'translateX(-50%)';
+                        break;
+                    case 'left':   
+                        popUp.style.top = '50%';
+                        popUp.style.left = '20px';
+                        popUp.style.transform = 'translateY(-50%)';
+                        break;
+                    case 'right':
+                        popUp.style.top = '50%';
+                        popUp.style.right = '20px';
+                        popUp.style.transform = 'translateY(-50%)';
+                        break;
+                    default:
+                        popUp.style.top = '50%';
+                        popUp.style.left = '50%';
+                        popUp.style.transform = 'translate(-50%, -50%)';
+                        break;
+                    }
+                    
+            }
+        } 
+        
+        // Default to center if no position specified
+        else {
+            popUp.style.top = '50%';
+            popUp.style.left = '50%';
+            popUp.style.transform = 'translate(-50%, -50%)';
+        }
+        if(backDrop){
+            backDropElement.addEventListener('click', () => {
+                document.body.removeChild(backDropElement);
+                document.body.removeChild(popUp);
+            });
+            document.body.appendChild(backDropElement); 
+        }
+        document.body.appendChild(popUp); 
+        return popUp;
+       
+    }
+
+}
 class Server {
     constructor(canvasId) {
         // Create instances of the CircleBoard and Shop
@@ -12,12 +130,63 @@ class Server {
             shopBalanceDisplay: document.getElementById('shopBalance'),
             
             // Container
-            shopContainer: document.getElementById('shopContainer')
+            shopContainer: document.getElementById('shopContainer'),
+
+            pauseButton: document.getElementById('pauseButton'),
+            resetButton: document.getElementById('resetButton'),
+            saveButton: document.getElementById('saveButton'),
+
         };
         
         // Initialize the event listeners
         this.setupEventListeners();
     }
+
+
+    // Setup event listeners for pause reset and save
+    setupMenuButtons() {
+        
+        if (this.elements.pauseButton) {
+            this.elements.pauseButton.addEventListener('click', () => {
+                console.log("pauseButton")
+                const isRun = this.circleBoard.toggleAnimation();
+                const buttonText = isRun ? 'Pause' : 'Resume';
+                this.elements.pauseButton.textContent = buttonText;
+            });
+        }
+        if (this.elements.resetButton) {
+            this.elements.resetButton.addEventListener('click', () => {
+
+                popUps({
+                    message: 'Are you sure you want to reset the game?',
+                    buttons: [
+                        {
+                            text: 'Yes',
+                            function: () => {
+                                this.resetGameState();
+                                this.shop.resetShop();
+                            }
+                        },
+                        {
+                            text: 'No',
+                            function: () => {
+                            }
+                        }
+                    ]
+                }, false, 'center', true);
+
+
+            });
+        }
+
+        if (this.elements.saveButton) {
+            this.elements.saveButton.addEventListener('click', () => {
+                this.saveGameState();
+            });
+        }
+
+    }
+
     
     // Set up all event listeners
     setupEventListeners() {
@@ -28,6 +197,8 @@ class Server {
         
         const originalAnimate = this.circleBoard.animate;
         this.circleBoard.animate = (shop) => {
+            if (!this.circleBoard.isRunning) return;
+
             originalAnimate.call(this.circleBoard, this.shop);
             
             this.updateCollisionDisplay();
@@ -92,27 +263,6 @@ class Server {
             
             shopContainer.appendChild(button);
         });
-        
-        // Add reset button
-        const resetButton = document.createElement('button');
-        resetButton.textContent = 'Reset Game';
-        resetButton.className = 'reset-button';
-        resetButton.addEventListener('click', () => {
-            if (confirm('Are you sure you want to reset the game? This will erase all progress.')) {
-                this.resetGameState();
-                
-                // Update shop buttons
-                this.shop.items.forEach(item => {
-                    const levelSpan = document.querySelector(`#${item.name.replace(/\s+/g, '-')}-level`);
-                    const costSpan = document.querySelector(`#${item.name.replace(/\s+/g, '-')}-cost`);
-                    
-                    if (levelSpan) levelSpan.textContent = item.level;
-                    if (costSpan) costSpan.textContent = item.price.toFixed(2);
-                });
-            }
-        });
-        
-        shopContainer.appendChild(resetButton);
     }
     
     // Buy an item from the shop
@@ -288,7 +438,7 @@ class Server {
                 
                 this.updateBalanceDisplay();
                 this.setupShopUI();
-                }
+            }
             
             // Start animation
             this.circleBoard.start();
@@ -339,6 +489,7 @@ class Server {
     initialize() {
         // Setup the shop UI
         this.setupShopUI();
+        this.setupMenuButtons();
         
         // Try to load saved state
         if (!this.loadGameState()) {
