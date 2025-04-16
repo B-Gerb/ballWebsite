@@ -17,14 +17,14 @@ class screenFullShop extends AShop {
                 getValue: function() { return this.level == 1 ? 1 : (1 + (this.level/4))**1.25; }
             },
             {
-                name: "Square Value Percent Increase",
+                name: "Triangle Value Percent Increase",
                 price: 5,
                 level: 1,
                 equation: price => price * 1.2 + 1,
                 getValue: function() { return this.level == 1 ? 1 : (1 + (this.level/5))**1.15; }
             },
             {
-                name: "Triangle Value Percent Increase",
+                name: "Square Value Percent Increase",
                 price: 10,
                 level: 1,
                 equation: price => price * 1.25 + 1,
