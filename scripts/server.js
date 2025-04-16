@@ -118,7 +118,7 @@ class Server {
     constructor(canvasId) {
         // Create instances of the CircleBoard and Shop
         this.circleBoard = new CircleBoard(canvasId);
-        this.shop = new Shop();
+        this.baseUpgradeShop = new baseUpgradeShop();
         
         // DOM elements
         this.elements = {
@@ -162,7 +162,7 @@ class Server {
                             text: 'Yes',
                             function: () => {
                                 this.resetGameState();
-                                this.shop.resetShop();
+                                this.baseUpgradeShop.resetShop();
                             }
                         },
                         {
@@ -194,10 +194,10 @@ class Server {
         });
         
         const originalAnimate = this.circleBoard.animate;
-        this.circleBoard.animate = (shop) => {
+        this.circleBoard.animate = (baseUpgradeShop) => {
             if (!this.circleBoard.isRunning) return;
 
-            originalAnimate.call(this.circleBoard, this.shop);
+            originalAnimate.call(this.circleBoard, this.baseUpgradeShop);
             
             this.updateCollisionDisplay();
             this.updateBalanceDisplay();
@@ -217,7 +217,7 @@ class Server {
     // Update the balance display
     updateBalanceDisplay() {
         if (this.elements.shopBalanceDisplay) {
-            this.elements.shopBalanceDisplay.textContent = this.shop.balance.toFixed(2);
+            this.elements.shopBalanceDisplay.textContent = this.baseUpgradeShop.balance.toFixed(2);
         }
     }
     
@@ -234,7 +234,7 @@ class Server {
         shopContainer.innerHTML = '';
         
         // Add shop items
-        this.shop.items.forEach(item => {
+        this.baseUpgradeShop.items.forEach(item => {
             const button = document.createElement('button');
             button.className = 'shop-item-button';
             button.innerHTML = `
@@ -255,7 +255,7 @@ class Server {
                     if (costSpan) costSpan.textContent = item.price.toFixed(2);
                 } else {
                     // Show message if not enough balance
-                    alert(`Not enough balance to buy ${item.name}. Need ${this.shop.itemCost(item, 1)[0].toFixed(2)}, have ${this.shop.balance.toFixed(2)}`);
+                    alert(`Not enough balance to buy ${item.name}. Need ${this.baseUpgradeShop.itemCost(item, 1)[0].toFixed(2)}, have ${this.baseUpgradeShop.balance.toFixed(2)}`);
                 }
             });
             
@@ -265,14 +265,14 @@ class Server {
     
     // Buy an item from the shop
     buyItem(itemName, amount = 1) {
-        const item = this.shop.getItem(itemName);
+        const item = this.baseUpgradeShop.getItem(itemName);
         
         if (!item) {
             console.error(`Item ${itemName} not found`);
             return false;
         }
         
-        const success = this.shop.buyItem(item, amount);
+        const success = this.baseUpgradeShop.buyItem(item, amount);
         
         if (success) {
             this.applyItemEffect(item);
@@ -352,8 +352,8 @@ class Server {
                 }
             },
             shop: {
-                balance: this.shop.balance,
-                items: this.shop.items.map(item => ({
+                balance: this.baseUpgradeShop.balance,
+                items: this.baseUpgradeShop.items.map(item => ({
                     name: item.name,
                     price: item.price,
                     level: item.level
@@ -420,13 +420,12 @@ class Server {
          
             // Load Shop state
             if ("shop" in gameState) {
-
                 
-                this.shop.balance = gameState.shop.balance || 0;
+                this.baseUpgradeShop.balance = gameState.shop.balance || 0;
                 
                 if (gameState.shop.items && Array.isArray(gameState.shop.items)) {
                     gameState.shop.items.forEach(savedItem => {
-                        const item = this.shop.getItem(savedItem.name);
+                        const item = this.baseUpgradeShop.getItem(savedItem.name);
                         if (item) {
                             item.price = savedItem.price;
                             item.level = savedItem.level;

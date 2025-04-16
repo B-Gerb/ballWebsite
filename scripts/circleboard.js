@@ -174,6 +174,9 @@ class CircleBoard {
         const dx = ball.x - this.container.x;
         const dy = ball.y - this.container.y;
         const distance = Math.sqrt(dx * dx + dy * dy);
+        let ballHitWall = 0;
+        let triangleHitObject = 0;
+        let squareHit = 0;
         
         // Handle container collision
         if (distance + ball.radius > this.container.radius - this.container.thickness) {
