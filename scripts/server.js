@@ -207,10 +207,10 @@ class Server {
     // Update the collision display
     updateCollisionDisplay() {
         if (this.elements.offWallB) {
-            this.elements.offWallB.textContent = this.circleBoard.wallHitsPerSecond.toFixed(2);
+            this.elements.offWallB.textContent = this.circleBoard.getWallHitsPerSecond().toFixed(2);
         }
         if (this.elements.offBallB) {
-            this.elements.offBallB.textContent = this.circleBoard.ballCollisionsPerSecond.toFixed(2);
+            this.elements.offBallB.textContent = this.circleBoard.getBallHitsPerSecond().toFixed(2);
         }
     }
     

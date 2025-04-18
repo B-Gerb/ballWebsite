@@ -18,10 +18,9 @@ class CircleBoard {
         // Collision tracking
         this.wallHits = 0;
         this.ballCollisions = 0;
-        this.wallHitsPerSecond = 0;
-        this.ballCollisionsPerSecond = 0;
-        this.lastCounterReset = Date.now();
-        this.counterResetInterval = 1000; // Reset counters every 1 second
+        this.wallHitsStack = []
+        this.ballCollisionsStack = [];
+
         
         // Scaled properties
         this.minBallSize = this.baseMinBallSize;
@@ -125,17 +124,11 @@ class CircleBoard {
     
     // Reset collision counters and calculate rates
     resetCollisionCounters() {
-        const now = Date.now();
-        const timeDelta = (now - this.lastCounterReset) / 1000; // Convert to seconds
-        
-        if (timeDelta > 0) {
-            this.wallHitsPerSecond = this.wallHits / timeDelta;
-            this.ballCollisionsPerSecond = this.ballCollisions / timeDelta;
-        }
         
         this.wallHits = 0;
         this.ballCollisions = 0;
-        this.lastCounterReset = now;
+        this.wallHitsStack = [];
+        this.ballCollisionsStack = [];
     }
     
     // Draw the container
@@ -169,7 +162,7 @@ class CircleBoard {
     
     //claude helped with physics
     // Update ball positions and handle collisions
-    updateBall(ball, index, shop) {
+    updateBall(ball, index, shop, totalWallHits, totalBallCollisions) {
         // Calculate distance from ball center to container center
         const dx = ball.x - this.container.x;
         const dy = ball.y - this.container.y;
@@ -177,11 +170,13 @@ class CircleBoard {
         let ballHitWall = 0;
         let triangleHitObject = 0;
         let squareHit = 0;
+
+
         
         // Handle container collision
         if (distance + ball.radius > this.container.radius - this.container.thickness) {
             // Increment wall hit counter
-            this.wallHits++;
+            totalWallHits++;
             
             if (shop && typeof shop.addBalance === 'function') {
                 shop.addBalance(1); // Add 1 to balance for each collision with the container
@@ -216,7 +211,7 @@ class CircleBoard {
             if (ballDistance < minDistance) {
                 // Increment ball collision counter (once per collision pair)
                 if (i > index) {
-                    this.ballCollisions++;
+                    totalBallCollisions++;
                 }
                 
                 // Calculate normal vector
@@ -252,6 +247,7 @@ class CircleBoard {
         
         ball.x += ball.dx;
         ball.y += ball.dy;
+        return [totalWallHits, totalBallCollisions];
     }
     
     animate(shop) {
@@ -269,10 +265,30 @@ class CircleBoard {
         this.drawContainer();
         
         // Update and draw all balls
+        let totalWallHits = 0;
+        let totalBallCollisions = 0;
         this.balls.forEach((ball, index) => {
-            this.updateBall(ball, index, shop);
+            let values = this.updateBall(ball, index, shop, totalWallHits, totalBallCollisions);
+            totalWallHits = values[0];
+            totalBallCollisions = values[1];
             this.drawBall(ball);
         });
+
+        if (this.wallHitsStack.length >= 120) {
+            let old = this.wallHitsStack.shift(); 
+            this.wallHits -= old; 
+        }
+        this.wallHitsStack.push(totalWallHits);
+        this.wallHits += totalWallHits
+
+        if(this.ballCollisionsStack.length >= 120) {
+            let old = this.ballCollisionsStack.shift();
+            this.ballCollisions -= old;
+        }
+        this.ballCollisionsStack.push(totalBallCollisions);
+        this.ballCollisions += totalBallCollisions
+
+        
         
 
         
@@ -349,8 +365,8 @@ class CircleBoard {
         // Draw collision rates on canvas
         this.ctx.font = '14px Arial';
         this.ctx.fillStyle = '#000';
-        this.ctx.fillText(`Wall hits/sec: ${this.wallHitsPerSecond.toFixed(1)}`, 10, 20);
-        this.ctx.fillText(`Ball collisions/sec: ${this.ballCollisionsPerSecond.toFixed(1)}`, 10, 40);
+        this.ctx.fillText(`Wall hits/sec: ${this.getWallHitsPerSecond().toFixed(2)}`, 10, 20);
+        this.ctx.fillText(`Ball collisions/sec: ${this.getBallHitsPerSecond().toFixed(2)}`, 10, 40);
     }
     
     // Start the animation
@@ -379,12 +395,12 @@ class CircleBoard {
     
     // Get the current wall hits per second
     getWallHitsPerSecond() {
-        return this.wallHitsPerSecond;
+        return (this.wallHits/this.wallHitsStack.length)*60;
     }
     
     // Get the current ball collisions per second
-    getBallCollisionsPerSecond() {
-        return this.ballCollisionsPerSecond;
+    getBallHitsPerSecond() {
+        return (this.ballCollisions/this.ballCollisionsStack.length)*60;
     }
     
     // Initialize and start the simulation
