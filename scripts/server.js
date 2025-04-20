@@ -384,7 +384,6 @@ class Server {
                 this.circleBoard.baseReferenceSize = gameState.circleBoard.baseReferenceSize || this.circleBoard.baseReferenceSize;
                 this.circleBoard.baseMinBallSpeed = gameState.circleBoard.baseMinBallSpeed || this.circleBoard.baseMinBallSpeed;
                 this.circleBoard.baseMaxBallSpeed = gameState.circleBoard.baseMaxBallSpeed || this.circleBoard.baseMaxBallSpeed;
-                
                 this.circleBoard.canvas.width = this.circleBoard.canvas.parentElement.clientWidth;
                 this.circleBoard.canvas.height = this.circleBoard.canvas.parentElement.clientHeight;
                 this.circleBoard.calculateScaleFactor();
@@ -409,7 +408,10 @@ class Server {
                             dx: ballData.velocity.x,
                             dy: ballData.velocity.y,
                             color: ballData.color,
-                            baseRadius: baseRadius
+                            baseRadius: baseRadius,
+                            collisionCount: 0 
+
+
                         };
                     });
                 } else {
@@ -438,7 +440,10 @@ class Server {
             }
             
             // Start animation
+
+            console.log(this.circleBoard.balls);
             this.circleBoard.start();
+
             
             console.log('Game state loaded successfully');
             return true;
@@ -453,7 +458,7 @@ class Server {
         // Reset CircleBoard
         localStorage.removeItem('circleBoardGameState');
         this.circleBoard = new CircleBoard(this.circleBoard.canvas.id);
-        this.shop   = new Shop();
+        this.baseUpgradeShop.resetShop();
         // this.circleBoard.ballCount = 1;
         // this.circleBoard.baseMinBallSize = 5;
         // this.circleBoard.baseMaxBallSize = 15;
@@ -464,15 +469,7 @@ class Server {
         // Update scaled properties
         this.circleBoard.calculateScaleFactor();
         
-        // Reset Shop
-        // this.shop.balance = 0;
-        // this.shop.items.forEach(item => {
-        //     item.level = 1;
-        //     item.price = item.name === "Add Ball" ? 1 : 
-        //                 (item.name.includes("Ball Size") ? 20 : 
-        //                 (item.name.includes("Ball Speed") ? 30 : 50));
-        // });
-        
+
         this.updateBalanceDisplay();
         this.setupShopUI();
         
@@ -500,7 +497,7 @@ class Server {
         // Update displays
         this.updateCollisionDisplay();
         this.updateBalanceDisplay();
-        
+        this.circleBoard.createPossibleCollisions();
         // Force a redraw after a short delay to ensure everything is rendered
         setTimeout(() => {
             this.circleBoard.drawContainer();
