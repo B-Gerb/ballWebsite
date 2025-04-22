@@ -14,22 +14,36 @@ class CollisionPriorityQueue {
         if (event.objectB) {
             event.countB = event.objectB.collisionCount;
         }
-        this.queue.push(event);
-        this.queue.sort((a, b) => a.time - b.time);
-    }
+        
+        let left = 0;
+        let right = this.queue.length - 1;
+        
+        while (left <= right) {
+            const mid = Math.floor((left + right) / 2);
+            if (this.queue[mid].time < event.time) {
+                left = mid + 1;
+            } else {
+                right = mid - 1;
+            }
+        }
+        
+        this.queue.splice(left, 0, event);
+    }c
     
     /**
      * Get the next collision event
      */
-    dequeue() {
+    dequeue(time) {
         if (this.queue.length === 0) return null;
         
-        const event = this.queue[0];
-        if (event.objectA.collisionCount !== event.countA ||
-            (event.objectB && event.objectB.collisionCount !== event.countB)) {
-            this.queue.shift(); 
-            return this.dequeue(); 
+        let event = this.queue[0];
+        while (this.queue.length > 0 && time >= this.getNextCollisionTime() && (event.objectA.collisionCount !== event.countA ||
+            (event.objectB && event.objectB.collisionCount !== event.countB))) {
+            event = this.queue.shift(); 
+            
         }
+        if (this.queue.length === 0 || this.getNextCollisionTime()  <= time) return null;
+
         return this.queue.shift();
     }
 
@@ -313,17 +327,11 @@ class CircleBoard {
         return Infinity;
     }
     
-    // Delete events involving a specific ball
-    removeBallEvents(ball) {
-        this.pq.queue = this.pq.queue.filter(event => 
-            event.objectA !== ball && event.objectB !== ball
-        );
-    }
+
     
     // Predict all possible collisions for a ball
     predictCollisions(ball) {
         // Remove any existing collision events involving this ball
-        this.removeBallEvents(ball);
         
         // Check for collisions with other balls
         this.balls.forEach(otherBall => {
@@ -469,7 +477,7 @@ class CircleBoard {
         let totalBallCollisions = 0;
         
         // Maximum number of collisions to process per frame to prevent infinite loops
-        const maxCollisionsPerFrame = 200;
+        const maxCollisionsPerFrame = 50;
         let collisionsProcessed = 0;
         
         // Process all collisions scheduled for this frame
@@ -477,7 +485,8 @@ class CircleBoard {
               this.pq.getNextCollisionTime() <= this.counter + 1 && 
               collisionsProcessed < maxCollisionsPerFrame) {
             
-            const event = this.pq.dequeue();
+            const event = this.pq.dequeue(this.counter + 1);
+    
             if (!event) break;
             
             // Validate that collision counts match
