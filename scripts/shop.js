@@ -48,9 +48,8 @@ class baseUpgradeShop extends AShop {
     }
 
     resetShop() {
-
         this.balance = 0.00;
-        
+
         // Reset all items to their initial state
         this.items.forEach(item => {
             // Reset price based on item name
@@ -59,7 +58,8 @@ class baseUpgradeShop extends AShop {
                         (item.name.includes("Ball Speed") ? 30 : 50));
             item.level = 1;
         });
-        
+        console.log(this.balance);
+
     }
 
     

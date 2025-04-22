@@ -1,119 +1,3 @@
-//if class draws pop up in spot based on class.draw
-//if not a class draws pop up contents will contains a dictionary
-/*
-contents {
-    message
-    buttons: [
-        button1: function(){}
-        button2: function(){}
-    ]
-}
-
-*/
-function popUps(contents, isClass = false, spot, backDrop = true) {
-    if(!isClass){
-        const popUp = document.createElement('div');
-        popUp.className = 'pop-up';
-
-        const backDropElement = document.createElement('div');
-        backDropElement.className = 'backdrop';
-                
-        const message = document.createElement('p');
-        message.textContent = contents.message;
-        message.style.fontSize = '16px';
-        message.style.margin = '0';
-        message.style.padding = '10px';
-        popUp.appendChild(message);
-
-        const buttons = document.createElement('div');
-        buttons.className = 'buttons';
-        contents.buttons.forEach((button) => {
-            const buttonText = button.text;
-            const buttonFunction = button.function;
-
-            const buttonElement = document.createElement('button');
-            buttonElement.textContent = buttonText;
-            buttonElement.className = 'pop-up-button';
-            buttonElement.addEventListener('click', () => {
-                buttonFunction();
-                document.body.removeChild(popUp);
-                if(backDrop){
-                    document.body.removeChild(backDropElement);
-                }
-            } );
-            buttonElement.style.margin = '5px';
-            buttons.appendChild(buttonElement);
-        })
-        popUp.appendChild(buttons);
-
-        // check if it exists
-        if (spot) {
-            // If spot is an element, position near it
-            if (spot instanceof HTMLElement) {
-                const rect = spot.getBoundingClientRect();
-                popUp.style.top = `${rect.bottom + 10}px`;
-                popUp.style.left = `${rect.left}px`;
-            }
-            // If spot is an object with x,y coordinates
-            else if (typeof spot === 'object' && 'x' in spot && 'y' in spot) {
-                popUp.style.top = `${spot.y}px`;
-                popUp.style.left = `${spot.x}px`;
-            }
-            // If spot is a string describing position
-            else if (typeof spot === 'string') {
-                switch (spot.toLowerCase()) {
-                    case 'center':
-                        popUp.style.top = '50%';
-                        popUp.style.left = '50%';
-                        popUp.style.transform = 'translate(-50%, -50%)';
-                        break;
-                    case 'top':
-                        popUp.style.top = '20px';
-                        popUp.style.left = '50%';
-                        popUp.style.transform = 'translateX(-50%)';
-                        break;
-                    case 'bottom':
-                        popUp.style.bottom = '20px';
-                        popUp.style.left = '50%';
-                        popUp.style.transform = 'translateX(-50%)';
-                        break;
-                    case 'left':   
-                        popUp.style.top = '50%';
-                        popUp.style.left = '20px';
-                        popUp.style.transform = 'translateY(-50%)';
-                        break;
-                    case 'right':
-                        popUp.style.top = '50%';
-                        popUp.style.right = '20px';
-                        popUp.style.transform = 'translateY(-50%)';
-                        break;
-                    default:
-                        popUp.style.top = '50%';
-                        popUp.style.left = '50%';
-                        popUp.style.transform = 'translate(-50%, -50%)';
-                        break;
-                    }
-                    
-            }
-        } 
-        
-        // Default to center if no position specified
-        else {
-            popUp.style.top = '50%';
-            popUp.style.left = '50%';
-            popUp.style.transform = 'translate(-50%, -50%)';
-        }
-        if(backDrop){
-            backDropElement.addEventListener('click', () => {
-                document.body.removeChild(backDropElement);
-                document.body.removeChild(popUp);
-            });
-            document.body.appendChild(backDropElement); 
-        }
-        document.body.appendChild(popUp);        
-    }
-
-}
 class Server {
     constructor(canvasId) {
         // Create instances of the CircleBoard and Shop
@@ -133,28 +17,31 @@ class Server {
             pauseButton: document.getElementById('pauseButton'),
             resetButton: document.getElementById('resetButton'),
             saveButton: document.getElementById('saveButton'),
-
         };
+        
+        // Animation and physics timing
+        this.animationFrameId = null;
+        this.physicsUpdateInterval = 1000 / 60; // 60 fps
+        this.lastPhysicsUpdate = 0;
+        this.physicsTimerId = null;
         
         // Initialize the event listeners
         this.setupEventListeners();
     }
 
-
-    // Setup event listeners for pause reset and save
+    // Setup event listeners for pause, reset and save
     setupMenuButtons() {
-        
         if (this.elements.pauseButton) {
             this.elements.pauseButton.addEventListener('click', () => {
-                console.log("pauseButton")
-                const isRun = this.circleBoard.toggleAnimation();
+                console.log("pauseButton");
+                const isRun = this.toggleAnimation();
                 const buttonText = isRun ? 'Pause' : 'Resume';
                 this.elements.pauseButton.textContent = buttonText;
             });
         }
+        
         if (this.elements.resetButton) {
             this.elements.resetButton.addEventListener('click', () => {
-
                 popUps({
                     message: 'Are you sure you want to reset the game?',
                     buttons: [
@@ -172,8 +59,6 @@ class Server {
                         }
                     ]
                 }, false, 'center', true);
-
-
             });
         }
 
@@ -182,9 +67,7 @@ class Server {
                 this.saveGameState();
             });
         }
-
     }
-
     
     // Set up all event listeners
     setupEventListeners() {
@@ -192,16 +75,101 @@ class Server {
         window.addEventListener('resize', () => {
             this.circleBoard.resizeCanvas();
         });
+    }
+    
+    // Start animation loop
+    startAnimationLoop() {
+        if (this.animationFrameId) return; // Already running
         
-        const originalAnimate = this.circleBoard.animate;
-        this.circleBoard.animate = (baseUpgradeShop) => {
+        const animate = () => {
             if (!this.circleBoard.isRunning) return;
-
-            originalAnimate.call(this.circleBoard, this.baseUpgradeShop);
             
-            this.updateCollisionDisplay();
-            this.updateBalanceDisplay();
+            // Render the current state
+            this.circleBoard.render();
+            
+            // Continue animation
+            this.animationFrameId = window.requestAnimationFrame(animate);
         };
+        
+        // Start the animation loop
+        this.animationFrameId = window.requestAnimationFrame(animate);
+    }
+    
+    // Stop animation loop
+    stopAnimationLoop() {
+        if (this.animationFrameId) {
+            window.cancelAnimationFrame(this.animationFrameId);
+            this.animationFrameId = null;
+        }
+    }
+    
+    // Start physics update loop
+    startPhysicsLoop() {
+        if (this.physicsTimerId) return; // Already running
+        
+        this.lastPhysicsUpdate = performance.now();
+        
+        // Setup regular physics updates
+        this.physicsTimerId = setInterval(() => {
+            this.updatePhysics();
+        }, this.physicsUpdateInterval);
+    }
+    
+    // Stop physics update loop
+    stopPhysicsLoop() {
+        if (this.physicsTimerId) {
+            clearInterval(this.physicsTimerId);
+            this.physicsTimerId = null;
+        }
+    }
+    
+    // Update physics - called on a fixed interval
+    updatePhysics() {
+        if (!this.circleBoard.isRunning) return;
+        
+        // Update physics
+        const stats = this.circleBoard.updatePhysics();
+        
+        // Add wall hits to balance
+        if (stats.totalWallHits > 0) {
+            this.baseUpgradeShop.addBalance(stats.totalWallHits);
+        }
+        
+        // Update displays
+        this.updateCollisionDisplay();
+        this.updateBalanceDisplay();
+        
+        // Reset counters every second
+        const now = Date.now();
+        if (now - this.circleBoard.lastCounterReset >= this.circleBoard.counterResetInterval) {
+            const timeDelta = (now - this.circleBoard.lastCounterReset) / 1000;
+            
+            if (timeDelta > 0) {
+                this.circleBoard.wallHitsPerSecond = this.circleBoard.wallHits / timeDelta;
+                this.circleBoard.ballCollisionsPerSecond = this.circleBoard.ballCollisions / timeDelta;
+            }
+            
+            this.circleBoard.wallHits = 0;
+            this.circleBoard.ballCollisions = 0;
+            this.circleBoard.wallHitsStack = [];
+            this.circleBoard.ballCollisionsStack = [];
+            this.circleBoard.lastCounterReset = now;
+        }
+    }
+    
+    // Toggle animation state
+    toggleAnimation() {
+        if (this.circleBoard.toggleSimulation()) {
+
+            this.startAnimationLoop();
+            this.startPhysicsLoop();
+
+        } else {
+            this.stopAnimationLoop();
+            this.stopPhysicsLoop();      
+
+        }
+        return this.circleBoard.isRunning;
     }
     
     // Update the collision display
@@ -210,14 +178,14 @@ class Server {
             this.elements.offWallB.textContent = this.circleBoard.getWallHitsPerSecond().toFixed(2);
         }
         if (this.elements.offBallB) {
-            this.elements.offBallB.textContent = this.circleBoard.getBallHitsPerSecond().toFixed(2);
+            this.elements.offBallB.textContent = this.circleBoard.getBallCollisionsPerSecond().toFixed(2);
         }
     }
     
     // Update the balance display
     updateBalanceDisplay() {
         if (this.elements.shopBalanceDisplay) {
-            this.elements.shopBalanceDisplay.textContent = this.baseUpgradeShop.balance.toFixed(2);
+            this.elements.shopBalanceDisplay.textContent = this.baseUpgradeShop.getBalance().toFixed(2);
         }
     }
     
@@ -409,9 +377,7 @@ class Server {
                             dy: ballData.velocity.y,
                             color: ballData.color,
                             baseRadius: baseRadius,
-                            collisionCount: 0 
-
-
+                            collisionCount: 0
                         };
                     });
                 } else {
@@ -422,7 +388,6 @@ class Server {
          
             // Load Shop state
             if ("shop" in gameState) {
-                
                 this.baseUpgradeShop.balance = gameState.shop.balance || 0;
                 
                 if (gameState.shop.items && Array.isArray(gameState.shop.items)) {
@@ -439,11 +404,11 @@ class Server {
                 this.setupShopUI();
             }
             
-            // Start animation
-
-            console.log(this.circleBoard.balls);
-            this.circleBoard.start();
-
+            // Create initial collision predictions
+            this.circleBoard.createPossibleCollisions();
+            
+            // Start animation and physics loop
+            this.startGame();
             
             console.log('Game state loaded successfully');
             return true;
@@ -455,31 +420,36 @@ class Server {
     
     // Reset the game state
     resetGameState() {
+        // Stop existing loops
+        this.stopAnimationLoop();
+        this.stopPhysicsLoop();
+        
         // Reset CircleBoard
         localStorage.removeItem('circleBoardGameState');
         this.circleBoard = new CircleBoard(this.circleBoard.canvas.id);
         this.baseUpgradeShop.resetShop();
-        // this.circleBoard.ballCount = 1;
-        // this.circleBoard.baseMinBallSize = 5;
-        // this.circleBoard.baseMaxBallSize = 15;
-        // this.circleBoard.baseReferenceSize = 750;
-        // this.circleBoard.baseMinBallSpeed = 5;
-        // this.circleBoard.baseMaxBallSpeed = 15;
         
         // Update scaled properties
         this.circleBoard.calculateScaleFactor();
         
-
         this.updateBalanceDisplay();
         this.setupShopUI();
         
         // Reinitialize
         this.circleBoard.initContainer();
         this.circleBoard.initBalls();
+        this.circleBoard.createPossibleCollisions();
         
-        // Remove from localStorage
+        // Start animation and physics loop
+        this.startGame();
         
         console.log('Game state reset successfully');
+    }
+    
+    // Start the game (animation and physics)
+    startGame() {
+        this.startAnimationLoop();
+        this.startPhysicsLoop();
     }
     
     // Initialize the game
@@ -492,16 +462,16 @@ class Server {
         if (!this.loadGameState()) {
             // No saved state, initialize with defaults
             this.circleBoard.initialize();
+            this.startGame();
         }
         
         // Update displays
         this.updateCollisionDisplay();
         this.updateBalanceDisplay();
-        this.circleBoard.createPossibleCollisions();
+        
         // Force a redraw after a short delay to ensure everything is rendered
         setTimeout(() => {
-            this.circleBoard.drawContainer();
-            this.circleBoard.balls.forEach(ball => this.circleBoard.drawBall(ball));
+            this.circleBoard.render();
         }, 500);
     }
     
