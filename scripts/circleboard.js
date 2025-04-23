@@ -1,75 +1,3 @@
-/**
- * CollisionPriorityQueue - A priority queue for collision events
- */
-class CollisionPriorityQueue {
-    constructor() {
-        this.queue = [];
-    }
-
-    /**
-     * Add a collision event to the queue
-     */
-    enqueue(event) {
-        event.countA = event.objectA.collisionCount;
-        if (event.objectB) {
-            event.countB = event.objectB.collisionCount;
-        }
-        
-        let left = 0;
-        let right = this.queue.length - 1;
-        
-        while (left <= right) {
-            const mid = Math.floor((left + right) / 2);
-            if (this.queue[mid].time < event.time) {
-                left = mid + 1;
-            } else {
-                right = mid - 1;
-            }
-        }
-        
-        this.queue.splice(left, 0, event);
-    }c
-    
-    /**
-     * Get the next collision event
-     */
-    dequeue(time) {
-        if (this.queue.length === 0) return null;
-        
-        let event = this.queue[0];
-        while (this.queue.length > 0 && time >= this.getNextCollisionTime() && (event.objectA.collisionCount !== event.countA ||
-            (event.objectB && event.objectB.collisionCount !== event.countB))) {
-            event = this.queue.shift(); 
-            
-        }
-        if (this.queue.length === 0 || this.getNextCollisionTime()  <= time) return null;
-
-        return this.queue.shift();
-    }
-
-    /**
-     * Get the next collision time
-     */
-    getNextCollisionTime() {
-        if (this.queue.length === 0) return Infinity;
-        return this.queue[0].time;
-    }
-    
-    /**
-     * Check if the queue is empty
-     */
-    isEmpty() {
-        return this.queue.length === 0;
-    }
-    
-    /**
-     * Clear all events from the queue
-     */
-    clear() {
-        this.queue = [];
-    }
-}
-
 class CircleBoard {
     constructor(canvasId) {
         // DOM elements
@@ -93,7 +21,6 @@ class CircleBoard {
         this.ballCollisionsStack = [];
 
         // Initialize priority queue
-        this.pq = new CollisionPriorityQueue();
         this.counter = 0;
         
         // Scaled properties
@@ -158,7 +85,6 @@ class CircleBoard {
         for (let i = 0; i < amount; i++) {
             const ballA = this.createBall();
             this.balls.push(ballA);
-            this.predictCollisions(ballA);
         }
     }
     
@@ -248,129 +174,6 @@ class CircleBoard {
         this.ctx.closePath();
     }
     
-    // Calculate time to collision between two balls
-    calculateRoundedCollisionTime(ballA, ballB) {
-        const dx = ballB.x - ballA.x;
-        const dy = ballB.y - ballA.y;
-        
-        const dvx = ballB.dx - ballA.dx;
-        const dvy = ballB.dy - ballA.dy;
-        
-        // Check for balls that are already overlapping
-        const distanceSquared = dx * dx + dy * dy;
-        const minDistance = ballA.radius + ballB.radius;
-        
-        if (distanceSquared < minDistance * minDistance) {
-            return 0; // Immediate collision
-        }
-        
-        // Check if the balls are moving toward each other
-        const dotProduct = dx * dvx + dy * dvy;
-        if (dotProduct >= 0) {
-            return Infinity; // Moving away or parallel
-        }
-        
-        const a = dvx * dvx + dvy * dvy;
-        
-        if (a === 0) return Infinity;
-        
-        const b = 2 * (dx * dvx + dy * dvy);
-        const c = distanceSquared - minDistance * minDistance;
-        
-        const discriminant = b * b - 4 * a * c;
-        
-        if (discriminant < 0) return Infinity;
-        
-        const t1 = (-b - Math.sqrt(discriminant)) / (2 * a);
-        const t2 = (-b + Math.sqrt(discriminant)) / (2 * a);
-        
-        let collisionTime = Infinity;
-        
-        if (t1 > 0.001) collisionTime = t1;
-        else if (t2 > 0.001) collisionTime = t2;
-        
-        return collisionTime !== Infinity ? Math.ceil(collisionTime) : Infinity;
-    }
-
-    // Calculate time to collision with container wall
-    calculateRoundedWallCollisionTime(ball) {
-        const dx = ball.x - this.container.x;
-        const dy = ball.y - this.container.y;
-        
-        const currentDistance = Math.sqrt(dx * dx + dy * dy);
-        
-        // Distance to wall
-        const distanceToWall = this.container.radius - ball.radius;
-        
-        // Check if ball is already outside or at wall boundary
-        if (currentDistance >= distanceToWall) {
-            return 0; // Immediate collision
-        }
-        
-        // Get normalized direction from center to ball
-        const nx = dx / Math.max(currentDistance, 0.0001);
-        const ny = dy / Math.max(currentDistance, 0.0001);
-        
-        // Calculate velocity component in the radial direction
-        const radialVelocity = ball.dx * nx + ball.dy * ny;
-        
-        // If ball is moving toward wall
-        if (radialVelocity > 0) {
-            // Calculate time to collision
-            const distanceToTravel = distanceToWall - currentDistance;
-            const collisionTime = distanceToTravel / radialVelocity;
-            
-            return Math.max(1, Math.floor(collisionTime));
-        }
-        
-        // Ball is moving away from wall or parallel to it
-        return Infinity;
-    }
-    
-
-    
-    // Predict all possible collisions for a ball
-    predictCollisions(ball) {
-        // Remove any existing collision events involving this ball
-        
-        // Check for collisions with other balls
-        this.balls.forEach(otherBall => {
-            if (ball !== otherBall) {
-                let collisionTime = this.calculateRoundedCollisionTime(ball, otherBall);
-                if (collisionTime !== Infinity) {
-                    this.pq.enqueue({
-                        time: collisionTime + this.counter,
-                        objectA: ball,
-                        objectB: otherBall
-                    });
-                }
-            }
-        });
-        
-        // Check for collision with wall
-        let wallCollisionTime = this.calculateRoundedWallCollisionTime(ball);
-        if (wallCollisionTime !== Infinity) {
-            this.pq.enqueue({
-                time: wallCollisionTime + this.counter,
-                objectA: ball,
-                objectB: null
-            });
-        }
-    }
-    
-    // Call at startup to create the first priority queue
-    createPossibleCollisions() {
-        // Clear existing queue
-        this.pq.clear();
-        
-        // Reset counter
-        this.counter = 0;
-        
-        // Predict collisions for all balls
-        this.balls.forEach(ball => {
-            this.predictCollisions(ball);
-        });
-    }
     
     // Handle collision between two balls
     handleBallCollision(ballA, ballB) {
@@ -476,57 +279,9 @@ class CircleBoard {
         let totalWallHits = 0;
         let totalBallCollisions = 0;
         
-        // Maximum number of collisions to process per frame to prevent infinite loops
-        const maxCollisionsPerFrame = 50;
-        let collisionsProcessed = 0;
-        
-        // Process all collisions scheduled for this frame
-        while (!this.pq.isEmpty() && 
-              this.pq.getNextCollisionTime() <= this.counter + 1 && 
-              collisionsProcessed < maxCollisionsPerFrame) {
-            
-            const event = this.pq.dequeue(this.counter + 1);
-    
-            if (!event) break;
-            
-            // Validate that collision counts match
-            if (event.objectA.collisionCount !== event.countA || 
-                (event.objectB && event.objectB.collisionCount !== event.countB)) {
-                continue;
-            }
-            
-            // Handle ball-to-ball collision
-            if (event.objectA && event.objectB) {
-                if (this.handleBallCollision(event.objectA, event.objectB)) {
-                    // Update collision counts
-                    event.objectA.collisionCount++;
-                    event.objectB.collisionCount++;
-                    totalBallCollisions++;
-                    
-                    // Recalculate future collisions
-                    this.predictCollisions(event.objectA);
-                    this.predictCollisions(event.objectB);
-                }
-            } 
-            // Handle ball-to-wall collision
-            else if (event.objectA) {
-                if (this.handleWallCollision(event.objectA)) {
-                    // Update collision count
-                    event.objectA.collisionCount++;
-                    totalWallHits++;
-                    
-                    // Recalculate future collisions
-                    this.predictCollisions(event.objectA);
-                }
-            }
-            
-            collisionsProcessed++;
-        }
-        
         // Move all balls forward by one frame
         this.balls.forEach(ball => {
-            ball.x += ball.dx;
-            ball.y += ball.dy;
+
             
             // Check if any ball went outside container (emergency wall collision detection)
             const dx = ball.x - this.container.x;
@@ -535,26 +290,27 @@ class CircleBoard {
             const validRadius = this.container.radius - this.container.thickness - ball.radius;
             
             if (distance > validRadius) {
-                // Ball is outside container - immediate wall collision
-                const nx = dx / distance;
-                const ny = dy / distance;
-                
-                // Apply reflection
-                const dotProduct = ball.dx * nx + ball.dy * ny;
-                ball.dx -= 2 * dotProduct * nx;
-                ball.dy -= 2 * dotProduct * ny;
-                
-                // Position correction
-                ball.x = this.container.x + nx * (validRadius - 0.5 * this.scaleFactor);
-                ball.y = this.container.y + ny * (validRadius - 0.5 * this.scaleFactor);
-                
-                // Update collision count
-                ball.collisionCount++;
+                this.handleWallCollision(ball);
                 totalWallHits++;
-                
-                // Recalculate collisions
-                this.predictCollisions(ball);
             }
+            this.balls.forEach(ballB => {  
+                if (ball !== ballB) {
+                    const dx = ballB.x - ball.x;
+                    const dy = ballB.y - ball.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    const validRadius = ball.radius + ballB.radius;
+                    
+                    if (distance < validRadius) {
+                        this.handleBallCollision(ball, ballB);
+                        totalBallCollisions++;
+                    }
+                }
+            });
+
+            ball.x += ball.dx;
+            ball.y += ball.dy;
+
+
         });
         
         // Update the collision statistics
@@ -645,7 +401,6 @@ class CircleBoard {
         });
         
         // Reset collision queue with new positions
-        this.createPossibleCollisions();
         
         // Force a redraw
         this.render();
@@ -705,9 +460,7 @@ class CircleBoard {
         
         this.initBalls();
         this.resetCollisionCounters();
-        this.createPossibleCollisions();
-        this.createPossibleCollisions();
-        
+
         window.addEventListener('resize', () => {
             this.resizeCanvas();
         });

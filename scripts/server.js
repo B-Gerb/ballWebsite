@@ -1,3 +1,109 @@
+function popUps(contents, isClass = false, spot, backDrop = true) {
+    if(!isClass){
+        const popUp = document.createElement('div');
+        popUp.className = 'pop-up';
+
+        const backDropElement = document.createElement('div');
+        backDropElement.className = 'backdrop';
+                
+        const message = document.createElement('p');
+        message.textContent = contents.message;
+        message.style.fontSize = '16px';
+        message.style.margin = '0';
+        message.style.padding = '10px';
+        popUp.appendChild(message);
+
+        const buttons = document.createElement('div');
+        buttons.className = 'buttons';
+        contents.buttons.forEach((button) => {
+            const buttonText = button.text;
+            const buttonFunction = button.function;
+
+            const buttonElement = document.createElement('button');
+            buttonElement.textContent = buttonText;
+            buttonElement.className = 'pop-up-button';
+            buttonElement.addEventListener('click', () => {
+                buttonFunction();
+                document.body.removeChild(popUp);
+                if(backDrop){
+                    document.body.removeChild(backDropElement);
+                }
+            } );
+            buttonElement.style.margin = '5px';
+            buttons.appendChild(buttonElement);
+        })
+        popUp.appendChild(buttons);
+
+        // check if it exists
+        if (spot) {
+            // If spot is an element, position near it
+            if (spot instanceof HTMLElement) {
+                const rect = spot.getBoundingClientRect();
+                popUp.style.top = `${rect.bottom + 10}px`;
+                popUp.style.left = `${rect.left}px`;
+            }
+            // If spot is an object with x,y coordinates
+            else if (typeof spot === 'object' && 'x' in spot && 'y' in spot) {
+                popUp.style.top = `${spot.y}px`;
+                popUp.style.left = `${spot.x}px`;
+            }
+            // If spot is a string describing position
+            else if (typeof spot === 'string') {
+                switch (spot.toLowerCase()) {
+                    case 'center':
+                        popUp.style.top = '50%';
+                        popUp.style.left = '50%';
+                        popUp.style.transform = 'translate(-50%, -50%)';
+                        break;
+                    case 'top':
+                        popUp.style.top = '20px';
+                        popUp.style.left = '50%';
+                        popUp.style.transform = 'translateX(-50%)';
+                        break;
+                    case 'bottom':
+                        popUp.style.bottom = '20px';
+                        popUp.style.left = '50%';
+                        popUp.style.transform = 'translateX(-50%)';
+                        break;
+                    case 'left':   
+                        popUp.style.top = '50%';
+                        popUp.style.left = '20px';
+                        popUp.style.transform = 'translateY(-50%)';
+                        break;
+                    case 'right':
+                        popUp.style.top = '50%';
+                        popUp.style.right = '20px';
+                        popUp.style.transform = 'translateY(-50%)';
+                        break;
+                    default:
+                        popUp.style.top = '50%';
+                        popUp.style.left = '50%';
+                        popUp.style.transform = 'translate(-50%, -50%)';
+                        break;
+                    }
+                    
+            }
+        } 
+        
+        // Default to center if no position specified
+        else {
+            popUp.style.top = '50%';
+            popUp.style.left = '50%';
+            popUp.style.transform = 'translate(-50%, -50%)';
+        }
+        if(backDrop){
+            backDropElement.addEventListener('click', () => {
+                document.body.removeChild(backDropElement);
+                document.body.removeChild(popUp);
+            });
+            document.body.appendChild(backDropElement); 
+        }
+        document.body.appendChild(popUp); 
+        return popUp;
+       
+    }
+
+}
 class Server {
     constructor(canvasId) {
         // Create instances of the CircleBoard and Shop
@@ -50,6 +156,7 @@ class Server {
                             function: () => {
                                 this.resetGameState();
                                 this.baseUpgradeShop.resetShop();
+
                             }
                         },
                         {
@@ -404,8 +511,7 @@ class Server {
                 this.setupShopUI();
             }
             
-            // Create initial collision predictions
-            this.circleBoard.createPossibleCollisions();
+
             
             // Start animation and physics loop
             this.startGame();
@@ -429,18 +535,15 @@ class Server {
         this.circleBoard = new CircleBoard(this.circleBoard.canvas.id);
         this.baseUpgradeShop.resetShop();
         
-        // Update scaled properties
-        this.circleBoard.calculateScaleFactor();
+        // Initialize the CircleBoard
+        this.circleBoard.initialize();
         
+        // Update displays
         this.updateBalanceDisplay();
         this.setupShopUI();
         
-        // Reinitialize
-        this.circleBoard.initContainer();
-        this.circleBoard.initBalls();
-        this.circleBoard.createPossibleCollisions();
-        
         // Start animation and physics loop
+        this.circleBoard.isRunning = true;  // Make sure isRunning flag is set to true
         this.startGame();
         
         console.log('Game state reset successfully');
@@ -468,6 +571,7 @@ class Server {
         // Update displays
         this.updateCollisionDisplay();
         this.updateBalanceDisplay();
+        this.circleBoard.resizeCanvas();
         
         // Force a redraw after a short delay to ensure everything is rendered
         setTimeout(() => {

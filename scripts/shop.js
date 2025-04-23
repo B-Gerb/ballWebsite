@@ -58,7 +58,6 @@ class baseUpgradeShop extends AShop {
                         (item.name.includes("Ball Speed") ? 30 : 50));
             item.level = 1;
         });
-        console.log(this.balance);
 
     }
 
