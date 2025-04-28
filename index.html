@@ -4,7 +4,7 @@
 <script src="scripts/circleboard.js"></script>
 <script src="scripts/AShop.js"></script>
 
-<script src="scripts/shop.js"></script>
+<script src="scripts/baseUpgradeShop.js"></script>
 <script src="scripts/server.js"></script>
 
 <head>
@@ -14,6 +14,9 @@
     <link rel="stylesheet" href="styles/style.css">
 </head>
 <body>
+    <div class="shop-balance-container">
+        <label for="shopBalance"> Balance: <span id="shopBalance">0</span></label>
+    </div>
     <div class="stats">
         <h3>Stats</h3>
         <div class="stat">
@@ -21,9 +24,7 @@
             <label for="offBallB"> Collision off other Balls per/sec: <span id="offBallB">0</span></label>
 
         </div>
-        <div class="stat">
-            <label for="shopBalance"> Balance: <span id="shopBalance">0</span></label>
-        </div>
+
     </div>
     <div class="container">
         <h1>Bouncing Balls Inside Circle</h1>

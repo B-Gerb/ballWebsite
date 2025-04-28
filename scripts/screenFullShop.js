@@ -7,7 +7,7 @@ class screenFullShop extends AShop {
                 price: 1, 
                 level: 1, 
                 equation: price => price * 1.1 + 1,
-                getValue: function() { return this.level == 1 ? 0 : this.level * 0.001 + 4; }
+                getValue: function() { return this.level == 1 ? 0 : this.level * 0.001 + .004; }
             },
             {
                 name: "Circle Value Percent Increase",

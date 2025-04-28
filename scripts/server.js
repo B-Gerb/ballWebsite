@@ -130,6 +130,7 @@ class Server {
         this.physicsUpdateInterval = 1000 / 60; // 60 fps
         this.lastPhysicsUpdate = 0;
         this.physicsTimerId = null;
+        this.frameCount = 0;
         
         // Initialize the event listeners
         this.setupEventListeners();
@@ -148,24 +149,51 @@ class Server {
         
         if (this.elements.resetButton) {
             this.elements.resetButton.addEventListener('click', () => {
-                popUps({
+                // Create the popup with a seed input field
+                const popup = popUps({
                     message: 'Are you sure you want to reset the game?',
                     buttons: [
                         {
                             text: 'Yes',
                             function: () => {
-                                this.resetGameState();
+                                const seedInput = document.getElementById('game-seed-input');
+                                const seed = seedInput ? seedInput.value : null;
+                                
+                                this.resetGameState(seed);
                                 this.baseUpgradeShop.resetShop();
-
                             }
                         },
                         {
                             text: 'No',
-                            function: () => {
-                            }
+                            function: () => {}
                         }
                     ]
                 }, false, 'center', true);
+                
+                // Use the returned popup reference instead of querying the DOM
+                const seedDiv = document.createElement('div');
+                seedDiv.style.margin = '10px 0';
+                
+                const inputId = 'game-seed-input';
+                
+                const seedLabel = document.createElement('label');
+                seedLabel.htmlFor = inputId;
+                seedLabel.textContent = 'Custom seed (optional):';
+                seedLabel.style.display = 'block';
+                seedLabel.style.marginBottom = '5px';
+                
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.id = inputId;
+                input.placeholder = 'Leave empty for random seed';
+                input.style.padding = '5px';
+                input.style.width = '100%';
+                input.style.boxSizing = 'border-box';
+                
+                seedLabel.appendChild(input);
+                seedDiv.appendChild(seedLabel);
+                popup.appendChild(seedDiv);
+
             });
         }
 
@@ -209,7 +237,6 @@ class Server {
             this.animationFrameId = null;
         }
     }
-    
     // Start physics update loop
     startPhysicsLoop() {
         if (this.physicsTimerId) return; // Already running
@@ -230,6 +257,7 @@ class Server {
         }
     }
     
+    
     // Update physics - called on a fixed interval
     updatePhysics() {
         if (!this.circleBoard.isRunning) return;
@@ -240,28 +268,20 @@ class Server {
         // Add wall hits to balance
         if (stats.totalWallHits > 0) {
             this.baseUpgradeShop.addBalance(stats.totalWallHits);
+            this.updateButtonAppearance();
         }
         
         // Update displays
         this.updateCollisionDisplay();
         this.updateBalanceDisplay();
-        
-        // Reset counters every second
-        const now = Date.now();
-        if (now - this.circleBoard.lastCounterReset >= this.circleBoard.counterResetInterval) {
-            const timeDelta = (now - this.circleBoard.lastCounterReset) / 1000;
-            
-            if (timeDelta > 0) {
-                this.circleBoard.wallHitsPerSecond = this.circleBoard.wallHits / timeDelta;
-                this.circleBoard.ballCollisionsPerSecond = this.circleBoard.ballCollisions / timeDelta;
-            }
-            
-            this.circleBoard.wallHits = 0;
-            this.circleBoard.ballCollisions = 0;
-            this.circleBoard.wallHitsStack = [];
-            this.circleBoard.ballCollisionsStack = [];
-            this.circleBoard.lastCounterReset = now;
+        this.frameCount++;
+        if(this.frameCount > 60){
+            this.saveGameState();
+            this.frameCount = 0;
         }
+
+    
+        
     }
     
     // Toggle animation state
@@ -295,7 +315,24 @@ class Server {
             this.elements.shopBalanceDisplay.textContent = this.baseUpgradeShop.getBalance().toFixed(2);
         }
     }
-    
+    updateButtonAppearance() {
+        const buttons = document.querySelectorAll('.shop-item-button');
+        
+        buttons.forEach(button => {
+            const itemName = button.querySelector('h3').textContent;
+            const item = this.baseUpgradeShop.items.find(i => i.name === itemName);
+            
+            if (item) {
+                const canAfford = this.baseUpgradeShop.balance >= this.baseUpgradeShop.itemCost(item, 1)[0];
+                
+                if (canAfford) {
+                    button.classList.remove('cannot-afford');
+                } else {
+                    button.classList.add('cannot-afford');
+                }
+            }
+        });
+    }
     // Setup shop UI elements
     setupShopUI() {
         const shopContainer = this.elements.shopContainer;
@@ -312,8 +349,13 @@ class Server {
         this.baseUpgradeShop.items.forEach(item => {
             const button = document.createElement('button');
             button.className = 'shop-item-button';
+            const canAfford = this.baseUpgradeShop.balance >= this.baseUpgradeShop.itemCost(item, 1)[0];
+            if (!canAfford) {
+                button.classList.add('cannot-afford');
+            }
+
             button.innerHTML = `
-                <h3>${item.name}</h3>
+                <h3 class="base-upgrade-itemNames">${item.name}</h3>
                 <p>Level: <span id="${item.name.replace(/\s+/g, '-')}-level">${item.level}</span></p>
                 <p>Cost: <span id="${item.name.replace(/\s+/g, '-')}-cost">${item.price.toFixed(2)}</span></p>
             `;
@@ -328,9 +370,8 @@ class Server {
                     
                     if (levelSpan) levelSpan.textContent = item.level;
                     if (costSpan) costSpan.textContent = item.price.toFixed(2);
-                } else {
-                    // Show message if not enough balance
-                    alert(`Not enough balance to buy ${item.name}. Need ${this.baseUpgradeShop.itemCost(item, 1)[0].toFixed(2)}, have ${this.baseUpgradeShop.balance.toFixed(2)}`);
+                    this.updateButtonAppearance();
+
                 }
             });
             
@@ -525,7 +566,7 @@ class Server {
     }
     
     // Reset the game state
-    resetGameState() {
+    resetGameState(seed=null) {
         // Stop existing loops
         this.stopAnimationLoop();
         this.stopPhysicsLoop();
@@ -533,11 +574,17 @@ class Server {
         // Reset CircleBoard
         localStorage.removeItem('circleBoardGameState');
         this.circleBoard = new CircleBoard(this.circleBoard.canvas.id);
+        if (!seed){
+            this.circleBoard.rng = new Math.seedrandom();
+        }
+        else{
+            this.circleBoard.rng = new Math.seedrandom(seed);
+        }
         this.baseUpgradeShop.resetShop();
         
         // Initialize the CircleBoard
-        this.circleBoard.initialize();
-        
+        this.circleBoard.initialize(seed);
+
         // Update displays
         this.updateBalanceDisplay();
         this.setupShopUI();
@@ -583,6 +630,7 @@ class Server {
     static startGame(canvasId) {
         // Create and initialize the server which will manage everything
         const gameServer = new Server(canvasId);
+        
         gameServer.initialize();
         return gameServer;
     }
