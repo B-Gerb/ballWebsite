@@ -348,51 +348,59 @@ class CircleBoard {
         
 
     }
+    updateCanvasSize(size) {
 
-    // Resize canvas to fit parent
-    resizeCanvas() {
-        // Save the current ball positions relative to container
+        
         const ballStates = this.balls.map(ball => {
+            const dx = ball.x - this.container.x;
+            const dy = ball.y - this.container.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            
+            const normalizedDistance = Math.max(distance, 0.0001);
+            
             return {
-                relX: (ball.x - this.container.x) / this.container.radius,
-                relY: (ball.y - this.container.y) / this.container.radius,
+                dirX: dx / normalizedDistance,
+                dirY: dy / normalizedDistance,
+                relDist: distance / this.container.radius, 
                 baseRadius: ball.baseRadius,
                 mass: ball.mass,
-                originalDx: ball.dx,
-                originalDy: ball.dy,
+                currentDx: ball.dx,
+                currentDy: ball.dy,
                 color: ball.color,
                 collisionCount: ball.collisionCount
             };
         });
         
-        const oldContainerRadius = this.container.radius;
+        const oldContainerRadius = this.container ? this.container.radius : size / 2;
         
-        const newWidth = this.canvas.parentElement.clientWidth;
-        const newHeight = this.canvas.parentElement.clientHeight;
-        this.canvas.width = newWidth;
-        this.canvas.height = newHeight;
+        this.canvas.width = size;
+        this.canvas.height = size;
         
         this.calculateScaleFactor();
+        
         this.initContainer();
         
-        const containerRatio = this.container.radius / oldContainerRadius;
+
+        const sizeRatio = this.container.radius / oldContainerRadius;
+    
         
-        // Restore balls with proper scaling
         this.balls = ballStates.map(state => {
-            const newX = this.container.x + (state.relX * this.container.radius);
-            const newY = this.container.y + (state.relY * this.container.radius);
+            const newDist = state.relDist * this.container.radius;
+            const newX = this.container.x + (state.dirX * newDist);
+            const newY = this.container.y + (state.dirY * newDist);
             
             const newRadius = state.baseRadius * this.scaleFactor;
+            
 
-            const newDx = state.originalDx * containerRatio;
-            const newDy = state.originalDy * containerRatio;
+            const newDx = state.currentDx * sizeRatio;
+            const newDy = state.currentDy * sizeRatio;
             
             return {
                 x: newX,
                 y: newY,
                 radius: newRadius,
                 baseRadius: state.baseRadius,
-                mass: state.mass, 
+                mass: state.mass,
                 dx: newDx,
                 dy: newDy,
                 color: state.color,
@@ -400,12 +408,10 @@ class CircleBoard {
             };
         });
         
-        // Reset collision queue with new positions
-        
-        // Force a redraw
         this.render();
+        
+        return this.scaleFactor;
     }
-    
 
     // Toggle simulation state
     toggleSimulation() {
@@ -461,8 +467,6 @@ class CircleBoard {
         this.initBalls();
         this.resetCollisionCounters();
 
-        window.addEventListener('resize', () => {
-            this.resizeCanvas();
-        });
+        
     }
 }

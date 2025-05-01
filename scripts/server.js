@@ -104,12 +104,14 @@ function popUps(contents, isClass = false, spot, backDrop = true) {
     }
 
 }
+
 class Server {
     constructor(canvasId) {
         // Create instances of the CircleBoard and Shop
         this.circleBoard = new CircleBoard(canvasId);
         this.baseUpgradeShop = new baseUpgradeShop();
-        
+        this.loadVersions = window.loadVersions;
+
         // DOM elements
         this.elements = {
             // Display elements
@@ -119,21 +121,182 @@ class Server {
             
             // Container
             shopContainer: document.getElementById('shopContainer'),
-
+            
+            // Menu buttons
             pauseButton: document.getElementById('pauseButton'),
             resetButton: document.getElementById('resetButton'),
             saveButton: document.getElementById('saveButton'),
+            
+            clickerCanvas: null
         };
         
+        this.createGameContainer();
+        
+        this.clickerObject = null;
+
         // Animation and physics timing
         this.animationFrameId = null;
-        this.physicsUpdateInterval = 1000 / 60; // 60 fps
+        this.physicsUpdateInterval = 1000 / 60; 
         this.lastPhysicsUpdate = 0;
         this.physicsTimerId = null;
         this.frameCount = 0;
         
-        // Initialize the event listeners
         this.setupEventListeners();
+    }
+    createGameContainer() {
+        let container = document.getElementById('game-container');
+        if (!container) {
+            container = document.createElement('div');
+            container.id = 'game-container';
+            container.style.display = 'flex';
+            container.style.width = '100%';
+            container.style.justifyContent = 'center';
+            container.style.gap = '20px';
+            container.style.margin = '0 auto 20px auto';
+            container.style.maxWidth = '1200px'; // Maximum width for very large screens
+            
+            // Create a wrapper div for the CircleBoard to ensure square aspect ratio
+            const circleBoardWrapper = document.createElement('div');
+            circleBoardWrapper.style.position = 'relative';
+            circleBoardWrapper.className = 'canvas-container';
+            
+            // Get the CircleBoard canvas
+            const circleBoardCanvas = this.circleBoard.canvas;
+            const circleBoardParent = circleBoardCanvas.parentElement;
+            
+            // Replace the canvas with our wrapper + canvas
+            circleBoardParent.insertBefore(container, circleBoardCanvas);
+            circleBoardWrapper.appendChild(circleBoardCanvas);
+            container.appendChild(circleBoardWrapper);
+            
+            // Create canvas for clicker
+            const clickerCanvas = document.createElement('canvas');
+            clickerCanvas.id = 'clickerCanvas';
+            clickerCanvas.style.border = '1px solid #ddd';
+            clickerCanvas.style.borderRadius = '8px';
+            clickerCanvas.style.boxShadow = '0 4px 8px rgba(0, 0, 0, 0.1)';
+            clickerCanvas.style.backgroundColor = '#f8f8f8';
+            clickerCanvas.style.cursor = 'pointer';
+            
+            container.appendChild(clickerCanvas);
+            this.elements.clickerCanvas = clickerCanvas;
+        }
+    }
+    initializeClickerObject() {
+        this.clickerObject = new ClickerObject('clickerCanvas');
+        const originalHandleClick = this.clickerObject.handleClick;
+        this.clickerObject.handleClick = () => {
+            originalHandleClick.call(this.clickerObject); // for animation purposes
+
+            // add to clickShop
+
+            this.updateBalanceDisplay();
+            this.updateButtonAppearance();
+        };
+    }
+    handleResize() { 
+        const windowWidth = window.innerWidth;
+        const container = document.getElementById('game-container');
+        if (!container) return;
+        
+        container.style.display = 'flex';
+        container.style.width = '100%';
+        
+
+        //large screen
+        if (windowWidth >= 800) {
+            container.style.flexDirection = 'row';
+            container.style.justifyContent = 'space-around'; 
+            container.style.alignItems = 'center';
+            
+            let boardSize;
+            if (windowWidth <= 800) {
+                boardSize = 500;
+            } else if (windowWidth >= 1600) {
+                boardSize = 800;
+            } else {
+                boardSize = 500 + (300 * (windowWidth - 800) / 800);
+            }
+            
+            boardSize = Math.round(boardSize);
+            
+            const boardContainer = this.circleBoard.canvas.parentElement;
+            
+            boardContainer.style.width = `${boardSize}px`;
+            boardContainer.style.height = `${boardSize}px`;
+            boardContainer.style.minWidth = `${boardSize}px`;
+            boardContainer.style.minHeight = `${boardSize}px`;
+            boardContainer.style.maxWidth = `${boardSize}px`;
+            boardContainer.style.maxHeight = `${boardSize}px`;
+            boardContainer.style.margin = '10px';
+
+            this.circleBoard.updateCanvasSize(boardSize);
+            
+            this.circleBoard.canvas.style.width = `${boardSize}px`;
+            this.circleBoard.canvas.style.height = `${boardSize}px`;
+            
+            const clickerCanvas = document.getElementById('clickerCanvas');
+            if (clickerCanvas) {
+                let clickerWidth;
+                if (windowWidth <= 800) {
+                    clickerWidth = 250;
+                } else if (windowWidth >= 1600) {
+                    clickerWidth = 300;
+                } else {
+                    clickerWidth = 250 + (50 * (windowWidth - 800) / 800);
+                }
+                clickerWidth = Math.round(clickerWidth);
+                
+                const clickerHeight = Math.round(boardSize * 0.8);
+                
+                clickerCanvas.style.width = `${clickerWidth}px`;
+                clickerCanvas.style.height = `${clickerHeight}px`;
+                clickerCanvas.width = clickerWidth;
+                clickerCanvas.height = clickerHeight;
+                clickerCanvas.style.margin = '10px';
+            }
+        } else {
+            // small screen
+            container.style.flexDirection = 'column';
+            container.style.alignItems = 'center';
+            container.style.justifyContent = 'center';
+            
+            const boardSize = Math.round(Math.min(windowWidth * 0.85, 450));
+            
+            const boardContainer = this.circleBoard.canvas.parentElement;
+            boardContainer.style.width = `${boardSize}px`;
+            boardContainer.style.height = `${boardSize}px`;
+            boardContainer.style.minWidth = `${boardSize}px`;
+            boardContainer.style.minHeight = `${boardSize}px`;
+            boardContainer.style.maxWidth = `${boardSize}px`;
+            boardContainer.style.maxHeight = `${boardSize}px`;
+            boardContainer.style.margin = '0 0 20px 0';
+    
+            this.circleBoard.updateCanvasSize(boardSize);
+            
+            this.circleBoard.canvas.style.width = `${boardSize}px`;
+            this.circleBoard.canvas.style.height = `${boardSize}px`;
+            
+            const clickerCanvas = document.getElementById('clickerCanvas');
+            if (clickerCanvas) {
+                const clickerWidth = Math.round(Math.min(windowWidth * 0.75, 280));
+                const clickerHeight = Math.min(180, windowWidth * 0.4); 
+                
+                clickerCanvas.style.width = `${clickerWidth}px`;
+                clickerCanvas.style.height = `${clickerHeight}px`;
+                clickerCanvas.width = clickerWidth;
+                clickerCanvas.height = clickerHeight;
+                clickerCanvas.style.margin = '20px 0 0 0';
+                
+                clickerCanvas.style.backgroundColor = 'rgba(245, 245, 245, 0.1)';
+            }
+        }
+        
+        this.circleBoard.render();
+        
+        if (this.clickerObject) {
+            this.clickerObject.draw();
+        }
     }
 
     // Setup event listeners for pause, reset and save
@@ -208,7 +371,7 @@ class Server {
     setupEventListeners() {
         // Window resize
         window.addEventListener('resize', () => {
-            this.circleBoard.resizeCanvas();
+            this.handleResize();
         });
     }
     
@@ -467,14 +630,19 @@ class Server {
                     borderColor: this.circleBoard.container.borderColor
                 }
             },
-            shop: {
+            baseUpgradeShop: {
                 balance: this.baseUpgradeShop.balance,
                 items: this.baseUpgradeShop.items.map(item => ({
                     name: item.name,
                     price: item.price,
                     level: item.level
                 }))
-            }
+            },
+            // Add clicker data to save state if needed
+            clicker: {
+                clickCount: this.clickerObject ? this.clickerObject.clickCount : 0
+            },
+            version: '0.0.1'
         };
         
         localStorage.setItem('circleBoardGameState', JSON.stringify(gameState));
@@ -482,77 +650,16 @@ class Server {
     }
     
     // Load game state from localStorage
-    loadGameState() {
-        const savedState = localStorage.getItem('circleBoardGameState');
-        
-        if (!savedState) {
-            console.log('No saved game state found');
-            return false;
-        }
-        
+    loadGameState() {        
         try {
-            const gameState = JSON.parse(savedState);
-            
-            if (gameState.circleBoard) {
-                this.circleBoard.ballCount = gameState.circleBoard.ballCount || this.circleBoard.ballCount;
-                this.circleBoard.baseMinBallSize = gameState.circleBoard.baseMinBallSize || this.circleBoard.baseMinBallSize;
-                this.circleBoard.baseMaxBallSize = gameState.circleBoard.baseMaxBallSize || this.circleBoard.baseMaxBallSize;
-                this.circleBoard.baseReferenceSize = gameState.circleBoard.baseReferenceSize || this.circleBoard.baseReferenceSize;
-                this.circleBoard.baseMinBallSpeed = gameState.circleBoard.baseMinBallSpeed || this.circleBoard.baseMinBallSpeed;
-                this.circleBoard.baseMaxBallSpeed = gameState.circleBoard.baseMaxBallSpeed || this.circleBoard.baseMaxBallSpeed;
-                this.circleBoard.canvas.width = this.circleBoard.canvas.parentElement.clientWidth;
-                this.circleBoard.canvas.height = this.circleBoard.canvas.parentElement.clientHeight;
-                this.circleBoard.calculateScaleFactor();
-                this.circleBoard.initContainer();
-                
-                if (gameState.circleBoard.container) {
-                    this.circleBoard.container.color = gameState.circleBoard.container.color || this.circleBoard.container.color;
-                    this.circleBoard.container.borderColor = gameState.circleBoard.container.borderColor || this.circleBoard.container.borderColor;
-                }
-                
-                if (gameState.circleBoard.balls && Array.isArray(gameState.circleBoard.balls)) {
-                    this.circleBoard.balls = gameState.circleBoard.balls.map(ballData => {
-                        // Ensure baseRadius is present, calculate if missing
-                        const baseRadius = ballData.baseRadius || 
-                            (ballData.size / this.circleBoard.scaleFactor);
-                        
-                        return {
-                            x: ballData.position.x,
-                            y: ballData.position.y,
-                            radius: ballData.size,
-                            mass: ballData.mass,
-                            dx: ballData.velocity.x,
-                            dy: ballData.velocity.y,
-                            color: ballData.color,
-                            baseRadius: baseRadius,
-                            collisionCount: 0
-                        };
-                    });
-                } else {
-                    // If no saved balls, initialize them
-                    this.circleBoard.initBalls();
-                }
-            }
-         
-            // Load Shop state
-            if ("shop" in gameState) {
-                this.baseUpgradeShop.balance = gameState.shop.balance || 0;
-                
-                if (gameState.shop.items && Array.isArray(gameState.shop.items)) {
-                    gameState.shop.items.forEach(savedItem => {
-                        const item = this.baseUpgradeShop.getItem(savedItem.name);
-                        if (item) {
-                            item.price = savedItem.price;
-                            item.level = savedItem.level;
-                        }
-                    });
-                }
-                
-                this.updateBalanceDisplay();
-                this.setupShopUI();
+            let success = this.loadVersions.load(this);
+            if (!success) {
+                console.error('Failed to load game state: Version mismatch or unsupported version');
+                return false;
             }
             
-
+            
+            
             
             // Start animation and physics loop
             this.startGame();
@@ -581,7 +688,9 @@ class Server {
             this.circleBoard.rng = new Math.seedrandom(seed);
         }
         this.baseUpgradeShop.resetShop();
-        
+        if (this.clickerObject) {
+            this.clickerOjbect = new ClickerObject(this.elements.clickerCanvas.id);
+        }
         // Initialize the CircleBoard
         this.circleBoard.initialize(seed);
 
@@ -604,7 +713,16 @@ class Server {
     
     // Initialize the game
     initialize() {
-        // Setup the shop UI
+        // Create the game container and initialize layout
+        this.createGameContainer();
+        
+        // Apply initial sizing
+        this.handleResize();
+        
+        // Initialize the clicker object
+        this.initializeClickerObject();
+        
+        // Setup UI components
         this.setupShopUI();
         this.setupMenuButtons();
         
@@ -618,12 +736,15 @@ class Server {
         // Update displays
         this.updateCollisionDisplay();
         this.updateBalanceDisplay();
-        this.circleBoard.resizeCanvas();
         
-        // Force a redraw after a short delay to ensure everything is rendered
+        // Force a final resize and redraw after everything is initialized
         setTimeout(() => {
+            this.handleResize();
             this.circleBoard.render();
-        }, 500);
+            if (this.clickerObject) {
+                this.clickerObject.draw();
+            }
+        }, 300);
     }
     
     // Static method to start the game
