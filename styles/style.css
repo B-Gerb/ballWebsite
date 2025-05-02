@@ -3,6 +3,9 @@
     padding: 0;
     box-sizing: border-box;
 }
+* {
+    -webkit-tap-highlight-color: transparent;
+}   
 
 body {
     font-family: Arial, sans-serif;
@@ -107,7 +110,7 @@ label {
 }
 
 .button {
-    background-color: #3498db;
+    background-color: #ffffff00;
     color: white;
     border: none;
     padding: 10px 20px;
@@ -140,9 +143,8 @@ label {
     }
 }
 
-.button:hover {
-    background-color: #2980b9;
-}
+
+
 .pop-up {
     position: fixed;
     z-index: 1000;

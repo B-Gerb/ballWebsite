@@ -11,6 +11,7 @@ class ClickerObject {
         
         // Get drawing context
         this.ctx = this.canvas.getContext('2d');
+        this.seed = new Math.seedrandom();
         
         // Properties for the clickable object
         this.color = '#4CAF50';
@@ -49,6 +50,10 @@ class ClickerObject {
             
         });
     }
+    setSeed(seed) { 
+        this.seed = seed;
+    }
+
     
     // Check if a point is inside the clickable area
     isPointInClickArea(x, y) {

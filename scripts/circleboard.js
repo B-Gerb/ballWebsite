@@ -12,7 +12,7 @@ class CircleBoard {
         this.baseMinBallSpeed = 5;
         this.baseMaxBallSpeed = 15;
         this.isRunning = true;
-        this.rng = new Math.seedrandom('userInput');
+        this.rng = new Math.seedrandom();
         
         // Collision tracking for time
         this.wallHits = 0;
@@ -49,6 +49,9 @@ class CircleBoard {
         this.baseReferenceSize = 750; 
         
 
+    }
+    setSeed(seed){
+        this.rng = seed;
     }
     
     // Calculate scale factor based on canvas size

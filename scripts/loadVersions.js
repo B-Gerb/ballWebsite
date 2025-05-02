@@ -66,10 +66,12 @@ function load0_0_1(server, gameState){
                     collisionCount: 0
                 };
             });
+            
         } else {
             // If no saved balls, initialize them
             server.circleBoard.initBalls();
         }
+        
     }
  
     // Load baseUpgradeShop 
@@ -88,6 +90,11 @@ function load0_0_1(server, gameState){
         
         server.updateBalanceDisplay();
         server.setupShopUI();
+    }
+    if("seed" in gameState){
+        server.setSeed(gameState.seed);
+        server.circleBoard.setSeed(gameState.seed);
+        server.clickerObject.setSeed(gameState.seed);
     }
     
     

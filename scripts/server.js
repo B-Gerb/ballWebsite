@@ -129,7 +129,6 @@ class Server {
             
             clickerCanvas: null
         };
-        
         this.createGameContainer();
         
         this.clickerObject = null;
@@ -142,6 +141,11 @@ class Server {
         this.frameCount = 0;
         
         this.setupEventListeners();
+        this.seed = new Math.seedrandom();
+
+    }
+    setSeed(seed) {
+        this.seed = seed;
     }
     createGameContainer() {
         let container = document.getElementById('game-container');
@@ -193,6 +197,7 @@ class Server {
             this.updateBalanceDisplay();
             this.updateButtonAppearance();
         };
+        this.clickerObject.setSeed(this.seed);
     }
     handleResize() { 
         const windowWidth = window.innerWidth;
@@ -642,7 +647,8 @@ class Server {
             clicker: {
                 clickCount: this.clickerObject ? this.clickerObject.clickCount : 0
             },
-            version: '0.0.1'
+            version: '0.0.1',
+            seed: this.seed,
         };
         
         localStorage.setItem('circleBoardGameState', JSON.stringify(gameState));
@@ -682,18 +688,19 @@ class Server {
         localStorage.removeItem('circleBoardGameState');
         this.circleBoard = new CircleBoard(this.circleBoard.canvas.id);
         if (!seed){
-            this.circleBoard.rng = new Math.seedrandom();
+            this.seed = new Math.seedrandom();
         }
         else{
-            this.circleBoard.rng = new Math.seedrandom(seed);
+            this.seed = new Math.seedrandom(seed);
         }
         this.baseUpgradeShop.resetShop();
         if (this.clickerObject) {
             this.clickerOjbect = new ClickerObject(this.elements.clickerCanvas.id);
         }
         // Initialize the CircleBoard
-        this.circleBoard.initialize(seed);
-
+        this.circleBoard.initialize(this.seed);
+        this.circleBoard.setSeed(this.seed);
+        this.clickerObject.setSeed(this.seed);
         // Update displays
         this.updateBalanceDisplay();
         this.setupShopUI();
