@@ -110,7 +110,16 @@ class Server {
         // Create instances of the CircleBoard and Shop
         this.circleBoard = new CircleBoard(canvasId);
         this.baseUpgradeShop = new baseUpgradeShop();
+        this.clickShop = new clickShop();
         this.loadVersions = window.loadVersions;
+
+        this.temporaryMultipliers = {
+            clickValue: 1,
+            ballValue: 1,
+            circleSpeed: 1,
+
+        };
+        this.temporaryMultipliersActiveFrames = [];
 
         // DOM elements
         this.elements = {
@@ -118,6 +127,7 @@ class Server {
             offWallB: document.getElementById('offWallB'),
             offBallB: document.getElementById('offBallB'),
             shopBalanceDisplay: document.getElementById('shopBalance'),
+            clickShopDisplay: document.getElementById('clickShopBalance'),
             
             // Container
             shopContainer: document.getElementById('shopContainer'),
@@ -132,6 +142,7 @@ class Server {
         this.createGameContainer();
         
         this.clickerObject = null;
+        this.clickerValue = 1;
 
         // Animation and physics timing
         this.animationFrameId = null;
@@ -190,9 +201,10 @@ class Server {
         this.clickerObject = new ClickerObject('clickerCanvas');
         const originalHandleClick = this.clickerObject.handleClick;
         this.clickerObject.handleClick = () => {
+            if(!this.circleBoard.isRunning) return;
             originalHandleClick.call(this.clickerObject); // for animation purposes
 
-            // add to clickShop
+            this.clickShop.addBalance(this.clickerValue * this.temporaryMultipliers.clickValue);
 
             this.updateBalanceDisplay();
             this.updateButtonAppearance();
@@ -392,6 +404,25 @@ class Server {
             
             // Continue animation
             this.animationFrameId = window.requestAnimationFrame(animate);
+            this.temporaryMultipliersActiveFrames.forEach(value => {
+                value.frames--;
+                if (value.frames <= 0){
+
+                    switch(value.name) {
+                        case "tclickValue":
+                            this.temporaryMultipliers.clickValue /= value.multiplier;
+                            break;
+                        case "tcircleValue":
+                            this.temporaryMultipliers.ballValue /= value.multiplier;
+                            break;
+                        case "tcircleSpeed":
+                            this.temporaryMultipliers /= value.multiplier;
+                            break;
+                    }
+
+                }
+            });
+            this.temporaryMultipliersActiveFrames = this.temporaryMultipliersActiveFrames.filter(item => item.frames > 0);
         };
         
         // Start the animation loop
@@ -431,11 +462,11 @@ class Server {
         if (!this.circleBoard.isRunning) return;
         
         // Update physics
-        const stats = this.circleBoard.updatePhysics();
+        const stats = this.circleBoard.updatePhysics(1*this.temporaryMultipliers.circleSpeed);
         
         // Add wall hits to balance
         if (stats.totalWallHits > 0) {
-            this.baseUpgradeShop.addBalance(stats.totalWallHits);
+            this.baseUpgradeShop.addBalance(stats.totalWallHits * this.temporaryMultipliers.ballValue);
             this.updateButtonAppearance();
         }
         
@@ -481,17 +512,36 @@ class Server {
     updateBalanceDisplay() {
         if (this.elements.shopBalanceDisplay) {
             this.elements.shopBalanceDisplay.textContent = this.baseUpgradeShop.getBalance().toFixed(2);
+
         }
+        if(this.elements.clickShopDisplay){
+            this.elements.clickShopDisplay.textContent = this.clickShop.getBalance().toFixed(2);
+        }
+
     }
     updateButtonAppearance() {
         const buttons = document.querySelectorAll('.shop-item-button');
         
         buttons.forEach(button => {
             const itemName = button.querySelector('h3').textContent;
-            const item = this.baseUpgradeShop.items.find(i => i.name === itemName);
             
-            if (item) {
-                const canAfford = this.baseUpgradeShop.balance >= this.baseUpgradeShop.itemCost(item, 1)[0];
+            // Check if item is in baseUpgradeShop
+            const baseItem = this.baseUpgradeShop.items.find(i => i.name === itemName);
+            if (baseItem) {
+                const canAfford = this.baseUpgradeShop.balance >= this.baseUpgradeShop.itemCost(baseItem, 1)[0];
+                
+                if (canAfford) {
+                    button.classList.remove('cannot-afford');
+                } else {
+                    button.classList.add('cannot-afford');
+                }
+                return; // Skip the rest if we found the item in baseUpgradeShop
+            }
+            
+            // Check if item is in clickShop
+            const clickItem = this.clickShop.items.find(i => i.name === itemName);
+            if (clickItem) {
+                const canAfford = this.clickShop.balance >= this.clickShop.itemCost(clickItem, 1)[0];
                 
                 if (canAfford) {
                     button.classList.remove('cannot-afford');
@@ -502,6 +552,7 @@ class Server {
         });
     }
     // Setup shop UI elements
+    // For ClickingShop and CircleBoardShop
     setupShopUI() {
         const shopContainer = this.elements.shopContainer;
         
@@ -512,6 +563,7 @@ class Server {
         
         // Clear existing content
         shopContainer.innerHTML = '';
+        shopContainer.appendChild(document.createElement('h2')).textContent = 'Circle Shop';
         
         // Add shop items
         this.baseUpgradeShop.items.forEach(item => {
@@ -529,7 +581,7 @@ class Server {
             `;
             
             button.addEventListener('click', () => {
-                const success = this.buyItem(item.name);
+                const success = this.buyItemBShop(item.name);
                 
                 if (success) {
                     // Update button text after purchase
@@ -545,10 +597,46 @@ class Server {
             
             shopContainer.appendChild(button);
         });
+        // Add clickShop items
+        shopContainer.appendChild(document.createElement('h2')).textContent = 'Click Shop';
+
+        this.clickShop.items.forEach(item => {
+            const button = document.createElement('button');
+            button.className = 'shop-item-button';
+            const canAfford = this.clickShop.balance >= this.clickShop.itemCost(item, 1)[0];
+            if (!canAfford) {
+                button.classList.add('cannot-afford');
+            }
+
+            button.innerHTML = `
+                <h3 class="base-upgrade-itemNames">${item.name}</h3>
+                <p>Level: <span id="${item.name.replace(/\s+/g, '-')}-level">${item.level}</span></p>
+                <p>Cost: <span id="${item.name.replace(/\s+/g, '-')}-cost">${item.price.toFixed(2)}</span></p>
+            `;
+            
+            button.addEventListener('click', () => {
+                const success = this.buyItemCShop(item.name);
+                
+                if (success) {
+                    // Update button text after purchase
+                    const levelSpan = button.querySelector(`#${item.name.replace(/\s+/g, '-')}-level`);
+                    const costSpan = button.querySelector(`#${item.name.replace(/\s+/g, '-')}-cost`);
+                    
+                    if (levelSpan) levelSpan.textContent = item.level;
+                    if (costSpan) costSpan.textContent = item.price.toFixed(2);
+                    this.updateButtonAppearance();
+
+                }
+            });
+            
+            shopContainer.appendChild(button);
+
+        });
+
     }
     
     // Buy an item from the shop
-    buyItem(itemName, amount = 1) {
+    buyItemBShop(itemName, amount = 1) {
         const item = this.baseUpgradeShop.getItem(itemName);
         
         if (!item) {
@@ -559,7 +647,7 @@ class Server {
         const success = this.baseUpgradeShop.buyItem(item, amount);
         
         if (success) {
-            this.applyItemEffect(item);
+            this.applyItemEffectBShop(item);
             this.updateBalanceDisplay();
             this.saveGameState();
         }
@@ -568,7 +656,7 @@ class Server {
     }
     
     // Apply the effect of an item to the CircleBoard
-    applyItemEffect(item) {
+    applyItemEffectBShop(item) {
         switch (item.name) {
             case "Add Ball":
                 this.circleBoard.addNewBalls(1);
@@ -592,6 +680,64 @@ class Server {
                 
             case "Decrease Large Circle Size":
                 this.circleBoard.baseReferenceSize = item.getValue();
+                break;
+        }
+        
+        // Update scaled properties based on current scale factor
+        this.circleBoard.calculateScaleFactor();
+        
+        // Reinitialize the CircleBoard with new values
+        this.circleBoard.initContainer();
+    }
+    buyItemCShop(itemName, amount = 1) {
+        const item = this.clickShop.getItem(itemName);
+        
+        if (!item) {
+            console.error(`Item ${itemName} not found`);
+            return false;
+        }
+        
+        const success = this.clickShop.buyItem(item, amount);
+        
+        if (success) {
+            this.applyItemEffectCShop(item);
+            this.updateBalanceDisplay();
+            this.saveGameState();
+        }
+        
+        return success;
+    }
+
+    applyItemEffectCShop(item) {
+        switch (item.name) {
+            case "Increase Click Value":
+                this.clickerValue = item.getValue();
+                break;
+                
+            case "Temporary Click Value Multiplier":
+                this.temporaryMultipliers.clickValue *= item.getValue();
+                this.temporaryMultipliersActiveFrames.push({
+                    multiplier: item.getValue(),
+                    frames: 600, // 10 seconds
+                    name: "tclickValue"
+                });
+                break;
+                
+            case "Temporary Ball Value Multiplier":
+                this.temporaryMultipliers.ballValue *= item.getValue();
+                this.temporaryMultipliersActiveFrames.push({
+                    multiplier: item.getValue(),
+                    frames: 600, // 10 seconds
+                    name: "tcircleValue"
+                });
+                break;
+            case "Temporary Speed Multiplier":
+                this.temporaryMultipliers.circleSpeed *= item.getValue();
+                this.temporaryMultipliersActiveFrames.push({
+                    multiplier: item.getValue(),
+                    frames: 600, // 10 seconds
+                    name: "tcircleSpeed"
+                });
                 break;
         }
         

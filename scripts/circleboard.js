@@ -275,7 +275,7 @@ class CircleBoard {
      * @param {Object} shop - Shop object for handling currency
      * @return {Object} Statistics for the current frame
      */
-    updatePhysics() {
+    updatePhysics(speedMultipler = 1) {
         if (!this.isRunning) return { totalWallHits: 0, totalBallCollisions: 0 };
         
         // Track collisions for this frame
@@ -310,8 +310,8 @@ class CircleBoard {
                 }
             });
 
-            ball.x += ball.dx;
-            ball.y += ball.dy;
+            ball.x += ball.dx*speedMultipler;
+            ball.y += ball.dy*speedMultipler;
 
 
         });
