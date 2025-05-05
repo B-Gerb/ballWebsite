@@ -113,13 +113,14 @@ class Server {
         this.clickShop = new clickShop();
         this.loadVersions = window.loadVersions;
 
+
         this.temporaryMultipliers = {
             clickValue: 1,
             ballValue: 1,
             circleSpeed: 1,
 
         };
-        this.temporaryMultipliersActiveFrames = [];
+        this.temporaryMultipliersActiveFrames = {};
 
         // DOM elements
         this.elements = {
@@ -404,29 +405,32 @@ class Server {
             
             // Continue animation
             this.animationFrameId = window.requestAnimationFrame(animate);
-            this.temporaryMultipliersActiveFrames.forEach(value => {
+            for (let key in this.temporaryMultipliersActiveFrames) {
+                let value =  this.temporaryMultipliersActiveFrames[key];
                 value.frames--;
-                if (value.frames <= 0){
-
+                if (value.frames <= 0) {
                     switch(value.name) {
                         case "tclickValue":
                             this.temporaryMultipliers.clickValue /= value.multiplier;
+                            delete this.temporaryMultipliersActiveFrames[key];
                             break;
                         case "tcircleValue":
                             this.temporaryMultipliers.ballValue /= value.multiplier;
+                            delete this.temporaryMultipliersActiveFrames[key];
                             break;
                         case "tcircleSpeed":
-                            this.temporaryMultipliers /= value.multiplier;
+                            this.temporaryMultipliers.circleSpeed /= value.multiplier;
+                            delete this.temporaryMultipliersActiveFrames[key];
                             break;
                     }
-
                 }
-            });
-            this.temporaryMultipliersActiveFrames = this.temporaryMultipliersActiveFrames.filter(item => item.frames > 0);
-        };
+
+            };
         
+        }
         // Start the animation loop
         this.animationFrameId = window.requestAnimationFrame(animate);
+
     }
     
     // Stop animation loop
@@ -716,29 +720,48 @@ class Server {
                 
             case "Temporary Click Value Multiplier":
                 this.temporaryMultipliers.clickValue *= item.getValue();
-                this.temporaryMultipliersActiveFrames.push({
-                    multiplier: item.getValue(),
-                    frames: 600, // 10 seconds
-                    name: "tclickValue"
-                });
+                if('tclickValue' in this.temporaryMultipliersActiveFrames){
+                    this.temporaryMultipliersActiveFrames.tclickValue.frames += 600; // 10 seconds
+                }
+                else{
+                    this.temporaryMultipliersActiveFrames.tclickValue = {
+                        multiplier: item.getValue(),
+                        frames: 600, // 10 seconds
+                        name: "tclickValue"
+                    };
+                }
+
                 break;
                 
             case "Temporary Ball Value Multiplier":
                 this.temporaryMultipliers.ballValue *= item.getValue();
-                this.temporaryMultipliersActiveFrames.push({
-                    multiplier: item.getValue(),
-                    frames: 600, // 10 seconds
-                    name: "tcircleValue"
-                });
+                if('tcircleValue' in this.temporaryMultipliersActiveFrames){
+                    this.temporaryMultipliersActiveFrames.tcircleValue.frames += 600; // 10 seconds
+                }
+
+                else{
+                    this.temporaryMultipliersActiveFrames.tcircleValue = {
+                        multiplier: item.getValue(),
+                        frames: 600, // 10 seconds
+                        name: "tcircleValue"
+                    };
+                }
+
                 break;
             case "Temporary Speed Multiplier":
                 this.temporaryMultipliers.circleSpeed *= item.getValue();
-                this.temporaryMultipliersActiveFrames.push({
-                    multiplier: item.getValue(),
-                    frames: 600, // 10 seconds
-                    name: "tcircleSpeed"
-                });
+                if('tcircleSpeed' in this.temporaryMultipliersActiveFrames){
+                    this.temporaryMultipliersActiveFrames.tcircleSpeed.frames += 600; // 10 seconds
+                }
+                else{
+                    this.temporaryMultipliersActiveFrames.tcircleSpeed = {
+                        multiplier: item.getValue(),
+                        frames: 600, // 10 seconds
+                        name: "tcircleSpeed"
+                    };
+                }
                 break;
+
         }
         
         // Update scaled properties based on current scale factor
@@ -781,19 +804,33 @@ class Server {
                     borderColor: this.circleBoard.container.borderColor
                 }
             },
-            baseUpgradeShop: {
-                balance: this.baseUpgradeShop.balance,
-                items: this.baseUpgradeShop.items.map(item => ({
-                    name: item.name,
-                    price: item.price,
-                    level: item.level
-                }))
+            shops: {
+                clickShop: {
+                    balance: this.clickShop.balance,
+                    items: this.clickShop.items.map(item => ({
+                        name: item.name,
+                        price: item.price,
+                        level: item.level
+                    }))
+                },
+                baseUpgradeShop: {
+                    balance: this.baseUpgradeShop.balance,
+                    items: this.baseUpgradeShop.items.map(item => ({
+                        name: item.name,
+                        price: item.price,
+                        level: item.level
+                    }))
+                },
+            },
+            tempMultiplier: {
+                frames: this.temporaryMultipliersActiveFrames,
+                values: this.temporaryMultipliers
             },
             // Add clicker data to save state if needed
             clicker: {
                 clickCount: this.clickerObject ? this.clickerObject.clickCount : 0
             },
-            version: '0.0.1',
+            version: '0.0.2',
             seed: this.seed,
         };
         

@@ -90,25 +90,25 @@ class clickShop extends AShop {
                 getValue: function() { 
                     /* rest of the getValue function remains the same */
                     if (this.level < 10){
-                        return 1.25;
+                        return 2.25;
                     }
                     if(this.level < 25){
-                        return 1.5;
-                    }
-                    if(this.level< 50){
-                        return 1.75;
-                    }
-                    if(this.level < 100){
-                        return 2;
-                    }
-                    if(this.level < 200){
                         return 2.5;
                     }
-                    if(this.level < 500){
+                    if(this.level< 50){
+                        return 2.75;
+                    }
+                    if(this.level < 100){
                         return 3;
                     }
-                    if(this.level < 1000){
+                    if(this.level < 200){
+                        return 3.5;
+                    }
+                    if(this.level < 500){
                         return 4;
+                    }
+                    if(this.level < 1000){
+                        return 5;
                     }
                     else{
                         return 0;

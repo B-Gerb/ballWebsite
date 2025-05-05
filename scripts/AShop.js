@@ -22,6 +22,7 @@ class AShop {
         let cost = 0;
         let currentPrice = item.price;
         
+        
         for (let i = 0; i < amount; ++i) {
             cost += currentPrice;
             currentPrice = item.equation(currentPrice);
