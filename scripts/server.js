@@ -118,7 +118,6 @@ class Server {
             clickValue: 1,
             ballValue: 1,
             circleSpeed: 1,
-
         };
         this.temporaryMultipliersActiveFrames = {};
 
@@ -719,11 +718,14 @@ class Server {
                 break;
                 
             case "Temporary Click Value Multiplier":
-                this.temporaryMultipliers.clickValue *= item.getValue();
                 if('tclickValue' in this.temporaryMultipliersActiveFrames){
+                    this.temporaryMultipliers.clickValue /= this.temporaryMultipliersActiveFrames.tclickValue.multiplier;
+                    this.temporaryMultipliers.clickValue *= item.getValue();
                     this.temporaryMultipliersActiveFrames.tclickValue.frames += 600; // 10 seconds
+                    this.temporaryMultipliersActiveFrames.tclickValue.multiplier = item.getValue();
                 }
                 else{
+                    this.temporaryMultipliers.clickValue *= item.getValue();
                     this.temporaryMultipliersActiveFrames.tclickValue = {
                         multiplier: item.getValue(),
                         frames: 600, // 10 seconds
@@ -734,12 +736,16 @@ class Server {
                 break;
                 
             case "Temporary Ball Value Multiplier":
-                this.temporaryMultipliers.ballValue *= item.getValue();
                 if('tcircleValue' in this.temporaryMultipliersActiveFrames){
+                    this.temporaryMultipliers.ballValue /= this.temporaryMultipliersActiveFrames.tcircleValue.multiplier;
+                    this.temporaryMultipliers.ballValue *= item.getValue();
                     this.temporaryMultipliersActiveFrames.tcircleValue.frames += 600; // 10 seconds
+                    this.temporaryMultipliersActiveFrames.tcircleValue.multiplier = item.getValue();
                 }
 
                 else{
+                    this.temporaryMultipliers.ballValue *= item.getValue();
+
                     this.temporaryMultipliersActiveFrames.tcircleValue = {
                         multiplier: item.getValue(),
                         frames: 600, // 10 seconds
@@ -749,11 +755,15 @@ class Server {
 
                 break;
             case "Temporary Speed Multiplier":
-                this.temporaryMultipliers.circleSpeed *= item.getValue();
                 if('tcircleSpeed' in this.temporaryMultipliersActiveFrames){
+                    this.temporaryMultipliers.circleSpeed /= this.temporaryMultipliersActiveFrames.tcircleSpeed.multiplier;
+                    this.temporaryMultipliers.circleSpeed *= item.getValue();
                     this.temporaryMultipliersActiveFrames.tcircleSpeed.frames += 600; // 10 seconds
+                    this.temporaryMultipliersActiveFrames.tcircleSpeed.multiplier = item.getValue();
                 }
                 else{
+                    this.temporaryMultipliers.circleSpeed *= item.getValue();
+
                     this.temporaryMultipliersActiveFrames.tcircleSpeed = {
                         multiplier: item.getValue(),
                         frames: 600, // 10 seconds
@@ -877,6 +887,14 @@ class Server {
             this.seed = new Math.seedrandom(seed);
         }
         this.baseUpgradeShop.resetShop();
+        this.clickShop.resetShop();
+        this.temporaryMultipliers = {
+            clickValue: 1,
+            ballValue: 1,
+            circleSpeed: 1,
+
+        };
+        this.temporaryMultipliersActiveFrames = {}; 
         if (this.clickerObject) {
             this.clickerOjbect = new ClickerObject(this.elements.clickerCanvas.id);
         }
