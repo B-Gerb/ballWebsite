@@ -124,13 +124,7 @@ class ClickerObject {
         this.ctx.lineWidth = 3;
         this.ctx.strokeStyle = '#000';
         this.ctx.stroke();
-        
-        // Draw text
-        this.ctx.font = 'bold 18px Arial';
-        this.ctx.textAlign = 'center';
-        this.ctx.textBaseline = 'middle';
-        this.ctx.fillStyle = '#fff';
-        this.ctx.fillText('CLICK ME', centerX, centerY);
+
     }
     
     // Animation loop for the clicker

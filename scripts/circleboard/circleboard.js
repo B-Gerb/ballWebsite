@@ -4,11 +4,12 @@ class CircleBoard {
         this.canvas = document.getElementById(canvasId);
         this.ctx = this.canvas.getContext('2d');
         
-        // Animation settings
-        this.ballCount = 1;
+        this.baseContainerThickness = 5;
+
+        
+   
         this.baseMinBallSize = 5;      
         this.baseMaxBallSize = 15;
-        this.baseContainerThickness = 5;
         this.baseMinBallSpeed = 5;
         this.baseMaxBallSpeed = 15;
         this.isRunning = true;
@@ -39,8 +40,7 @@ class CircleBoard {
             thickness: this.baseContainerThickness
         };
         
-        this.shapes = {};   
-        this.balls = [];
+        this.shapes = [];   
         
         // Scale factor based on screen size
         this.scaleFactor = 1;
@@ -87,7 +87,7 @@ class CircleBoard {
         this.ballCount += amount;
         for (let i = 0; i < amount; i++) {
             const ballA = this.createBall();
-            this.balls.push(ballA);
+            this.shapes.push(ballA);
         }
     }
     
@@ -100,45 +100,31 @@ class CircleBoard {
         const distance = this.rng() * (maxDistance * 0.9); // Use only 90% of available space
         const x = this.container.x + Math.cos(angle) * distance;
         const y = this.container.y + Math.sin(angle) * distance;
-            
-        const baseRadius = radius / this.scaleFactor; 
-        const mass = baseRadius * baseRadius * Math.PI;
-            
-        const ball = {
-            x: x,
-            y: y,
-            radius: radius,
-            baseRadius: baseRadius, 
-            mass: mass, 
-            dx: (this.rng() - 0.5) * speed,
-            dy: (this.rng() - 0.5) * speed,
-            color: `rgb(${Math.floor(this.rng() * 255)}, ${Math.floor(this.rng() * 255)}, ${Math.floor(this.rng() * 255)})`,
-            collisionCount: 0
-        };
+        const color = `rgb(${Math.floor(this.rng() * 255)}, ${Math.floor(this.rng() * 255)}, ${Math.floor(this.rng() * 255)})`
+
         
+        const velocityAngle = this.rng() * Math.PI * 2;
+        const velocityX = Math.cos(velocityAngle) * speed * (this.rng() - 0.5);
+        const velocityY = Math.sin(velocityAngle) * speed * (this.rng() - 0.5);
+
+        
+        const ball = Circle.create(x, y, radius, color, velocityX, velocityY);
+        ball.baseRadius = radius / this.scaleFactor; 
+        
+
         // Ensure ball has minimum velocity
         const minSpeed = 0.5 * this.scaleFactor;
-        const currentSpeed = Math.sqrt(ball.dx * ball.dx + ball.dy * ball.dy);
+        const currentSpeed = Math.sqrt(ball.velocity.x * ball.velocity.x + ball.velocity.y * ball.velocity.y);
         if (currentSpeed < minSpeed) {
             const factor = minSpeed / Math.max(currentSpeed, 0.0001);
-            ball.dx *= factor;
-            ball.dy *= factor;
+            ball.velocity.x *= factor;
+            ball.velocity.y *= factor;
         }
+
         
         return ball;
     }
     
-    // Initialize bouncing balls within the container
-    initBalls() {
-        this.balls = [];
-        
-        for (let i = 0; i < this.ballCount; i++) {
-            this.balls.push(this.createBall());
-        }
-        
-        // Reset collision counters
-        this.resetCollisionCounters();
-    }
     
     // Reset collision counters and calculate rates
     resetCollisionCounters() {
@@ -168,20 +154,13 @@ class CircleBoard {
         this.ctx.closePath();
     }
     
-    // Draw a bouncing ball
-    drawBall(ball) {
-        this.ctx.beginPath();
-        this.ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
-        this.ctx.fillStyle = ball.color;
-        this.ctx.fill();
-        this.ctx.closePath();
-    }
+ 
     
     
     // Handle collision between two balls
     handleBallCollision(ballA, ballB) {
-        const dx = ballB.x - ballA.x;
-        const dy = ballB.y - ballA.y;
+        const dx = ballB.center.x - ballA.center.x;
+        const dy = ballB.center.y - ballA.center.y;
         const distance = Math.sqrt(dx * dx + dy * dy);
         
         // Calculate normal vector (direction from ballA to ballB)
@@ -191,8 +170,8 @@ class CircleBoard {
         const ny = dy / Math.max(distance, minDistance);
         
         // Calculate relative velocity
-        const vx = ballB.dx - ballA.dx;
-        const vy = ballB.dy - ballA.dy;
+        const vx = ballB.velocity.x - ballA.velocity.x;
+        const vy = ballB.velocity.y - ballA.velocity.y;
         
         // Calculate velocity along the normal direction
         const velocityAlongNormal = vx * nx + vy * ny;
@@ -206,10 +185,10 @@ class CircleBoard {
                 const moveRatio1 = ballB.mass / massSum;
                 const moveRatio2 = ballA.mass / massSum;
                 
-                ballA.x -= nx * overlap * moveRatio1 * 1.001; // Slightly more separation
-                ballA.y -= ny * overlap * moveRatio1 * 1.001;
-                ballB.x += nx * overlap * moveRatio2 * 1.001;
-                ballB.y += ny * overlap * moveRatio2 * 1.001;
+                ballA.center.x -= nx * overlap * moveRatio1 * 1.001; // Slightly more separation
+                ballA.center.y -= ny * overlap * moveRatio1 * 1.001;
+                ballB.center.x += nx * overlap * moveRatio2 * 1.001;
+                ballB.center.y += ny * overlap * moveRatio2 * 1.001;
             }
             return true;
         }
@@ -222,10 +201,10 @@ class CircleBoard {
         const impulseX = impulse * nx;
         const impulseY = impulse * ny;
         
-        ballA.dx -= impulseX * ballB.mass;
-        ballA.dy -= impulseY * ballB.mass;
-        ballB.dx += impulseX * ballA.mass;
-        ballB.dy += impulseY * ballA.mass;
+        ballA.velocity.x -= impulseX * ballB.mass;
+        ballA.velocity.y -= impulseY * ballB.mass;
+        ballB.velocity.x += impulseX * ballA.mass;
+        ballB.velocity.y += impulseY * ballA.mass;
         
         // Position correction to prevent overlap (with a small separation factor)
         const overlap = (ballA.radius + ballB.radius) - distance;
@@ -235,39 +214,107 @@ class CircleBoard {
             const moveRatio2 = ballA.mass / massSum;
             
             // Apply a bit more separation (1.001) to ensure balls don't stick
-            ballA.x -= nx * overlap * moveRatio1 * 1.001;
-            ballA.y -= ny * overlap * moveRatio1 * 1.001;
-            ballB.x += nx * overlap * moveRatio2 * 1.001;
-            ballB.y += ny * overlap * moveRatio2 * 1.001;
+            ballA.center.x -= nx * overlap * moveRatio1 * 1.001;
+            ballA.center.y -= ny * overlap * moveRatio1 * 1.001;
+            ballB.center.x += nx * overlap * moveRatio2 * 1.001;
+            ballB.center.y += ny * overlap * moveRatio2 * 1.001;
         }
         
         return true;
     }
     
     /**
-     * Handle ball collision with the container wall without checking conditions
-     * @param {Object} ball - Ball colliding with wall
+     * Handle shape collision with the container wall without checking conditions
+     * Assumes if object is not a circle it contains getVertices method
+     * @param {Object} shape - shape colliding with wall
      * @returns {boolean} Always returns true since we assume collision happens
      */
-    handleWallCollision(ball) {
-        const dx = ball.x - this.container.x;
-        const dy = ball.y - this.container.y;
+    handleWallCollision(shape) {
+        const dx = shape.center.x - this.container.x;
+        const dy = shape.center.y - this.container.y;
         const distance = Math.sqrt(dx * dx + dy * dy);
         
         const nx = dx / Math.max(distance, 0.0001);
         const ny = dy / Math.max(distance, 0.0001);
 
-        const overlap = distance + ball.radius - (this.container.radius - this.container.thickness);
-        ball.x -= overlap * nx;
-        ball.y -= overlap * ny;
-        
-        const dotProduct = ball.dx * nx + ball.dy * ny;
+
+        if(shape.getName() === "Circle"){
+            const overlap = distance + shape.radius - (this.container.radius - this.container.thickness);
+            shape.center.x -= overlap * nx;
+            shape.center.y -= overlap * ny;
             
-        ball.dx -= 2 * dotProduct * nx;
-        ball.dy -= 2 * dotProduct * ny;
+            const dotProduct = shape.velocity.x * nx + shape.velocity.y * ny;
+                
+            shape.velocity.x -= 2 * dotProduct * nx;
+            shape.velocity.y -= 2 * dotProduct * ny;
+            return true;
+        }
+        else{ 
+            if(shape.getVertices()){
+                const vertices = shape.getVertices();
+                let maxOverlap = 0;
+                let collisionNormalX = 0;
+                let collisionNormalY = 0;
+                for(const vertex of vertices){
+                    const vx = vertex.x - this.container.x;
+                    const vy = vertex.y - this.container.y;
+                    const distance = Math.sqrt(vx * vx + vy * vy);
+                    const overlap = distance - (this.container.radius - this.container.thickness);
+                    if(overlap > maxOverlap){
+                        maxOverlap = overlap;
+                        collisionNormalX = vx / Math.max(distance, 0.0001);
+                        collisionNormalY = vy / Math.max(distance, 0.0001);
+                    }
+
+                }
+                shape.center.x -= (maxOverlap + 0.1) * collisionNormalX;
+                shape.center.y -= (maxOverlap + 0.1) * collisionNormalY;
+                
+                // Calculate reflection for velocity
+                const dotProduct = shape.velocity.x * collisionNormalX + 
+                                shape.velocity.y * collisionNormalY;
+                
+                shape.velocity.x -= 2 * dotProduct * collisionNormalX;
+                shape.velocity.y -= 2 * dotProduct * collisionNormalY;
+                                
+                return true;
+
+            }
+
+        }
+
         
-        return true;
+        console.log(shape);
+        return false;
     }
+
+    isWallCollision(shape) {
+        if (shape.getName() === "Circle"){
+            const dx = shape.center.x - this.container.x;
+            const dy = shape.center.y - this.container.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            
+            // Check if circle is outside or touching the container wall
+            return distance + shape.radius >= this.container.radius - this.container.thickness;
+        }
+        else if (shape.getVertices) {
+            // For shapes with vertices, check if any vertex is outside the container
+            const vertices = shape.getVertices();
+            for (const vertex of vertices) {
+                const dx = vertex.x - this.container.center.x;
+                const dy = vertex.y - this.container.center.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                
+                if (distance >= this.container.radius - this.container.thickness) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        console.log("unknown shape", shape);
+        return false;
+    }
+
     
     /**
      * Process physics for one frame
@@ -276,45 +323,67 @@ class CircleBoard {
      * @return {Object} Statistics for the current frame
      */
     updatePhysics(speedMultipler = 1) {
-        if (!this.isRunning) return { totalWallHits: 0, totalBallCollisions: 0 };
+        if (!this.isRunning) return {total: { totalWallHits: 0, totalShapeCollisions: 0 }};
+
+        const returnValues = {total: { totalWallHits: 0, totalShapeCollisions: 0 }};
         
         // Track collisions for this frame
         let totalWallHits = 0;
-        let totalBallCollisions = 0;
+        let totalShapeCollisions = 0;
         
         // Move all balls forward by one frame
-        this.balls.forEach(ball => {
-
-            
-            // Check if any ball went outside container (emergency wall collision detection)
-            const dx = ball.x - this.container.x;
-            const dy = ball.y - this.container.y;
-            const distance = Math.sqrt(dx * dx + dy * dy);
-            const validRadius = this.container.radius - this.container.thickness - ball.radius;
-            
-            if (distance > validRadius) {
-                this.handleWallCollision(ball);
+        this.shapes.forEach(shape => {
+            if(this.isWallCollision(shape)){
+                this.handleWallCollision(shape);
                 totalWallHits++;
+                if(shape.getName() in returnValues){
+                    returnValues[shape.getName()].totalWallHits += 1;
+                }
+                else{
+                    returnValues[shape.getName()] = {totalWallHits: 0, totalShapeCollisions: 0};
+                    returnValues[shape.getName()].totalWallHits = 1;  
+                }
             }
-            this.balls.forEach(ballB => {  
-                if (ball !== ballB) {
-                    const dx = ballB.x - ball.x;
-                    const dy = ballB.y - ball.y;
-                    const distance = Math.sqrt(dx * dx + dy * dy);
-                    const validRadius = ball.radius + ballB.radius;
-                    
-                    if (distance < validRadius) {
-                        this.handleBallCollision(ball, ballB);
-                        totalBallCollisions++;
+
+            this.shapes.forEach(shapeB => {  
+                if (shape !== shapeB) {
+                    const axises = new Set([...shape.axes(shapeB), ...shapeB.axes(shape)]);
+                    for (const axis of axises) {
+                        const projectionA = shape.projection(axis);
+                        const projectionB = shapeB.projection(axis);
+                        if (projectionA[1] > projectionB[0] && projectionB[1] > projectionA[0]) {
+
+                            totalShapeCollisions++;
+                            if(shape.type in returnValues){
+                                returnValues[shape.type].totalShapeCollisions += 1;
+                            }
+                            else{
+                                returnValues[shape.type] = {totalWallHits: 0, totalShapeCollisions: 0};
+                                returnValues[shape.type].totalShapeCollisions = 1;  
+                            }
+                            if(shapeB.type in returnValues){
+                                returnValues[shapeB.type].totalShapeCollisions += 1;
+                            }
+                            else{
+                                returnValues[shapeB.type] = {totalWallHits: 0, totalShapeCollisions: 0};
+                                returnValues[shapeB.type].totalShapeCollisions = 1;  
+                            }
+                            // collision detected
+                            // somehow handle it
+                            console.log("Collision detected between shapes", shape, shapeB);
+                            
+                        }
+
                     }
                 }
             });
+            shape.update(speedMultipler);
 
-            ball.x += ball.dx*speedMultipler;
-            ball.y += ball.dy*speedMultipler;
 
 
         });
+        returnValues.total.totalWallHits = totalWallHits;
+        returnValues.total.totalShapeCollisions = totalShapeCollisions;
         
         // Update the collision statistics
         if (this.wallHitsStack.length >= 120) {
@@ -328,17 +397,15 @@ class CircleBoard {
             let old = this.ballCollisionsStack.shift();
             this.ballCollisions -= old;
         }
-        this.ballCollisionsStack.push(totalBallCollisions);
-        this.ballCollisions += totalBallCollisions;
+        this.ballCollisionsStack.push(totalShapeCollisions);
+        this.ballCollisions += totalShapeCollisions;
         
         // Increment counter
         this.counter++;
         
         // Return stats for this frame
-        return {
-            totalWallHits,
-            totalBallCollisions
-        };
+        // going to be more detailed
+        return returnValues;
     }
     
     /**
@@ -347,30 +414,22 @@ class CircleBoard {
     render() {
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
         this.drawContainer();
-        this.balls.forEach(ball => this.drawBall(ball));
+        this.shapes.forEach(shape => shape.draw(this.ctx));
         
 
     }
     updateCanvasSize(size) {
-
-        
-        const ballStates = this.balls.map(ball => {
-            const dx = ball.x - this.container.x;
-            const dy = ball.y - this.container.y;
+        const shapeStates = this.shapes.map(shape => {    
+            const info = shape.getInformation();
+            const dx = info.center.x - this.container.x;
+            const dy = info.center.y - this.container.y;
             const distance = Math.sqrt(dx * dx + dy * dy);
-            
-            const normalizedDistance = Math.max(distance, 0.0001);
-            
             return {
-                dirX: dx / normalizedDistance,
-                dirY: dy / normalizedDistance,
-                relDist: distance / this.container.radius, 
-                baseRadius: ball.baseRadius,
-                mass: ball.mass,
-                currentDx: ball.dx,
-                currentDy: ball.dy,
-                color: ball.color,
-                collisionCount: ball.collisionCount
+                shape: shape,
+                info: info,
+                dirX: dx / Math.max(distance, 0.0001), // Avoid division by zero
+                dirY: dy / Math.max(distance, 0.0001),
+                relDist: distance / this.container.radius // Store distance as percentage of container radius
             };
         });
         
@@ -386,29 +445,28 @@ class CircleBoard {
 
         const sizeRatio = this.container.radius / oldContainerRadius;
     
-        
-        this.balls = ballStates.map(state => {
+        shapeStates.forEach(state => {
+            const shape = state.shape;
+            
+            // Calculate new position based on relative distance to container center
             const newDist = state.relDist * this.container.radius;
             const newX = this.container.x + (state.dirX * newDist);
             const newY = this.container.y + (state.dirY * newDist);
             
-            const newRadius = state.baseRadius * this.scaleFactor;
+            // Update shape position
+            shape.center.x = newX;
+            shape.center.y = newY;
             
-
-            const newDx = state.currentDx * sizeRatio;
-            const newDy = state.currentDy * sizeRatio;
+            // Scale velocity by size ratio
+            shape.velocity.x *= sizeRatio;
+            shape.velocity.y *= sizeRatio;
             
-            return {
-                x: newX,
-                y: newY,
-                radius: newRadius,
-                baseRadius: state.baseRadius,
-                mass: state.mass,
-                dx: newDx,
-                dy: newDy,
-                color: state.color,
-                collisionCount: state.collisionCount
-            };
+            // Scale radius if it's a Circle
+            if (shape instanceof Circle) {
+                shape.radius = shape.baseRadius * this.scaleFactor;
+            }
+            
+            
         });
         
         this.render();
@@ -429,7 +487,7 @@ class CircleBoard {
     }
     
     // Get the current ball collisions per second
-    getBallCollisionsPerSecond() {
+    getShapeCollisionsPerSecond() {
         if (this.ballCollisionsStack.length === 0) return 0;
         return 60 * this.ballCollisions / this.ballCollisionsStack.length;
     }
@@ -465,9 +523,7 @@ class CircleBoard {
             console.warn("Container too small for balls, adjusting sizes");
             this.minBallSize = Math.min(this.minBallSize, this.container.radius * 0.1);
             this.maxBallSize = Math.min(this.maxBallSize, this.container.radius * 0.2);
-        }
-        
-        this.initBalls();
+        }        
         this.resetCollisionCounters();
 
         

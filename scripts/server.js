@@ -109,6 +109,8 @@ class Server {
     constructor(canvasId) {
         // Create instances of the CircleBoard and Shop
         this.circleBoard = new CircleBoard(canvasId);
+        this.circleBoard.addNewBalls(1);
+
         this.baseUpgradeShop = new baseUpgradeShop();
         this.clickShop = new clickShop();
         this.loadVersions = window.loadVersions;
@@ -399,7 +401,8 @@ class Server {
         const animate = () => {
             if (!this.circleBoard.isRunning) return;
             
-            // Render the current state
+
+            
             this.circleBoard.render();
             
             // Continue animation
@@ -465,11 +468,13 @@ class Server {
         if (!this.circleBoard.isRunning) return;
         
         // Update physics
-        const stats = this.circleBoard.updatePhysics(1*this.temporaryMultipliers.circleSpeed);
+        const stats = this.circleBoard.updatePhysics(1 * this.temporaryMultipliers.circleSpeed);
+        
         
         // Add wall hits to balance
-        if (stats.totalWallHits > 0) {
-            this.baseUpgradeShop.addBalance(stats.totalWallHits * this.temporaryMultipliers.ballValue);
+        if(stats.total.totalShapeCollisions > 0) console.log(stats);
+        if (stats.total.totalWallHits > 0) {
+            this.baseUpgradeShop.addBalance(stats.total.totalWallHits * this.temporaryMultipliers.ballValue);
             this.updateButtonAppearance();
         }
         
@@ -477,13 +482,11 @@ class Server {
         this.updateCollisionDisplay();
         this.updateBalanceDisplay();
         this.frameCount++;
-        if(this.frameCount > 60){
+        
+        if (this.frameCount > 60) {
             this.saveGameState();
             this.frameCount = 0;
         }
-
-    
-        
     }
     
     // Toggle animation state
@@ -507,7 +510,7 @@ class Server {
             this.elements.offWallB.textContent = this.circleBoard.getWallHitsPerSecond().toFixed(2);
         }
         if (this.elements.offBallB) {
-            this.elements.offBallB.textContent = this.circleBoard.getBallCollisionsPerSecond().toFixed(2);
+            this.elements.offBallB.textContent = this.circleBoard.getShapeCollisionsPerSecond().toFixed(2);
         }
     }
     
@@ -785,29 +788,30 @@ class Server {
     saveGameState() {
         const gameState = {
             circleBoard: {
-                ballCount: this.circleBoard.ballCount,
                 baseMinBallSize: this.circleBoard.baseMinBallSize,
                 baseMaxBallSize: this.circleBoard.baseMaxBallSize,
                 baseReferenceSize: this.circleBoard.baseReferenceSize,
                 baseMinBallSpeed: this.circleBoard.baseMinBallSpeed,
                 baseMaxBallSpeed: this.circleBoard.baseMaxBallSpeed,
-                balls: this.circleBoard.balls.map(ball => ({
-                    size: ball.radius,
-                    baseRadius: ball.baseRadius,
-                    position: {
-                        x: ball.x,
-                        y: ball.y
-                    },
-                    velocity: {
-                        x: ball.dx,
-                        y: ball.dy
-                    },
-                    color: ball.color,
-                    mass: ball.mass
-                })),
+                shapes: this.circleBoard.shapes.map(shape => {
+                    // Get shape information for saving
+                    const info = shape.getInformation();
+                    
+                    // Return a serializable object
+                    return {
+                        type: shape.constructor.name.toLowerCase(),
+                        center: info.center,
+                        radius: info.radius,
+                        baseRadius: info.baseRadius,
+                        velocity: info.velocity,
+                        color: info.color,
+                        mass: info.mass
+                    };
+                }),
                 container: {
                     x: this.circleBoard.container.x,
                     y: this.circleBoard.container.y,
+
                     radius: this.circleBoard.container.radius,
                     thickness: this.circleBoard.container.thickness,
                     color: this.circleBoard.container.color,
@@ -847,10 +851,15 @@ class Server {
         localStorage.setItem('circleBoardGameState', JSON.stringify(gameState));
         return gameState;
     }
+
     
     // Load game state from localStorage
     loadGameState() {        
         try {
+            if (!localStorage.getItem('circleBoardGameState')) {
+                
+                return false;
+            }
             let success = this.loadVersions.load(this);
             if (!success) {
                 console.error('Failed to load game state: Version mismatch or unsupported version');
@@ -908,6 +917,9 @@ class Server {
         
         // Start animation and physics loop
         this.circleBoard.isRunning = true;  // Make sure isRunning flag is set to true
+        this.handleResize();
+        this.circleBoard.addNewBalls(1);
+
         this.startGame();
         
         console.log('Game state reset successfully');
@@ -938,6 +950,7 @@ class Server {
         if (!this.loadGameState()) {
             // No saved state, initialize with defaults
             this.circleBoard.initialize();
+            this.circleBoard.addNewBalls(1);
             this.startGame();
         }
         

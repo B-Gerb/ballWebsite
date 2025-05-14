@@ -32,6 +32,8 @@ function load(server){
     }
 
 }
+
+
 function boardLoad(server, gameState){
     if (gameState.circleBoard) {
         server.circleBoard.ballCount = gameState.circleBoard.ballCount || server.circleBoard.ballCount;
@@ -49,34 +51,40 @@ function boardLoad(server, gameState){
             server.circleBoard.container.color = gameState.circleBoard.container.color || server.circleBoard.container.color;
             server.circleBoard.container.borderColor = gameState.circleBoard.container.borderColor || server.circleBoard.container.borderColor;
         }
-        
-        if (gameState.circleBoard.balls && Array.isArray(gameState.circleBoard.balls)) {
-            server.circleBoard.balls = gameState.circleBoard.balls.map(ballData => {
-                // Ensure baseRadius is present, calculate if missing
-                const baseRadius = ballData.baseRadius || 
-                    (ballData.size / server.circleBoard.scaleFactor);
-                
-                return {
-                    x: ballData.position.x,
-                    y: ballData.position.y,
-                    radius: ballData.size,
-                    mass: ballData.mass,
-                    dx: ballData.velocity.x,
-                    dy: ballData.velocity.y,
-                    color: ballData.color,
-                    baseRadius: baseRadius,
-                    collisionCount: 0
-                };
+        server.circleBoard.shapes = [];
+        if (gameState.circleBoard.shapes && Array.isArray(gameState.circleBoard.shapes)) {
+            gameState.circleBoard.shapes.forEach(savedShape => {
+                switch (savedShape.type) {
+                    case 'circle':
+                        console.log("Loading circle", savedShape);
+                        server.circleBoard.shapes.push(Circle.create(savedShape.center.x, savedShape.center.y, savedShape.radius, savedShape.color, savedShape.velocity.x, savedShape.velocity.y, savedShape.baseRadius));
+                        break;
+                        /*
+                    case 'square':
+                        server.circleBoard.shapes.push(square.createSquare(savedShape.center.x, savedShape.center.y, savedShape.width, savedShape.height, savedShape.color, savedShape.velocity.x, savedShape.velocity.y));
+                        break;
+                    case 'triangle':
+                        server.circleBoard.shapes.push(triangle.createTriangle(savedShape.center.x, savedShape.center.y, savedShape.baseSize, savedShape.color, savedShape.velocity.x, savedShape.velocity.y));
+                        break;
+                        */
+                    default:
+                        console.error('Unknown shape type:', savedShape.type);
+                }
             });
-            
-        } 
-        else{
-
-            // If no saved balls, initialize them
-            server.circleBoard.initBalls();
         }
-    }
+        else if (gameState.circleBoard.balls && Array.isArray(gameState.circleBoard.balls)) {
+            gameState.circleBoard.balls.forEach(savedBall => {
+                server.circleBoard.shapes.push(Circle.create(savedBall.position.x, savedBall.position.y, baseRadius, savedBall.color, savedBall.velocity.x, savedBall.velocity.y));
+            });
+        }
+        else {
+            // If no saved shapes, initialize them
+            server.circleBoard.addNewBalls(1);
+        }
+
+
         
+    }
 }
 function loadbaseUpgradeShop(server, gameState){
     if ("baseUpgradeShop" in gameState) {
@@ -131,6 +139,9 @@ function loadTempMultiplier(server, gameState){
 
     }
 
+
+}
+function load0_0_3(server, gameState){
 
 }
     
