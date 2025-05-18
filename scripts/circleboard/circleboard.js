@@ -6,12 +6,26 @@ class CircleBoard {
         
         this.baseContainerThickness = 5;
 
+
         
-   
-        this.baseMinBallSize = 5;      
-        this.baseMaxBallSize = 15;
-        this.baseMinBallSpeed = 5;
-        this.baseMaxBallSpeed = 15;
+        // Properties
+        this.shapeInfo = {
+            'Circle': {
+                baseMinBallSize: 5,
+                baseMaxBallSize: 15,
+                baseMinBallSpeed: 5,
+                baseMaxBallSpeed: 15,
+            },
+            'Square': {
+                baseMinSide: 5,
+                baseMaxSide: 15,
+                baseMinSpeed: 5,
+                baseMaxSpeed: 15,
+            }
+        };
+
+
+
         this.isRunning = true;
         this.rng = new Math.seedrandom();
         
@@ -25,10 +39,21 @@ class CircleBoard {
         this.counter = 0;
         
         // Scaled properties
-        this.minBallSize = this.baseMinBallSize;
-        this.maxBallSize = this.baseMaxBallSize;
-        this.minBallSpeed = this.baseMinBallSpeed;
-        this.maxBallSpeed = this.baseMaxBallSpeed;
+        this.shapeInfoScaled = {
+            Circle: {
+                baseMinBallSize: 5,
+                baseMaxBallSize: 15,
+                baseMinBallSpeed: 5,
+                baseMaxBallSpeed: 15,
+            },
+            Square: {
+                baseMinSide: 5,
+                baseMaxSide: 15,
+                baseMinSpeed: 5,
+                baseMaxSpeed: 15,
+            }
+        };
+
         
         // Create container
         this.container = {
@@ -62,10 +87,13 @@ class CircleBoard {
         const smallerDimension = Math.min(this.canvas.width, this.canvas.height);
         this.scaleFactor = smallerDimension / this.baseReferenceSize;
         
-        this.minBallSize = this.baseMinBallSize * this.scaleFactor;
-        this.maxBallSize = this.baseMaxBallSize * this.scaleFactor;
-        this.minBallSpeed = this.baseMinBallSpeed * this.scaleFactor;
-        this.maxBallSpeed = this.baseMaxBallSpeed * this.scaleFactor;
+        for( const shape of Object.keys(this.shapeInfo)){
+            for(const prop of Object.keys(this.shapeInfo[shape])){
+                this.shapeInfoScaled[shape][prop] = this.shapeInfo[shape][prop] * this.scaleFactor;
+                
+            }
+        }
+
     }
     
     // Initialize container
@@ -92,9 +120,9 @@ class CircleBoard {
     }
     
     createBall() {
-        const radius = this.minBallSize + (this.rng() * (this.maxBallSize - this.minBallSize));
-        const speed = this.minBallSpeed + (this.rng() * (this.maxBallSpeed - this.minBallSpeed));
-            
+        const radius = this.shapeInfo['Circle'].baseMinBallSize + (this.rng() * (this.shapeInfo['Circle'].baseMaxBallSize - this.shapeInfo['Circle'].baseMinBallSize));
+        const speed = this.shapeInfo['Circle'].baseMinBallSpeed + (this.rng() * (this.shapeInfo['Circle'].baseMaxBallSpeed - this.shapeInfo['Circle'].baseMinBallSpeed));
+           
         const angle = this.rng() * Math.PI * 2;
         const maxDistance = this.container.radius - radius - this.container.thickness - 5 * this.scaleFactor;
         const distance = this.rng() * (maxDistance * 0.9); // Use only 90% of available space
