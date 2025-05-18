@@ -56,7 +56,6 @@ function boardLoad(server, gameState){
             gameState.circleBoard.shapes.forEach(savedShape => {
                 switch (savedShape.type) {
                     case 'circle':
-                        console.log("Loading circle", savedShape);
                         server.circleBoard.shapes.push(Circle.create(savedShape.center.x, savedShape.center.y, savedShape.radius, savedShape.color, savedShape.velocity.x, savedShape.velocity.y, savedShape.baseRadius));
                         break;
                         /*

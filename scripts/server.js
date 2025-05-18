@@ -394,112 +394,14 @@ class Server {
         });
     }
     
-    // Start animation loop
-    startAnimationLoop() {
-        if (this.animationFrameId) return; // Already running
-        
-        const animate = () => {
-            if (!this.circleBoard.isRunning) return;
-            
-
-            
-            this.circleBoard.render();
-            
-            // Continue animation
-            this.animationFrameId = window.requestAnimationFrame(animate);
-            for (let key in this.temporaryMultipliersActiveFrames) {
-                let value =  this.temporaryMultipliersActiveFrames[key];
-                value.frames--;
-                if (value.frames <= 0) {
-                    switch(value.name) {
-                        case "tclickValue":
-                            this.temporaryMultipliers.clickValue /= value.multiplier;
-                            delete this.temporaryMultipliersActiveFrames[key];
-                            break;
-                        case "tcircleValue":
-                            this.temporaryMultipliers.ballValue /= value.multiplier;
-                            delete this.temporaryMultipliersActiveFrames[key];
-                            break;
-                        case "tcircleSpeed":
-                            this.temporaryMultipliers.circleSpeed /= value.multiplier;
-                            delete this.temporaryMultipliersActiveFrames[key];
-                            break;
-                    }
-                }
-
-            };
-        
-        }
-        // Start the animation loop
-        this.animationFrameId = window.requestAnimationFrame(animate);
-
-    }
     
-    // Stop animation loop
-    stopAnimationLoop() {
-        if (this.animationFrameId) {
-            window.cancelAnimationFrame(this.animationFrameId);
-            this.animationFrameId = null;
-        }
-    }
-    // Start physics update loop
-    startPhysicsLoop() {
-        if (this.physicsTimerId) return; // Already running
-        
-        this.lastPhysicsUpdate = performance.now();
-        
-        // Setup regular physics updates
-        this.physicsTimerId = setInterval(() => {
-            this.updatePhysics();
-        }, this.physicsUpdateInterval);
-    }
-    
-    // Stop physics update loop
-    stopPhysicsLoop() {
-        if (this.physicsTimerId) {
-            clearInterval(this.physicsTimerId);
-            this.physicsTimerId = null;
-        }
-    }
-    
-    
-    // Update physics - called on a fixed interval
-    updatePhysics() {
-        if (!this.circleBoard.isRunning) return;
-        
-        // Update physics
-        const stats = this.circleBoard.updatePhysics(1 * this.temporaryMultipliers.circleSpeed);
-        
-        
-        // Add wall hits to balance
-        if(stats.total.totalShapeCollisions > 0) console.log(stats);
-        if (stats.total.totalWallHits > 0) {
-            this.baseUpgradeShop.addBalance(stats.total.totalWallHits * this.temporaryMultipliers.ballValue);
-            this.updateButtonAppearance();
-        }
-        
-        // Update displays
-        this.updateCollisionDisplay();
-        this.updateBalanceDisplay();
-        this.frameCount++;
-        
-        if (this.frameCount > 60) {
-            this.saveGameState();
-            this.frameCount = 0;
-        }
-    }
     
     // Toggle animation state
     toggleAnimation() {
         if (this.circleBoard.toggleSimulation()) {
-
-            this.startAnimationLoop();
-            this.startPhysicsLoop();
-
+            this.startGame();
         } else {
-            this.stopAnimationLoop();
-            this.stopPhysicsLoop();      
-
+            this.stopGame();
         }
         return this.circleBoard.isRunning;
     }
@@ -883,8 +785,7 @@ class Server {
     // Reset the game state
     resetGameState(seed=null) {
         // Stop existing loops
-        this.stopAnimationLoop();
-        this.stopPhysicsLoop();
+        this.stopGame();
         
         // Reset CircleBoard
         localStorage.removeItem('circleBoardGameState');
@@ -925,10 +826,78 @@ class Server {
         console.log('Game state reset successfully');
     }
     
-    // Start the game (animation and physics)
     startGame() {
-        this.startAnimationLoop();
-        this.startPhysicsLoop();
+        if (this.animationFrameId) return; // Already running
+        
+        const targetFPS = 60;
+        const frameInterval = 1000 / targetFPS; //frame rate
+        let lastFrameTime = performance.now();
+        let accumulator = 0;
+        
+        const gameLoop = (currentTime) => {
+            if (!this.circleBoard.isRunning) return;
+            
+            const deltaTime = currentTime - lastFrameTime;
+            lastFrameTime = currentTime;
+            
+            accumulator += deltaTime;
+            
+            while (accumulator >= frameInterval) {
+                const stats = this.circleBoard.updatePhysics(1 * this.temporaryMultipliers.circleSpeed);
+                
+                if (stats.total.totalWallHits > 0) {
+                    this.baseUpgradeShop.addBalance(stats.total.totalWallHits * this.temporaryMultipliers.ballValue);
+                    this.updateButtonAppearance();
+                }
+                
+                this.updateCollisionDisplay();
+                this.updateBalanceDisplay();
+                
+                this.processTemporaryMultipliers();
+                
+                this.frameCount++;
+                if (this.frameCount > 60) {
+                    this.saveGameState();
+                    this.frameCount = 0;
+                }
+                
+                accumulator -= frameInterval;
+            }
+            
+            this.circleBoard.render();
+            this.animationFrameId = window.requestAnimationFrame(gameLoop);
+        };
+        
+        this.animationFrameId = window.requestAnimationFrame(gameLoop);
+    }
+    processTemporaryMultipliers() {
+        for (let key in this.temporaryMultipliersActiveFrames) {
+            let value = this.temporaryMultipliersActiveFrames[key];
+            value.frames--;
+            if (value.frames <= 0) {
+                switch(value.name) {
+                    case "tclickValue":
+                        this.temporaryMultipliers.clickValue /= value.multiplier;
+                        delete this.temporaryMultipliersActiveFrames[key];
+                        break;
+                    case "tcircleValue":
+                        this.temporaryMultipliers.ballValue /= value.multiplier;
+                        delete this.temporaryMultipliersActiveFrames[key];
+                        break;
+                    case "tcircleSpeed":
+                        this.temporaryMultipliers.circleSpeed /= value.multiplier;
+                        delete this.temporaryMultipliersActiveFrames[key];
+                        break;
+                }
+            }
+        }
+    }
+    
+    stopGame() {
+        if (this.animationFrameId) {
+            window.cancelAnimationFrame(this.animationFrameId);
+            this.animationFrameId = null;
+        }
     }
     
     // Initialize the game
