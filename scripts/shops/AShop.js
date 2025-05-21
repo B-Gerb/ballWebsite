@@ -46,8 +46,12 @@ class AShop {
         throw new Error("Method 'resetShop()' must be implemented by child classes");
     }
     getItem(itemName) {
-        return this.items.find(item => item.name === itemName);
-    }
+        const found =  this.items.find(item => item.name === itemName);
+        if (found) return found;
+
+
+    };
+
 
 
 }

@@ -1,4 +1,4 @@
-class prestigeUpgradeShop extends AShop {
+class prestigeSquareShop extends AShop {
     constructor() {
         super();
         this.items = [

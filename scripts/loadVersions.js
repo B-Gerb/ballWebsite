@@ -20,6 +20,8 @@ function load(server){
                     return load0_0_1(server, gameState);  
                 case '0.0.2':
                     return load0_0_2(server, gameState);
+                case '0.0.3':
+                    return load0_0_3(server, gameState);
                 default:
                     console.log('Unknown game version:', version);
                     return false;
@@ -85,24 +87,93 @@ function boardLoad(server, gameState){
         
     }
 }
-function loadbaseUpgradeShop(server, gameState){
+function loadbaseUpgradeShop(server, gameState) {
     if ("baseUpgradeShop" in gameState) {
         server.baseUpgradeShop.balance = gameState.baseUpgradeShop.balance || 0;
+        
+        // Check if items has the old array format or the new categorized format
         if (gameState.baseUpgradeShop.items && Array.isArray(gameState.baseUpgradeShop.items)) {
+            // Old format - flat array of items
             gameState.baseUpgradeShop.items.forEach(savedItem => {
-                const item = server.baseUpgradeShop.getItem(savedItem.name);
-                if (item) {
-                    item.price = savedItem.price;
-                    item.level = savedItem.level;
+                // Look through all categories to find the item
+                for (const category in server.baseUpgradeShop.items) {
+                    const item = server.baseUpgradeShop.items[category].find(i => i.name === savedItem.name);
+                    if (item) {
+                        item.price = savedItem.price;
+                        item.level = savedItem.level;
+                        break; // Exit once found
+                    }
                 }
             });
+        } else if (gameState.baseUpgradeShop.items && typeof gameState.baseUpgradeShop.items === 'object') {
+            // New format - categorized items
+            for (const category in gameState.baseUpgradeShop.items) {
+                if (category in server.baseUpgradeShop.items) {
+                    const savedItems = gameState.baseUpgradeShop.items[category];
+                    
+                    savedItems.forEach(savedItem => {
+                        const item = server.baseUpgradeShop.items[category].find(i => i.name === savedItem.name);
+                        if (item) {
+                            item.price = savedItem.price;
+                            item.level = savedItem.level;
+                        }
+                    });
+                }
+            }
         }
-
-
-
-
     }
 }
+
+// Add a new load function for version 0.0.3
+function load0_0_3(server, gameState) {
+    boardLoad(server, gameState);
+    if ("shops" in gameState) {
+        loadbaseUpgradeShop(server, gameState.shops);
+        loadclickShop(server, gameState.shops);
+    }
+    loadSeed(server, gameState);
+    loadClicker(server, gameState);
+    loadTempMultiplier(server, gameState);
+    server.updateBalanceDisplay();
+    server.setupShopUI();
+    return true;
+}
+
+// Also update the version switch in the main load function
+function load(server) {
+    const savedState = localStorage.getItem('circleBoardGameState');
+    console.log('savedState', savedState);
+    if (!savedState) {
+        console.log('No saved game state found');
+        return false;
+    }
+    try {
+        const gameState = JSON.parse(savedState);
+        if (!("version" in gameState)) {
+            return loadPreVersion(server, gameState);
+        }
+        else {
+            let version = gameState.version;
+            switch (version) {
+                case '0.0.1':
+                    return load0_0_1(server, gameState);  
+                case '0.0.2':
+                    return load0_0_2(server, gameState);
+                case '0.0.3':
+                    return load0_0_3(server, gameState);
+                default:
+                    console.log('Unknown game version:', version);
+                    return false;
+            }
+        }
+    }
+    catch (error) {
+        console.error('Error loading game state:', error);
+        return false;
+    }
+}
+
+
 function loadSeed(server, gameState){
     if("seed" in gameState){
         server.setSeed(gameState.seed);
@@ -126,6 +197,9 @@ function loadclickShop(server, gameState){
                     item.price = savedItem.price;
                     item.level = savedItem.level;
                 }
+                if (savedItem.name === "Increase Click Value") {
+                    server.clickerValue = item.getValue() || 1;
+                }
             });
         }
 
@@ -140,9 +214,7 @@ function loadTempMultiplier(server, gameState){
 
 
 }
-function load0_0_3(server, gameState){
 
-}
     
 
 function load0_0_2(server, gameState){

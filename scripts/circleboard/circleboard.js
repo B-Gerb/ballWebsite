@@ -111,8 +111,8 @@ class CircleBoard {
         };
     }
     
+    // Shape creation
     addNewBalls(amount = 1) {
-        this.ballCount += amount;
         for (let i = 0; i < amount; i++) {
             const ballA = this.createBall();
             this.shapes.push(ballA);
@@ -141,7 +141,7 @@ class CircleBoard {
         
 
         // Ensure ball has minimum velocity
-        const minSpeed = 0.5 * this.scaleFactor;
+        const minSpeed = this.shapeInfo['Circle'].baseMinBallSpeed * this.scaleFactor;
         const currentSpeed = Math.sqrt(ball.velocity.x * ball.velocity.x + ball.velocity.y * ball.velocity.y);
         if (currentSpeed < minSpeed) {
             const factor = minSpeed / Math.max(currentSpeed, 0.0001);
@@ -152,7 +152,39 @@ class CircleBoard {
         
         return ball;
     }
-    
+
+    addNewSquares(amount = 1) {
+        for (let i = 0; i < amount; i++) {
+            const squareA = this.createSquare();
+            this.shapes.push(squareA);
+        }
+    }
+    createSquare() {
+        const side = this.shapeInfo['Square'].baseMinSide + (this.rng() * (this.shapeInfo['Square'].baseMaxSide - this.shapeInfo['Square'].baseMinSide));
+        const speed = this.shapeInfo['Square'].baseMinSpeed + (this.rng() * (this.shapeInfo['Square'].baseMaxSpeed - this.shapeInfo['Square'].baseMinSpeed));
+        const angle = this.rng() * Math.PI * 2;
+        const maxDistance = this.container.radius - side - this.container.thickness - 5 * this.scaleFactor;
+        const distance = this.rng() * (maxDistance * 0.9); // Use only 90% of available space
+        const x = this.container.x + Math.cos(angle) * distance;
+        const y = this.container.y + Math.sin(angle) * distance;
+        const color = `rgb(${Math.floor(this.rng() * 255)}, ${Math.floor(this.rng() * 255)}, ${Math.floor(this.rng() * 255)})`
+        const velocityAngle = this.rng() * Math.PI * 2;
+        const velocityX = Math.cos(velocityAngle) * speed * (this.rng() - 0.5);
+        const velocityY = Math.sin(velocityAngle) * speed * (this.rng() - 0.5);
+        const square = Square.create(x, y, side, color, velocityX, velocityY);
+        square.baseSide = side / this.scaleFactor; // Store the base size for scaling
+
+        // Ensure square has minimum velocity
+        const minSpeed = this.shapeInfo['Square'].baseMinSpeed * this.scaleFactor;
+        const currentSpeed = Math.sqrt(square.velocity.x * square.velocity.x + square.velocity.y * square.velocity.y);
+        if (currentSpeed < minSpeed) {
+            const factor = minSpeed / Math.max(currentSpeed, 0.0001);
+            square.velocity.x *= factor;
+            square.velocity.y *= factor;
+        }
+        return square;
+    }
+
     
     // Reset collision counters and calculate rates
     resetCollisionCounters() {
