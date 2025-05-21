@@ -36,14 +36,42 @@ function load(server){
 }
 
 
-function boardLoad(server, gameState){
+function boardLoad(server, gameState) {
     if (gameState.circleBoard) {
+        // Handle shapeInfo if present in saved state
+        if (gameState.circleBoard.shapeInfo) {
+            server.circleBoard.shapeInfo = gameState.circleBoard.shapeInfo;
+        } else {
+            // Legacy support: Map old properties to new shapeInfo structure
+            server.circleBoard.shapeInfo = server.circleBoard.shapeInfo || {
+                'Circle': {
+                    baseMinBallSize: 5,
+                    baseMaxBallSize: 15,
+                    baseMinBallSpeed: 5,
+                    baseMaxBallSpeed: 15,
+                },
+                'Square': {
+                    baseMinSide: 5,
+                    baseMaxSide: 15,
+                    baseMinSpeed: 5,
+                    baseMaxSpeed: 15,
+                }
+            };
+            
+            // Map old properties if they exist
+            if (gameState.circleBoard.baseMinBallSize) 
+                server.circleBoard.shapeInfo.Circle.baseMinBallSize = gameState.circleBoard.baseMinBallSize;
+            if (gameState.circleBoard.baseMaxBallSize)
+                server.circleBoard.shapeInfo.Circle.baseMaxBallSize = gameState.circleBoard.baseMaxBallSize;
+            if (gameState.circleBoard.baseMinBallSpeed)
+                server.circleBoard.shapeInfo.Circle.baseMinBallSpeed = gameState.circleBoard.baseMinBallSpeed;
+            if (gameState.circleBoard.baseMaxBallSpeed)
+                server.circleBoard.shapeInfo.Circle.baseMaxBallSpeed = gameState.circleBoard.baseMaxBallSpeed;
+        }
+        
+        
         server.circleBoard.ballCount = gameState.circleBoard.ballCount || server.circleBoard.ballCount;
-        server.circleBoard.baseMinBallSize = gameState.circleBoard.baseMinBallSize || server.circleBoard.baseMinBallSize;
-        server.circleBoard.baseMaxBallSize = gameState.circleBoard.baseMaxBallSize || server.circleBoard.baseMaxBallSize;
         server.circleBoard.baseReferenceSize = gameState.circleBoard.baseReferenceSize || server.circleBoard.baseReferenceSize;
-        server.circleBoard.baseMinBallSpeed = gameState.circleBoard.baseMinBallSpeed || server.circleBoard.baseMinBallSpeed;
-        server.circleBoard.baseMaxBallSpeed = gameState.circleBoard.baseMaxBallSpeed || server.circleBoard.baseMaxBallSpeed;
         server.circleBoard.canvas.width = server.circleBoard.canvas.parentElement.clientWidth;
         server.circleBoard.canvas.height = server.circleBoard.canvas.parentElement.clientHeight;
         server.circleBoard.calculateScaleFactor();
@@ -53,21 +81,24 @@ function boardLoad(server, gameState){
             server.circleBoard.container.color = gameState.circleBoard.container.color || server.circleBoard.container.color;
             server.circleBoard.container.borderColor = gameState.circleBoard.container.borderColor || server.circleBoard.container.borderColor;
         }
+        
         server.circleBoard.shapes = [];
         if (gameState.circleBoard.shapes && Array.isArray(gameState.circleBoard.shapes)) {
             gameState.circleBoard.shapes.forEach(savedShape => {
-                switch (savedShape.type) {
-                    case 'circle':
+                switch (savedShape.name) {
+                    case 'Circle':
                         server.circleBoard.shapes.push(Circle.create(savedShape.center.x, savedShape.center.y, savedShape.radius, savedShape.color, savedShape.velocity.x, savedShape.velocity.y, savedShape.baseRadius));
                         break;
-                        /*
-                    case 'square':
-                        server.circleBoard.shapes.push(square.createSquare(savedShape.center.x, savedShape.center.y, savedShape.width, savedShape.height, savedShape.color, savedShape.velocity.x, savedShape.velocity.y));
+                        
+                    case 'Square':
+                        server.circleBoard.shapes.push(Square.create(savedShape.center.x, savedShape.center.y, savedShape.side, savedShape.rotation, savedShape.color, savedShape.velocity.x, savedShape.velocity.y));
                         break;
+                        /*
                     case 'triangle':
                         server.circleBoard.shapes.push(triangle.createTriangle(savedShape.center.x, savedShape.center.y, savedShape.baseSize, savedShape.color, savedShape.velocity.x, savedShape.velocity.y));
                         break;
                         */
+                        
                     default:
                         console.error('Unknown shape type:', savedShape.type);
                 }
@@ -82,9 +113,6 @@ function boardLoad(server, gameState){
             // If no saved shapes, initialize them
             server.circleBoard.addNewBalls(1);
         }
-
-
-        
     }
 }
 function loadbaseUpgradeShop(server, gameState) {
@@ -142,7 +170,6 @@ function load0_0_3(server, gameState) {
 // Also update the version switch in the main load function
 function load(server) {
     const savedState = localStorage.getItem('circleBoardGameState');
-    console.log('savedState', savedState);
     if (!savedState) {
         console.log('No saved game state found');
         return false;
@@ -252,7 +279,7 @@ function loadPreVersion(server, gameState){
         
         if (gameState.shop.items && Array.isArray(gameState.shop.items)) {
             gameState.shop.items.forEach(savedItem => {
-                const item = server.baseUpgradeShop.getItem(savedItem.name);
+                const item = server.baseUpgradeShop.getItem(savedItem.name)[0];
                 if (item) {
                     item.price = savedItem.price;
                     item.level = savedItem.level;

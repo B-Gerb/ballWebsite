@@ -1,14 +1,13 @@
 class Square{
     constructor(x, y, side, rotation, color, dx, dy){
-        if(side%2 !== 0){
-            side += 1;
-        }  
+
         this.center = { x, y};
         this.side = side;
         this.rotation = rotation;
         this.color = color;
         this.mass = Math.PI * side * side;
         this.velocity = { x: dx, y: dy };
+        this.baseSide = side;
     }
     getName(){
         return "Square";
@@ -64,6 +63,7 @@ class Square{
             { x: this.center.x - halfSide * Math.cos(radians) + halfSide * Math.sin(radians), y: this.center.y - halfSide * Math.sin(radians) - halfSide * Math.cos(radians) }
         ];
 
+
         return vertices;
     }
 
@@ -73,15 +73,17 @@ class Square{
     }
     getInformation(){
         return {
+            name: this.getName(),
+            rotation: this.rotation,
             center: this.center,
             side: this.side,
             mass: this.mass,
             velocity: this.velocity,
             color: this.color,
-            baseDistVertex: this.baseDistVertex
         };
     }
     static create(x, y, side, rotation, color, dx, dy) {
+       
         return new Square(x, y, side, rotation, color, dx, dy);
     }
     static create(x, y, side, rotation, color, dx, dy, baseSide) {

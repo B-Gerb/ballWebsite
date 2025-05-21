@@ -171,8 +171,9 @@ class CircleBoard {
         const velocityAngle = this.rng() * Math.PI * 2;
         const velocityX = Math.cos(velocityAngle) * speed * (this.rng() - 0.5);
         const velocityY = Math.sin(velocityAngle) * speed * (this.rng() - 0.5);
-        const square = Square.create(x, y, side, color, velocityX, velocityY);
-        square.baseSide = side / this.scaleFactor; // Store the base size for scaling
+        const rotation = this.rng() * 360;
+        
+        const square = Square.create(x, y, side, rotation, color, velocityX, velocityY, side/this.scaleFactor);
 
         // Ensure square has minimum velocity
         const minSpeed = this.shapeInfo['Square'].baseMinSpeed * this.scaleFactor;
@@ -361,8 +362,9 @@ class CircleBoard {
             // For shapes with vertices, check if any vertex is outside the container
             const vertices = shape.getVertices();
             for (const vertex of vertices) {
-                const dx = vertex.x - this.container.center.x;
-                const dy = vertex.y - this.container.center.y;
+
+                const dx = vertex.x - this.container.x;
+                const dy = vertex.y - this.container.y;
                 const distance = Math.sqrt(dx * dx + dy * dy);
                 
                 if (distance >= this.container.radius - this.container.thickness) {
@@ -430,7 +432,7 @@ class CircleBoard {
                             }
                             // collision detected
                             // somehow handle it
-                            console.log("Collision detected between shapes", shape, shapeB);
+                            //console.log("Collision detected between shapes", shape, shapeB);
                             
                         }
 

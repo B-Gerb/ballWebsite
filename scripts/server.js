@@ -432,7 +432,7 @@ class Server {
         buttons.forEach(button => {
             const itemName = button.querySelector('h3').textContent;
             
-            const item = this.baseUpgradeShop.getItem(itemName);
+            const item = this.baseUpgradeShop.getItem(itemName)[0];
             if (item) {
                 const canAfford = this.baseUpgradeShop.balance >= this.baseUpgradeShop.itemCost(item, 1)[0];
                 
@@ -569,10 +569,10 @@ class Server {
             return false;
         }
         
-        const success = this.baseUpgradeShop.buyItem(item, amount);
+        const success = this.baseUpgradeShop.buyItem(item[0], amount);
         
         if (success) {
-            this.applyItemEffectBShop(item);
+            this.applyItemEffectBShop(item, amount);
             this.updateBalanceDisplay();
             this.saveGameState();
         }
@@ -581,32 +581,60 @@ class Server {
     }
     
     // Apply the effect of an item to the CircleBoard
-    applyItemEffectBShop(item) {
-        switch (item.name) {
-            case "Add Ball":
-                this.circleBoard.addNewBalls(1);
-                break;
+    applyItemEffectBShop(item, amount=1) {
+        switch (item[1]) {
+            case "ballShop":
+                switch(item[0].name) {
+                    case "Add Ball":
+                        this.circleBoard.addNewBalls(amount);
+                        break;
                 
-            case "Increase Ball Size Range Min":
-                this.circleBoard.baseMinBallSize = item.getValue();
+                    case "Increase Ball Size Range Min":
+                        this.circleBoard.shapeInfo.Circle.baseMinBallSize = item[0].getValue();
+                        break;
+                        
+                    case "Increase Ball Size Range Max":
+                        this.circleBoard.shapeInfo.Circle.baseMaxBallSize = item[0].getValue();
+                        break;
+                        
+                    case "Increase Ball Speed Min":
+                        this.circleBoard.shapeInfo.Circle.baseMinBallSpeed = item[0].getValue();
+                        break;
+                        
+                    case "Increase Ball Speed Max":
+                        this.circleBoard.shapeInfo.Circle.baseMaxBallSpeed = item[0].getValue();
+                        break;
+                        
+                    case "Decrease Large Circle Size":
+                        this.circleBoard.circleBoard.baseReferenceSize = item[0].getValue();
+                        break;
+                }
                 break;
-                
-            case "Increase Ball Size Range Max":
-                this.circleBoard.baseMaxBallSize = item.getValue();
-                break;
-                
-            case "Increase Ball Speed Min":
-                this.circleBoard.baseMinBallSpeed = item.getValue();
-                break;
-                
-            case "Increase Ball Speed Max":
-                this.circleBoard.baseMaxBallSpeed = item.getValue();
-                break;
-                
-            case "Decrease Large Circle Size":
-                this.circleBoard.baseReferenceSize = item.getValue();
+            case "squareShop":
+                switch(item[0].name) {
+                    case "Add Square":
+                        this.circleBoard.addNewSquares(amount);
+                        break;
+                    
+                    case "Increase Square Size Range Min":
+                        this.circleBoard.shapeInfo.Square.baseMinSide = item[0].getValue();
+                        break;
+                        
+                    case "Increase Square Size Range Max":
+                        this.circleBoard.shapeInfo.Square.baseMaxSide = item[0].getValue();
+                        break;
+                        
+                    case "Increase Square Speed Min":
+                        this.circleBoard.shapeInfo.Square.baseMinSpeed = item[0].getValue();
+                        break;
+                        
+                    case "Increase Square Speed Max":
+                        this.circleBoard.shapeInfo.Square.baseMaxSpeed = item[0].getValue();
+                        break;
+                }
                 break;
         }
+
         
         // Update scaled properties based on current scale factor
         this.circleBoard.calculateScaleFactor();
@@ -707,25 +735,14 @@ class Server {
     saveGameState() {
         const gameState = {
             circleBoard: {
-                baseMinBallSize: this.circleBoard.baseMinBallSize,
-                baseMaxBallSize: this.circleBoard.baseMaxBallSize,
+                shapeInfo: this.circleBoard.shapeInfo, // Save the entire shapeInfo object
                 baseReferenceSize: this.circleBoard.baseReferenceSize,
-                baseMinBallSpeed: this.circleBoard.baseMinBallSpeed,
-                baseMaxBallSpeed: this.circleBoard.baseMaxBallSpeed,
                 shapes: this.circleBoard.shapes.map(shape => {
                     // Get shape information for saving
                     const info = shape.getInformation();
                     
                     // Return a serializable object
-                    return {
-                        type: shape.constructor.name.toLowerCase(),
-                        center: info.center,
-                        radius: info.radius,
-                        baseRadius: info.baseRadius,
-                        velocity: info.velocity,
-                        color: info.color,
-                        mass: info.mass
-                    };
+                    return info;
                 }),
                 container: {
                     x: this.circleBoard.container.x,
@@ -765,7 +782,7 @@ class Server {
             clicker: {
                 clickCount: this.clickerObject ? this.clickerObject.clickCount : 0
             },
-            version: '0.0.3', 
+            version: '0.0.3', // Increment version number
             seed: this.seed,
         };
         
@@ -868,6 +885,11 @@ class Server {
                     this.baseUpgradeShop.addBalance(stats.total.totalWallHits * this.temporaryMultipliers.ballValue);
                     this.updateButtonAppearance();
                 }
+                if(this.baseUpgradeShop.getBalance() > 100 && !this.baseUpgradeShop.items.squareShop){
+                    this.baseUpgradeShop.addSquaresToShop();
+                    this.setupShopUI();
+                }
+
                 
                 this.updateCollisionDisplay();
                 this.updateBalanceDisplay();

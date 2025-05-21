@@ -38,6 +38,7 @@ class Circle{
     }
     getInformation(){
         return {
+            name: this.getName(),
             center: this.center,
             radius: this.radius,
             mass: this.mass,
