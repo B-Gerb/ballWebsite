@@ -83,15 +83,21 @@ function boardLoad(server, gameState) {
         }
         
         server.circleBoard.shapes = [];
+        let counter = 0;
         if (gameState.circleBoard.shapes && Array.isArray(gameState.circleBoard.shapes)) {
             gameState.circleBoard.shapes.forEach(savedShape => {
                 switch (savedShape.name) {
                     case 'Circle':
-                        server.circleBoard.shapes.push(Circle.create(savedShape.center.x, savedShape.center.y, savedShape.radius, savedShape.color, savedShape.velocity.x, savedShape.velocity.y, savedShape.baseRadius));
+                        const circle = Circle.create(savedShape.center.x, savedShape.center.y, savedShape.radius, savedShape.color, savedShape.velocity.x, savedShape.velocity.y, savedShape.baseRadius);
+                        circle.id = counter++;
+                        server.circleBoard.shapes.push(circle);
                         break;
                         
                     case 'Square':
-                        server.circleBoard.shapes.push(Square.create(savedShape.center.x, savedShape.center.y, savedShape.side, savedShape.rotation, savedShape.color, savedShape.velocity.x, savedShape.velocity.y));
+
+                        const square = Square.create(savedShape.center.x, savedShape.center.y, savedShape.side, savedShape.rotation, savedShape.color, savedShape.velocity.x, savedShape.velocity.y, savedShape.baseSide);
+                        square.id = counter++;
+                        server.circleBoard.shapes.push(square);
                         break;
                         /*
                     case 'triangle':

@@ -77,6 +77,7 @@ class Square{
             rotation: this.rotation,
             center: this.center,
             side: this.side,
+            baseSide: this.baseSide,
             mass: this.mass,
             velocity: this.velocity,
             color: this.color,

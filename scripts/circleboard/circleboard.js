@@ -137,8 +137,7 @@ class CircleBoard {
         const velocityY = Math.sin(velocityAngle) * speed * (this.rng() - 0.5);
 
         
-        const ball = Circle.create(x, y, radius, color, velocityX, velocityY);
-        ball.baseRadius = radius / this.scaleFactor; 
+        const ball = Circle.create(x, y, radius * this.scaleFactor, color, velocityX, velocityY, radius);
         
 
         // Ensure ball has minimum velocity
@@ -174,7 +173,7 @@ class CircleBoard {
         const velocityY = Math.sin(velocityAngle) * speed * (this.rng() - 0.5);
         const rotation = this.rng() * 360;
         
-        const square = Square.create(x, y, side, rotation, color, velocityX, velocityY, side/this.scaleFactor);
+        const square = Square.create(x, y, side*this.scaleFactor, rotation, color, velocityX, velocityY, side);
 
         // Ensure square has minimum velocity
         const minSpeed = this.shapeInfo['Square'].baseMinSpeed * this.scaleFactor;
@@ -426,18 +425,23 @@ class CircleBoard {
         }
         else{
             const vertices = shape.getVertices();
-            let startX = grid.bounds.x;
-            let endX = grid.bounds.x + grid.bounds.width;
-            let startY = grid.bounds.y;
-            let endY = grid.bounds.y + grid.bounds.height;
+            let startX = Infinity;
+            let endX = -Infinity;
+            let startY = Infinity;
+            let endY = -Infinity;
 
             for (const vertex of vertices) {
-                startX = Math.max(startX, vertex.x);
-                endX = Math.min(endX, vertex.x);
-                startY = Math.max(startY, vertex.y);
-                endY = Math.min(endY, vertex.y);
+                startX = Math.min(startX, vertex.x);
+                endX = Math.max(endX, vertex.x);
+                startY = Math.min(startY, vertex.y);
+                endY = Math.max(endY, vertex.y);
                 
             }
+            // Ensure we stay within grid bounds
+            startX = Math.max(grid.bounds.x, startX);
+            endX = Math.min(grid.bounds.x + grid.bounds.width, endX);
+            startY = Math.max(grid.bounds.y, startY);
+            endY = Math.min(grid.bounds.y + grid.bounds.height, endY);
             for (let x = startX; x <= endX; x += grid.widthBoxes) {
                 for (let y = startY; y <= endY; y += grid.heightBoxes) {
                     cellSpots.push({
@@ -518,6 +522,7 @@ class CircleBoard {
                     if (!proccessedCollisions.has(pairKey)) {
                         proccessedCollisions.add(pairKey);
                         if (this.checkShapeCollision(shapeA, shapeB)) {
+
                             totalShapeCollisions++;
                             if(!(shapeA.getName() in returnValues)){
                                 returnValues[shapeA.getName()] = {totalWallHits: 0, totalShapeCollisions: 0};
@@ -591,7 +596,8 @@ class CircleBoard {
                 info: info,
                 dirX: dx / Math.max(distance, 0.0001), // Avoid division by zero
                 dirY: dy / Math.max(distance, 0.0001),
-                relDist: distance / this.container.radius // Store distance as percentage of container radius
+                relDist: distance / this.container.radius, // Store distance as percentage of container radius
+                velocity: { ...shape.velocity } // Store original velocity
             };
         });
         
@@ -604,7 +610,6 @@ class CircleBoard {
         
         this.initContainer();
         
-
         const sizeRatio = this.container.radius / oldContainerRadius;
     
         shapeStates.forEach(state => {
@@ -619,16 +624,18 @@ class CircleBoard {
             shape.center.x = newX;
             shape.center.y = newY;
             
-            // Scale velocity by size ratio
+            // Scale velocity by size ratio while maintaining speed
             shape.velocity.x *= sizeRatio;
             shape.velocity.y *= sizeRatio;
-            
+
             // Scale radius if it's a Circle
             if (shape instanceof Circle) {
                 shape.radius = shape.baseRadius * this.scaleFactor;
             }
-            
-            
+            // Scale side if it's a Square
+            else if (shape instanceof Square) {
+                shape.side = shape.baseSide * this.scaleFactor;
+            }
         });
         
         this.render();

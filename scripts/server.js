@@ -114,7 +114,12 @@ class Server {
         this.clickShop = new clickShop();
         this.loadVersions = window.loadVersions;
 
-
+        // FPS counter variables
+        this.fpsCounter = document.getElementById('fpsCounter');
+        this.frameCount = 0;
+        this.lastFpsUpdate = 0;
+        this.fps = 60;  // Initialize with target FPS
+        this.fpsCounter.textContent = this.fps;  // Set initial display value
 
         // temporary mult
         this.temporaryMultipliers = {
@@ -152,8 +157,7 @@ class Server {
         this.physicsUpdateInterval = 1000 / 60; 
         this.lastPhysicsUpdate = 0;
         this.physicsTimerId = null;
-        this.frameCount = 0;
-        
+
         this.setupEventListeners();
         this.seed = new Math.seedrandom();
 
@@ -865,57 +869,70 @@ class Server {
     }
     
     startGame() {
-        if (this.animationFrameId) return; // Already running
-        
-        const targetFPS = 60;
-        const frameInterval = 1000 / targetFPS; //frame rate
-        let lastFrameTime = performance.now();
-        let accumulator = 0;
-        
-        const gameLoop = (currentTime) => {
-            if (!this.circleBoard.isRunning) return;
+        if (!this.animationFrameId) {
+            const targetFPS = 60;
+            const frameInterval = 1000 / targetFPS;
+            let lastFrameTime = performance.now();
+            let accumulator = 0;
             
-            const deltaTime = currentTime - lastFrameTime;
-            lastFrameTime = currentTime;
-            
-            accumulator += deltaTime;
-            
-            while (accumulator >= frameInterval) {
-                const stats = this.circleBoard.updatePhysics(1 * this.temporaryMultipliers.circleSpeed);
-                
-                if ('Circle' in stats){
-                    this.baseUpgradeShop.addBalance(stats.Circle.totalWallHits * this.temporaryMultipliers.ballValue);
-                    this.updateButtonAppearance();
+            const gameLoop = (currentTime) => {
+                if (!this.circleBoard.isRunning) {
+                    this.animationFrameId = requestAnimationFrame(gameLoop);
+                    return;
                 }
-                if('Square' in stats) {
-                    this.baseUpgradeShop.addBalance(stats.Square.totalShapeCollisions * this.temporaryMultipliers.ballValue);
-                    this.updateButtonAppearance();
-                }
-                if(this.baseUpgradeShop.getBalance() > 100 && !this.baseUpgradeShop.items.squareShop){
-                    this.baseUpgradeShop.addSquaresToShop();
-                    this.setupShopUI();
-                }
-
                 
-                this.updateCollisionDisplay();
-                this.updateBalanceDisplay();
-                
-                this.processTemporaryMultipliers();
-                
+                // Calculate FPS
                 this.frameCount++;
-                if (this.frameCount > 60) {
-                    this.saveGameState();
+                if (currentTime - this.lastFpsUpdate >= 1000) {
+                    this.fps = Math.round(this.frameCount * 1000 / (currentTime - this.lastFpsUpdate));
+                    this.fpsCounter.textContent = this.fps;
                     this.frameCount = 0;
+                    this.lastFpsUpdate = currentTime;
                 }
                 
-                accumulator -= frameInterval;
-            }
+                const deltaTime = currentTime - lastFrameTime;
+                lastFrameTime = currentTime;
+                
+                accumulator += deltaTime;
+                
+                // Update physics at fixed time steps
+                while (accumulator >= frameInterval) {
+                    const stats = this.circleBoard.updatePhysics(1 * this.temporaryMultipliers.circleSpeed);
+                    
+                    if ('Circle' in stats){
+                        this.baseUpgradeShop.addBalance(stats.Circle.totalWallHits * this.temporaryMultipliers.ballValue);
+                        this.updateButtonAppearance();
+                    }
+                    if('Square' in stats) {
+                        this.baseUpgradeShop.addBalance(stats.Square.totalShapeCollisions * this.temporaryMultipliers.ballValue);
+                        this.updateButtonAppearance();
+                    }
+                    if(this.baseUpgradeShop.getBalance() > 100 && !this.baseUpgradeShop.items.squareShop){
+                        this.baseUpgradeShop.addSquaresToShop();
+                        this.setupShopUI();
+                    }
+                    
+                    this.updateCollisionDisplay();
+                    this.updateBalanceDisplay();
+                    
+                    this.processTemporaryMultipliers();
+                    
+                    if (this.frameCount > 60) {
+                        this.saveGameState();
+                        this.frameCount = 0;
+                    }
+                    
+                    accumulator -= frameInterval;
+                }
+                
+                // Render at the current frame rate
+                this.circleBoard.render();
+                this.animationFrameId = requestAnimationFrame(gameLoop);
+            };
             
-            this.circleBoard.render();
-            this.animationFrameId = window.requestAnimationFrame(gameLoop);
-        };
-        
-        this.animationFrameId = window.requestAnimationFrame(gameLoop);
+            this.lastFpsUpdate = performance.now();
+            this.animationFrameId = requestAnimationFrame(gameLoop);
+        }
     }
     processTemporaryMultipliers() {
         for (let key in this.temporaryMultipliersActiveFrames) {
