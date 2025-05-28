@@ -17,4 +17,5 @@ the function will return a list of two values list[0] = min, list[1] = max
 
 
 # get Values which returns all important information to shape
+# getName which returns name
 # static create function which creates a copy based on

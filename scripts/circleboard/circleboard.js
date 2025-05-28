@@ -23,6 +23,7 @@ class CircleBoard {
                 baseMaxSpeed: 15,
             }
         };
+        this.counter = 0; // For unique shape IDs
 
 
 
@@ -148,8 +149,8 @@ class CircleBoard {
             ball.velocity.x *= factor;
             ball.velocity.y *= factor;
         }
-
-        
+        ball.id = this.counter++;
+            
         return ball;
     }
 
@@ -183,6 +184,8 @@ class CircleBoard {
             square.velocity.x *= factor;
             square.velocity.y *= factor;
         }
+
+        square.id = this.counter++;
         return square;
     }
 
@@ -377,6 +380,92 @@ class CircleBoard {
         return false;
     }
 
+    createSpatialGrid(){
+        const bounds = {
+            x: this.container.x - this.container.radius,
+            y: this.container.y - this.container.radius,
+            width: this.container.radius * 2,
+            height: this.container.radius * 2
+
+        }
+        const widthBoxes = bounds.width / 4;
+        const heightBoxes = bounds.height / 4;
+        return {
+            cells: Array.from({ length: 16}, () => []), // 4x4 grid
+            bounds: bounds,
+            widthBoxes: widthBoxes,
+            heightBoxes: heightBoxes,
+        }
+    }
+
+
+    getShapeCells(shape, grid) {
+        const cellSpots = [];
+        // Use bounding boxes
+        if(shape.getName() === "Circle"){
+            const radius = shape.radius;
+            const centerX = shape.center.x;
+            const centerY = shape.center.y;
+            
+            const startX = Math.max(grid.bounds.x, centerX- radius);
+            const endX = Math.min(grid.bounds.x + grid.bounds.width, centerX + radius);
+            const startY = Math.max(grid.bounds.y, centerY - radius);
+            const endY = Math.min(grid.bounds.y + grid.bounds.height, centerY + radius);
+
+        
+
+            for (let x = startX; x <= endX; x += grid.widthBoxes) {
+                for (let y = startY; y <= endY; y += grid.heightBoxes) {
+
+                    cellSpots.push({
+                        x: Math.floor((x - grid.bounds.x) / grid.widthBoxes),
+                        y: Math.floor((y - grid.bounds.y) / grid.heightBoxes)
+                    });
+                }
+            }
+        }
+        else{
+            const vertices = shape.getVertices();
+            let startX = grid.bounds.x;
+            let endX = grid.bounds.x + grid.bounds.width;
+            let startY = grid.bounds.y;
+            let endY = grid.bounds.y + grid.bounds.height;
+
+            for (const vertex of vertices) {
+                startX = Math.max(startX, vertex.x);
+                endX = Math.min(endX, vertex.x);
+                startY = Math.max(startY, vertex.y);
+                endY = Math.min(endY, vertex.y);
+                
+            }
+            for (let x = startX; x <= endX; x += grid.widthBoxes) {
+                for (let y = startY; y <= endY; y += grid.heightBoxes) {
+                    cellSpots.push({
+                        x: Math.floor((x - grid.bounds.x) / grid.widthBoxes),
+                        y: Math.floor((y - grid.bounds.y) / grid.heightBoxes)
+                    });
+                }
+            }
+        }
+        return cellSpots;
+    }
+
+    checkShapeCollision(shapeA, shapeB) {
+        const axises = new Set([...shapeA.axes(shapeB), ...shapeB.axes(shapeA)]);
+        
+        for (const axis of axises) {
+            const projectionA = shapeA.projection(axis);
+            const projectionB = shapeB.projection(axis);
+            
+            // line can exisit no collision
+            if (!(projectionA[1] > projectionB[0] && projectionB[1] > projectionA[0])) {
+                return false;
+            }
+        }
+        
+        return true; // All axes have overlapping projections
+    }
+
     
     /**
      * Process physics for one frame
@@ -392,8 +481,10 @@ class CircleBoard {
         // Track collisions for this frame
         let totalWallHits = 0;
         let totalShapeCollisions = 0;
-        
-        // Move all balls forward by one frame
+
+        const grid = this.createSpatialGrid();
+
+        // Populate the spatial grid
         this.shapes.forEach(shape => {
             if(this.isWallCollision(shape)){
                 this.handleWallCollision(shape);
@@ -406,43 +497,51 @@ class CircleBoard {
                     returnValues[shape.getName()].totalWallHits = 1;  
                 }
             }
-
-            this.shapes.forEach(shapeB => {  
-                if (shape !== shapeB) {
-                    const axises = new Set([...shape.axes(shapeB), ...shapeB.axes(shape)]);
-                    for (const axis of axises) {
-                        const projectionA = shape.projection(axis);
-                        const projectionB = shapeB.projection(axis);
-                        if (projectionA[1] > projectionB[0] && projectionB[1] > projectionA[0]) {
-
+            const cells = this.getShapeCells(shape, grid);
+            cells.forEach(cell => {
+                const index = cell.x + cell.y * 4; // Assuming a 4x4 grid
+                grid.cells[index].push(shape);
+            });
+        });
+        const proccessedCollisions = new Set();
+        for (let i = 0; i < grid.cells.length; i++) {
+            const cell = grid.cells[i];
+            if (cell.length < 2) continue; // No collisions possible in this cell
+            for (let j = 0; j < cell.length-1; j++) {
+                for ( let k = j + 1; k < cell.length; k++) {
+                    const shapeA = cell[j];
+                    const shapeB = cell[k];
+                    if(shapeA.id === shapeB.id) continue; // Skip self-collision
+                    const pairKey = shapeA.id < shapeB.id ? 
+                    `${shapeA.id}-${shapeB.id}` : 
+                    `${shapeB.id}-${shapeA.id}`;
+                    if (!proccessedCollisions.has(pairKey)) {
+                        proccessedCollisions.add(pairKey);
+                        if (this.checkShapeCollision(shapeA, shapeB)) {
                             totalShapeCollisions++;
-                            if(shape.type in returnValues){
-                                returnValues[shape.type].totalShapeCollisions += 1;
+                            if(!(shapeA.getName() in returnValues)){
+                                returnValues[shapeA.getName()] = {totalWallHits: 0, totalShapeCollisions: 0};
                             }
-                            else{
-                                returnValues[shape.type] = {totalWallHits: 0, totalShapeCollisions: 0};
-                                returnValues[shape.type].totalShapeCollisions = 1;  
+                            returnValues[shapeA.getName()].totalShapeCollisions += 1;
+                            
+                            if(!(shapeB.getName() in returnValues)){
+                                returnValues[shapeB.getName()] = {totalWallHits: 0, totalShapeCollisions: 0};
                             }
-                            if(shapeB.type in returnValues){
-                                returnValues[shapeB.type].totalShapeCollisions += 1;
-                            }
-                            else{
-                                returnValues[shapeB.type] = {totalWallHits: 0, totalShapeCollisions: 0};
-                                returnValues[shapeB.type].totalShapeCollisions = 1;  
-                            }
+                            returnValues[shapeB.getName()].totalShapeCollisions += 1;
+
                             // collision detected
                             // somehow handle it
-                            //console.log("Collision detected between shapes", shape, shapeB);
+                            // console.log("Collision detected between shapes", shape, shapeB);
+
+
                             
                         }
-
                     }
                 }
-            });
+            }
+        }
+        this.shapes.forEach(shape => {
             shape.update(speedMultipler);
-
-
-
         });
         returnValues.total.totalWallHits = totalWallHits;
         returnValues.total.totalShapeCollisions = totalShapeCollisions;
@@ -469,6 +568,7 @@ class CircleBoard {
         // going to be more detailed
         return returnValues;
     }
+
     
     /**
      * Render the current state without updating physics

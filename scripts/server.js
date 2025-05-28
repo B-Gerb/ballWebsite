@@ -115,10 +115,12 @@ class Server {
         this.loadVersions = window.loadVersions;
 
 
+
+        // temporary mult
         this.temporaryMultipliers = {
             clickValue: 1,
             ballValue: 1,
-            circleSpeed: 1,
+            circleSpeed: 1
         };
         this.temporaryMultipliersActiveFrames = {};
 
@@ -606,7 +608,7 @@ class Server {
                         break;
                         
                     case "Decrease Large Circle Size":
-                        this.circleBoard.circleBoard.baseReferenceSize = item[0].getValue();
+                        this.circleBoard.baseReferenceSize = item[0].getValue();
                         break;
                 }
                 break;
@@ -881,8 +883,12 @@ class Server {
             while (accumulator >= frameInterval) {
                 const stats = this.circleBoard.updatePhysics(1 * this.temporaryMultipliers.circleSpeed);
                 
-                if (stats.total.totalWallHits > 0) {
-                    this.baseUpgradeShop.addBalance(stats.total.totalWallHits * this.temporaryMultipliers.ballValue);
+                if ('Circle' in stats){
+                    this.baseUpgradeShop.addBalance(stats.Circle.totalWallHits * this.temporaryMultipliers.ballValue);
+                    this.updateButtonAppearance();
+                }
+                if('Square' in stats) {
+                    this.baseUpgradeShop.addBalance(stats.Square.totalShapeCollisions * this.temporaryMultipliers.ballValue);
                     this.updateButtonAppearance();
                 }
                 if(this.baseUpgradeShop.getBalance() > 100 && !this.baseUpgradeShop.items.squareShop){
