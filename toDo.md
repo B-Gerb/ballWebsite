@@ -1,8 +1,8 @@
 # To Do List
 ## Game Play
 ### Functionality
-- [ ] grid style collision system for checks 
-    - **PRIORITY** 
+- [X] grid style collision system for checks 
+    - Possibly finished want to test more to see efficency
 - [ ] add back collisions
     - **PRIORITY** 
 - [ ] possibly add rotations
@@ -16,4 +16,5 @@
 ### Better UI
 - [ ] improve ui functionality in terms of upgrades and adding descriptions
 - [ ] improve ui for prestige when added
+- [ ] popup for balance information do not scale with zooming could be an issue for larger and smaller devices
 

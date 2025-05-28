@@ -142,6 +142,11 @@ function loadbaseUpgradeShop(server, gameState) {
         } else if (gameState.baseUpgradeShop.items && typeof gameState.baseUpgradeShop.items === 'object') {
             // New format - categorized items
             for (const category in gameState.baseUpgradeShop.items) {
+                // If this is a square shop category and it doesn't exist in the server yet, add it
+                if (category === 'squareShop' && !('squareShop' in server.baseUpgradeShop.items)) {
+                    server.baseUpgradeShop.addSquaresToShop();
+                }
+                
                 if (category in server.baseUpgradeShop.items) {
                     const savedItems = gameState.baseUpgradeShop.items[category];
                     
