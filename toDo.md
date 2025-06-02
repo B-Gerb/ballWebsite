@@ -3,7 +3,7 @@
 ### Functionality
 - [X] grid style collision system for checks 
     - Possibly finished want to test more to see efficency
-- [ ] add back collisions
+- [X] add back collisions
     - **PRIORITY** 
 - [ ] possibly add rotations
 ### Features
@@ -17,4 +17,7 @@
 - [ ] improve ui functionality in terms of upgrades and adding descriptions
 - [ ] improve ui for prestige when added
 - [ ] popup for balance information do not scale with zooming could be an issue for larger and smaller devices
+
+### Bugs
+- [X] refreshing on different sized windows after a save causes speed multiplier errors.
 
