@@ -121,6 +121,10 @@ class Server {
         this.fps = 60;  // Initialize with target FPS
         this.fpsCounter.textContent = this.fps;  // Set initial display value
 
+        // Add visibility state tracking
+        this.isVisible = true;
+        this.lastVisibleTime = performance.now();
+
         // temporary mult
         this.temporaryMultipliers = {
             clickValue: 1,
@@ -226,13 +230,17 @@ class Server {
         container.style.display = 'flex';
         container.style.width = '100%';
         
+        // Get current container dimensions before changes
+        const currentBoardContainer = this.circleBoard.canvas.parentElement;
+        const currentBoardSize = parseInt(currentBoardContainer.style.width) || 500;
 
-        //large screen
+        // Large screen layout
         if (windowWidth >= 800) {
             container.style.flexDirection = 'row';
             container.style.justifyContent = 'space-around'; 
             container.style.alignItems = 'center';
             
+            // Calculate new board size
             let boardSize;
             if (windowWidth <= 800) {
                 boardSize = 500;
@@ -244,21 +252,27 @@ class Server {
             
             boardSize = Math.round(boardSize);
             
-            const boardContainer = this.circleBoard.canvas.parentElement;
-            
-            boardContainer.style.width = `${boardSize}px`;
-            boardContainer.style.height = `${boardSize}px`;
-            boardContainer.style.minWidth = `${boardSize}px`;
-            boardContainer.style.minHeight = `${boardSize}px`;
-            boardContainer.style.maxWidth = `${boardSize}px`;
-            boardContainer.style.maxHeight = `${boardSize}px`;
-            boardContainer.style.margin = '10px';
+            // Only update if size actually changed
+            if (Math.abs(boardSize - currentBoardSize) > 5) {
+                const boardContainer = this.circleBoard.canvas.parentElement;
+                
+                // Update container styles
+                boardContainer.style.width = `${boardSize}px`;
+                boardContainer.style.height = `${boardSize}px`;
+                boardContainer.style.minWidth = `${boardSize}px`;
+                boardContainer.style.minHeight = `${boardSize}px`;
+                boardContainer.style.maxWidth = `${boardSize}px`;
+                boardContainer.style.maxHeight = `${boardSize}px`;
+                boardContainer.style.margin = '10px';
 
-            this.circleBoard.updateCanvasSize(boardSize);
+                // Update canvas size and properties
+                this.circleBoard.updateCanvasSize(boardSize);
+                
+                this.circleBoard.canvas.style.width = `${boardSize}px`;
+                this.circleBoard.canvas.style.height = `${boardSize}px`;
+            }
             
-            this.circleBoard.canvas.style.width = `${boardSize}px`;
-            this.circleBoard.canvas.style.height = `${boardSize}px`;
-            
+            // Handle clicker canvas
             const clickerCanvas = document.getElementById('clickerCanvas');
             if (clickerCanvas) {
                 let clickerWidth;
@@ -280,26 +294,29 @@ class Server {
                 clickerCanvas.style.margin = '10px';
             }
         } else {
-            // small screen
+            // Small screen layout
             container.style.flexDirection = 'column';
             container.style.alignItems = 'center';
             container.style.justifyContent = 'center';
             
             const boardSize = Math.round(Math.min(windowWidth * 0.85, 450));
             
-            const boardContainer = this.circleBoard.canvas.parentElement;
-            boardContainer.style.width = `${boardSize}px`;
-            boardContainer.style.height = `${boardSize}px`;
-            boardContainer.style.minWidth = `${boardSize}px`;
-            boardContainer.style.minHeight = `${boardSize}px`;
-            boardContainer.style.maxWidth = `${boardSize}px`;
-            boardContainer.style.maxHeight = `${boardSize}px`;
-            boardContainer.style.margin = '0 0 20px 0';
-    
-            this.circleBoard.updateCanvasSize(boardSize);
-            
-            this.circleBoard.canvas.style.width = `${boardSize}px`;
-            this.circleBoard.canvas.style.height = `${boardSize}px`;
+            // Only update if size actually changed
+            if (Math.abs(boardSize - currentBoardSize) > 5) {
+                const boardContainer = this.circleBoard.canvas.parentElement;
+                boardContainer.style.width = `${boardSize}px`;
+                boardContainer.style.height = `${boardSize}px`;
+                boardContainer.style.minWidth = `${boardSize}px`;
+                boardContainer.style.minHeight = `${boardSize}px`;
+                boardContainer.style.maxWidth = `${boardSize}px`;
+                boardContainer.style.maxHeight = `${boardSize}px`;
+                boardContainer.style.margin = '0 0 20px 0';
+
+                this.circleBoard.updateCanvasSize(boardSize);
+                
+                this.circleBoard.canvas.style.width = `${boardSize}px`;
+                this.circleBoard.canvas.style.height = `${boardSize}px`;
+            }
             
             const clickerCanvas = document.getElementById('clickerCanvas');
             if (clickerCanvas) {
@@ -316,11 +333,13 @@ class Server {
             }
         }
         
-        this.circleBoard.render();
-        
-        if (this.clickerObject) {
-            this.clickerObject.draw();
-        }
+        // Force a render after all changes
+        setTimeout(() => {
+            this.circleBoard.render();
+            if (this.clickerObject) {
+                this.clickerObject.draw();
+            }
+        }, 50);
     }
 
     // Setup event listeners for pause, reset and save
@@ -874,31 +893,51 @@ class Server {
             const frameInterval = 1000 / targetFPS;
             let lastFrameTime = performance.now();
             let accumulator = 0;
-            
+
+            // Initialize FPS tracking variables
+            this.frameCount = 0;
+            this.frames = 0;
+            this.lastFpsUpdate = performance.now();
+
             const gameLoop = (currentTime) => {
                 if (!this.circleBoard.isRunning) {
                     this.animationFrameId = requestAnimationFrame(gameLoop);
                     return;
                 }
-                
+
+                // Handle visibility changes
+                if (document.hidden) {
+                    if (this.isVisible) {
+                        this.isVisible = false;
+                        this.lastVisibleTime = currentTime;
+                    }
+                    this.animationFrameId = requestAnimationFrame(gameLoop);
+                    return;
+                } else if (!this.isVisible) {
+                    this.isVisible = true;
+                    lastFrameTime = currentTime;
+                    accumulator = 0;
+                }
+
                 // Calculate FPS
                 this.frameCount++;
+                this.frames++;
                 if (currentTime - this.lastFpsUpdate >= 1000) {
-                    this.fps = Math.round(this.frameCount * 1000 / (currentTime - this.lastFpsUpdate));
+                    this.fps = Math.round(this.frames * 1000 / (currentTime - this.lastFpsUpdate));
                     this.fpsCounter.textContent = this.fps;
-                    this.frameCount = 0;
+                    this.frames = 0;
                     this.lastFpsUpdate = currentTime;
                 }
-                
-                const deltaTime = currentTime - lastFrameTime;
+
+                const deltaTime = Math.min(currentTime - lastFrameTime, frameInterval * 2); // Cap delta time
                 lastFrameTime = currentTime;
-                
+
                 accumulator += deltaTime;
-                
+
                 // Update physics at fixed time steps
                 while (accumulator >= frameInterval) {
                     const stats = this.circleBoard.updatePhysics(1 * this.temporaryMultipliers.circleSpeed);
-                    
+
                     if ('Circle' in stats){
                         this.baseUpgradeShop.addBalance(stats.Circle.totalWallHits * this.temporaryMultipliers.ballValue);
                         this.updateButtonAppearance();
@@ -911,25 +950,25 @@ class Server {
                         this.baseUpgradeShop.addSquaresToShop();
                         this.setupShopUI();
                     }
-                    
+
                     this.updateCollisionDisplay();
                     this.updateBalanceDisplay();
-                    
+
                     this.processTemporaryMultipliers();
-                    
+
                     if (this.frameCount > 60) {
                         this.saveGameState();
                         this.frameCount = 0;
                     }
-                    
+
                     accumulator -= frameInterval;
                 }
-                
+
                 // Render at the current frame rate
                 this.circleBoard.render();
                 this.animationFrameId = requestAnimationFrame(gameLoop);
             };
-            
+
             this.lastFpsUpdate = performance.now();
             this.animationFrameId = requestAnimationFrame(gameLoop);
         }
@@ -964,43 +1003,54 @@ class Server {
         }
     }
     
-    // Initialize the game
     initialize() {
         // Create the game container and initialize layout
         this.createGameContainer();
-        
-        // Apply initial sizing
-        this.handleResize();
-        
+
         // Initialize the clicker object
         this.initializeClickerObject();
-        
+
         // Setup UI components
         this.setupShopUI();
         this.setupMenuButtons();
-        
+
+        // Force initial resize before loading/starting
+        this.handleResize();
+
         // Try to load saved state
         if (!this.loadGameState()) {
             // No saved state, initialize with defaults
             this.circleBoard.initialize();
             this.circleBoard.addNewBalls(1);
+
+            // Force resize and render BEFORE starting the game loop
+            this.handleResize();
+            this.circleBoard.render();
+
+            // Start the game loop
+            this.startGame();
+        } else {
+            // After loading, ensure proper sizing and rendering
+            this.handleResize();
+            this.circleBoard.render();
+            
+            // Start the game loop
             this.startGame();
         }
-        
+
         // Update displays
         this.updateCollisionDisplay();
         this.updateBalanceDisplay();
-        
-        // Force a final resize and redraw after everything is initialized
+
+        // Final resize after everything is loaded to ensure proper scaling
         setTimeout(() => {
             this.handleResize();
-            this.circleBoard.render();
             if (this.clickerObject) {
                 this.clickerObject.draw();
             }
-        }, 300);
+        }, 100);
     }
-    
+        
     // Static method to start the game
     static startGame(canvasId) {
         // Create and initialize the server which will manage everything

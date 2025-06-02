@@ -36,6 +36,8 @@ class CircleBoard {
         this.wallHitsStack = [];
         this.ballCollisionsStack = [];
 
+        
+
         // Initialize priority queue
         this.counter = 0;
         
@@ -218,168 +220,7 @@ class CircleBoard {
     }
     
  
-    
-    
-    // Handle collision between two balls
-    handleBallCollision(ballA, ballB) {
-        const dx = ballB.center.x - ballA.center.x;
-        const dy = ballB.center.y - ballA.center.y;
-        const distance = Math.sqrt(dx * dx + dy * dy);
-        
-        // Calculate normal vector (direction from ballA to ballB)
-        // Use a minimum distance to avoid division by zero
-        const minDistance = 0.0001;
-        const nx = dx / Math.max(distance, minDistance);
-        const ny = dy / Math.max(distance, minDistance);
-        
-        // Calculate relative velocity
-        const vx = ballB.velocity.x - ballA.velocity.x;
-        const vy = ballB.velocity.y - ballA.velocity.y;
-        
-        // Calculate velocity along the normal direction
-        const velocityAlongNormal = vx * nx + vy * ny;
-        
-        // If balls are moving away from each other, only fix overlap without changing velocities
-        if (velocityAlongNormal > 0) {
-            // Still fix overlap
-            const overlap = (ballA.radius + ballB.radius) - distance;
-            if (overlap > 0) {
-                const massSum = ballA.mass + ballB.mass;
-                const moveRatio1 = ballB.mass / massSum;
-                const moveRatio2 = ballA.mass / massSum;
-                
-                ballA.center.x -= nx * overlap * moveRatio1 * 1.001; // Slightly more separation
-                ballA.center.y -= ny * overlap * moveRatio1 * 1.001;
-                ballB.center.x += nx * overlap * moveRatio2 * 1.001;
-                ballB.center.y += ny * overlap * moveRatio2 * 1.001;
-            }
-            return true;
-        }
-    
-        // Calculate impulse scalar - using conservation of momentum with perfect elasticity (1.0)
-        const massSum = ballA.mass + ballB.mass;
-        const impulse = (-(1 + 1.0) * velocityAlongNormal) / massSum;
-        
-        // Apply impulse
-        const impulseX = impulse * nx;
-        const impulseY = impulse * ny;
-        
-        ballA.velocity.x -= impulseX * ballB.mass;
-        ballA.velocity.y -= impulseY * ballB.mass;
-        ballB.velocity.x += impulseX * ballA.mass;
-        ballB.velocity.y += impulseY * ballA.mass;
-        
-        // Position correction to prevent overlap (with a small separation factor)
-        const overlap = (ballA.radius + ballB.radius) - distance;
-        if (overlap > 0) {
-            const massSum = ballA.mass + ballB.mass;
-            const moveRatio1 = ballB.mass / massSum;
-            const moveRatio2 = ballA.mass / massSum;
-            
-            // Apply a bit more separation (1.001) to ensure balls don't stick
-            ballA.center.x -= nx * overlap * moveRatio1 * 1.001;
-            ballA.center.y -= ny * overlap * moveRatio1 * 1.001;
-            ballB.center.x += nx * overlap * moveRatio2 * 1.001;
-            ballB.center.y += ny * overlap * moveRatio2 * 1.001;
-        }
-        
-        return true;
-    }
-    
-    /**
-     * Handle shape collision with the container wall without checking conditions
-     * Assumes if object is not a circle it contains getVertices method
-     * @param {Object} shape - shape colliding with wall
-     * @returns {boolean} Always returns true since we assume collision happens
-     */
-    handleWallCollision(shape) {
-        const dx = shape.center.x - this.container.x;
-        const dy = shape.center.y - this.container.y;
-        const distance = Math.sqrt(dx * dx + dy * dy);
-        
-        const nx = dx / Math.max(distance, 0.0001);
-        const ny = dy / Math.max(distance, 0.0001);
-
-
-        if(shape.getName() === "Circle"){
-            const overlap = distance + shape.radius - (this.container.radius - this.container.thickness);
-            shape.center.x -= overlap * nx;
-            shape.center.y -= overlap * ny;
-            
-            const dotProduct = shape.velocity.x * nx + shape.velocity.y * ny;
-                
-            shape.velocity.x -= 2 * dotProduct * nx;
-            shape.velocity.y -= 2 * dotProduct * ny;
-            return true;
-        }
-        else{ 
-            if(shape.getVertices()){
-                const vertices = shape.getVertices();
-                let maxOverlap = 0;
-                let collisionNormalX = 0;
-                let collisionNormalY = 0;
-                for(const vertex of vertices){
-                    const vx = vertex.x - this.container.x;
-                    const vy = vertex.y - this.container.y;
-                    const distance = Math.sqrt(vx * vx + vy * vy);
-                    const overlap = distance - (this.container.radius - this.container.thickness);
-                    if(overlap > maxOverlap){
-                        maxOverlap = overlap;
-                        collisionNormalX = vx / Math.max(distance, 0.0001);
-                        collisionNormalY = vy / Math.max(distance, 0.0001);
-                    }
-
-                }
-                shape.center.x -= (maxOverlap + 0.1) * collisionNormalX;
-                shape.center.y -= (maxOverlap + 0.1) * collisionNormalY;
-                
-                // Calculate reflection for velocity
-                const dotProduct = shape.velocity.x * collisionNormalX + 
-                                shape.velocity.y * collisionNormalY;
-                
-                shape.velocity.x -= 2 * dotProduct * collisionNormalX;
-                shape.velocity.y -= 2 * dotProduct * collisionNormalY;
-                                
-                return true;
-
-            }
-
-        }
-
-        
-        console.log(shape);
-        return false;
-    }
-
-    isWallCollision(shape) {
-        if (shape.getName() === "Circle"){
-            const dx = shape.center.x - this.container.x;
-            const dy = shape.center.y - this.container.y;
-            const distance = Math.sqrt(dx * dx + dy * dy);
-            
-            // Check if circle is outside or touching the container wall
-            return distance + shape.radius >= this.container.radius - this.container.thickness;
-        }
-        else if (shape.getVertices) {
-            // For shapes with vertices, check if any vertex is outside the container
-            const vertices = shape.getVertices();
-            for (const vertex of vertices) {
-
-                const dx = vertex.x - this.container.x;
-                const dy = vertex.y - this.container.y;
-                const distance = Math.sqrt(dx * dx + dy * dy);
-                
-                if (distance >= this.container.radius - this.container.thickness) {
-                    return true;
-                }
-            }
-            return false;
-        }
-        console.log("unknown shape", shape);
-        return false;
-    }
-
-    createSpatialGrid(){
+    createSpatialGrid(size =4){
         const bounds = {
             x: this.container.x - this.container.radius,
             y: this.container.y - this.container.radius,
@@ -387,10 +228,10 @@ class CircleBoard {
             height: this.container.radius * 2
 
         }
-        const widthBoxes = bounds.width / 4;
-        const heightBoxes = bounds.height / 4;
+        const widthBoxes = bounds.width / size;
+        const heightBoxes = bounds.height / size;
         return {
-            cells: Array.from({ length: 16}, () => []), // 4x4 grid
+            cells: Array.from({ length: size**2}, () => []), // 4x4 grid
             bounds: bounds,
             widthBoxes: widthBoxes,
             heightBoxes: heightBoxes,
@@ -454,22 +295,7 @@ class CircleBoard {
         return cellSpots;
     }
 
-    checkShapeCollision(shapeA, shapeB) {
-        const axises = new Set([...shapeA.axes(shapeB), ...shapeB.axes(shapeA)]);
-        
-        for (const axis of axises) {
-            const projectionA = shapeA.projection(axis);
-            const projectionB = shapeB.projection(axis);
-            
-            // line can exisit no collision
-            if (!(projectionA[1] > projectionB[0] && projectionB[1] > projectionA[0])) {
-                return false;
-            }
-        }
-        
-        return true; // All axes have overlapping projections
-    }
-
+    
     
     /**
      * Process physics for one frame
@@ -485,13 +311,14 @@ class CircleBoard {
         // Track collisions for this frame
         let totalWallHits = 0;
         let totalShapeCollisions = 0;
+        const size = 6; // Size of the spatial grid
 
-        const grid = this.createSpatialGrid();
+        const grid = this.createSpatialGrid(size);
 
         // Populate the spatial grid
         this.shapes.forEach(shape => {
-            if(this.isWallCollision(shape)){
-                this.handleWallCollision(shape);
+            if(CollisionResponse.handleContainerCollision(shape, this.container)){
+
                 totalWallHits++;
                 if(shape.getName() in returnValues){
                     returnValues[shape.getName()].totalWallHits += 1;
@@ -503,7 +330,7 @@ class CircleBoard {
             }
             const cells = this.getShapeCells(shape, grid);
             cells.forEach(cell => {
-                const index = cell.x + cell.y * 4; // Assuming a 4x4 grid
+                const index = cell.x + cell.y * size; //  a 4x4 grid
                 grid.cells[index].push(shape);
             });
         });
@@ -521,7 +348,7 @@ class CircleBoard {
                     `${shapeB.id}-${shapeA.id}`;
                     if (!proccessedCollisions.has(pairKey)) {
                         proccessedCollisions.add(pairKey);
-                        if (this.checkShapeCollision(shapeA, shapeB)) {
+                        if (CollisionResponse.handleCollision(shapeA, shapeB))
 
                             totalShapeCollisions++;
                             if(!(shapeA.getName() in returnValues)){
@@ -533,10 +360,7 @@ class CircleBoard {
                                 returnValues[shapeB.getName()] = {totalWallHits: 0, totalShapeCollisions: 0};
                             }
                             returnValues[shapeB.getName()].totalShapeCollisions += 1;
-
-                            // collision detected
-                            // somehow handle it
-                            // console.log("Collision detected between shapes", shape, shapeB);
+   
 
 
                             
@@ -544,7 +368,7 @@ class CircleBoard {
                     }
                 }
             }
-        }
+        
         this.shapes.forEach(shape => {
             shape.update(speedMultipler);
         });

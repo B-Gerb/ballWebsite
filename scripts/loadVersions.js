@@ -69,13 +69,20 @@ function boardLoad(server, gameState) {
                 server.circleBoard.shapeInfo.Circle.baseMaxBallSpeed = gameState.circleBoard.baseMaxBallSpeed;
         }
         
-        
         server.circleBoard.ballCount = gameState.circleBoard.ballCount || server.circleBoard.ballCount;
         server.circleBoard.baseReferenceSize = gameState.circleBoard.baseReferenceSize || server.circleBoard.baseReferenceSize;
+        
+        // First set canvas size and calculate scale factor
         server.circleBoard.canvas.width = server.circleBoard.canvas.parentElement.clientWidth;
         server.circleBoard.canvas.height = server.circleBoard.canvas.parentElement.clientHeight;
         server.circleBoard.calculateScaleFactor();
         server.circleBoard.initContainer();
+        
+        // Store the old container radius from saved state
+        const oldContainerRadius = gameState.circleBoard.container ? gameState.circleBoard.container.radius : server.circleBoard.container.radius;
+        
+        // Calculate the scale ratio between old and new container sizes
+        const containerScaleRatio = server.circleBoard.container.radius / oldContainerRadius;
         
         if (gameState.circleBoard.container) {
             server.circleBoard.container.color = gameState.circleBoard.container.color || server.circleBoard.container.color;
@@ -86,24 +93,60 @@ function boardLoad(server, gameState) {
         let counter = 0;
         if (gameState.circleBoard.shapes && Array.isArray(gameState.circleBoard.shapes)) {
             gameState.circleBoard.shapes.forEach(savedShape => {
+                // Calculate relative position and velocity based on old container
+                const oldDx = savedShape.center.x - (gameState.circleBoard.container ? gameState.circleBoard.container.x : 0);
+                const oldDy = savedShape.center.y - (gameState.circleBoard.container ? gameState.circleBoard.container.y : 0);
+                const oldDistance = Math.sqrt(oldDx * oldDx + oldDy * oldDy);
+                const oldDirX = oldDx / Math.max(oldDistance, 0.0001);
+                const oldDirY = oldDy / Math.max(oldDistance, 0.0001);
+                
+                // Calculate relative speed
+                const oldSpeed = Math.sqrt(savedShape.velocity.x * savedShape.velocity.x + savedShape.velocity.y * savedShape.velocity.y);
+                const oldRelativeSpeed = oldSpeed / Math.max(oldContainerRadius, 0.0001);
+                
+                // Calculate new absolute speed based on new container size
+                const newAbsoluteSpeed = oldRelativeSpeed * server.circleBoard.container.radius;
+                
+                // Calculate new position
+                const newDistance = oldDistance * containerScaleRatio;
+                const newX = server.circleBoard.container.x + (oldDirX * newDistance);
+                const newY = server.circleBoard.container.y + (oldDirY * newDistance);
+                
+                // Calculate new velocity
+                const velocityDirX = savedShape.velocity.x / Math.max(oldSpeed, 0.0001);
+                const velocityDirY = savedShape.velocity.y / Math.max(oldSpeed, 0.0001);
+                const newVelocityX = velocityDirX * newAbsoluteSpeed;
+                const newVelocityY = velocityDirY * newAbsoluteSpeed;
+                
                 switch (savedShape.name) {
                     case 'Circle':
-                        const circle = Circle.create(savedShape.center.x, savedShape.center.y, savedShape.radius, savedShape.color, savedShape.velocity.x, savedShape.velocity.y, savedShape.baseRadius);
+                        const circle = Circle.create(
+                            newX, 
+                            newY, 
+                            savedShape.radius * containerScaleRatio, 
+                            savedShape.color, 
+                            newVelocityX, 
+                            newVelocityY, 
+                            savedShape.baseRadius
+                        );
                         circle.id = counter++;
                         server.circleBoard.shapes.push(circle);
                         break;
                         
                     case 'Square':
-
-                        const square = Square.create(savedShape.center.x, savedShape.center.y, savedShape.side, savedShape.rotation, savedShape.color, savedShape.velocity.x, savedShape.velocity.y, savedShape.baseSide);
+                        const square = Square.create(
+                            newX, 
+                            newY, 
+                            savedShape.side * containerScaleRatio, 
+                            savedShape.rotation, 
+                            savedShape.color, 
+                            newVelocityX, 
+                            newVelocityY, 
+                            savedShape.baseSide
+                        );
                         square.id = counter++;
                         server.circleBoard.shapes.push(square);
                         break;
-                        /*
-                    case 'triangle':
-                        server.circleBoard.shapes.push(triangle.createTriangle(savedShape.center.x, savedShape.center.y, savedShape.baseSize, savedShape.color, savedShape.velocity.x, savedShape.velocity.y));
-                        break;
-                        */
                         
                     default:
                         console.error('Unknown shape type:', savedShape.type);
