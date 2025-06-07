@@ -1,76 +1,114 @@
-class prestigeSquareShop extends AShop {
+class prestigeShop extends AShop {
     constructor() {
         super();
         this.items = [
             {
-                name: "Add Square",
-                price: 1,
+                name: "Unlock Square",
+                price: 1500,
+            }
+            ,
+            {
+                name: "Increase Base Square Value",
+                price: 3000,
                 level: 1,
-                equation: price => price * 1.1 + 1,
-            }
-            ,
+                equation: price => function(price) {
+                    if(this.level < 10){
+                        return price + (this.level * 250);
+                    }
+                    if(this.level < 20){
+                        return price + (this.level * 500);
+                    }
+                    if(this.level < 30){
+                        return price + (this.level * 750);
+                    }
+                    if(this.level < 40){
+                        return price + (this.level * 1000);
+                    }
+                    return price * 1.1;
+                },
+                getValue: function() {
+                    return this.level * 0.5;
+                }
+            },
             {
-                name: "Increase Square Size Range Min", 
-                price: 20, 
-                level: 1, 
-                equation: price => (price + 10) ** 1.2,
-                getValue: function() { return this.level + 4; }
-            }
-            ,
+                name: "Increase Base Square Speed",
+                price: 3000,
+                level: 1,
+                equation: price => function(price) {
+                    if(this.level < 10){
+                        return price + (this.level * 250);
+                    }
+                    if(this.level < 20){
+                        return price + (this.level * 500);
+                    }
+                    if(this.level < 30){
+                        return price + (this.level * 750);
+                    }
+                    if(this.level < 40){
+                        return price + (this.level * 1000);
+                    }
+                    return price * 1.05;
+                },
+                getValue: function() {
+                    return this.level * 0.5;
+                }
+            },
             {
-                name: "Increase Square Size Range Max", 
-                price: 20, 
-                level: 1, 
-                equation: price => (price + 10) ** 1.2,
-                getValue: function() { return this.level + 14; }
-            }
-            ,
+                name: "Increase Ball Value Multiplier",
+                price: 5000,
+                level: 1,
+                equation: price => function(price) {
+                    if(this.level < 10){
+                        return price + (this.level * 500);
+                    }
+                    if(this.level < 20){
+                        return price + (this.level * 1000);
+                    }
+                    if(this.level < 30){
+                        return price + (this.level * 1500);
+                    }
+                    if(this.level < 40){
+                        return price + (this.level * 2000);
+                    }
+                    return price * 1.1;
+                },
+                getValue: function() {
+                    return this.level * 0.5;
+                }
+            },
             {
-                name: "Increase Square Speed Min", 
-                price: 30, 
-                level: 1, 
-                equation: price => (price + 10) ** 1.4,
-                getValue: function() { return this.level + 4; }
+                name: "Increase Ball Speed Multiplier",
+                price: 5000,
+                level: 1,
+                equation: price => function(price) {
+                    if(this.level < 10){
+                        return price + (this.level * 500);
+                    }
+                    if(this.level < 20){
+                        return price + (this.level * 1000);
+                    }
+                    if(this.level < 30){
+                        return price + (this.level * 1500);
+                    }
+                    if(this.level < 40){
+                        return price + (this.level * 2000);
+                    }
+                    return price * 1.05;
+                },
+                getValue: function() {
+                    return this.level * 0.5;
+                }
             }
-            ,
-            {
-                name: "Increase Square Speed Max", 
-                price: 30, 
-                level: 1, 
-                equation: price => (price + 10) ** 1.4,
-                getValue: function() { return this.level + 14; }
-            }
-        ]   
+
+        ];
 
     }
     resetShop() {
         this.balance = 0.00;
-        
-        // Reset all items to their initial state
-        this.items.forEach(item => {
-            // Reset price based on item name
-            switch(item.name) {
-                case "Add Square":
-                    item.price = 1;
-                    item.level = 1
-                    break;
-                case "Increase Square Size Range Min":
-                    item.price = 20;
-                    item.level = 1
-                    break;
-                case "Increase Square Size Range Max":
-                    item.price = 20;
-                    item.level = 1
-                    break;
-                case "Increase Square Speed Min":
-                    item.price = 30;
-                    item.level = 1
-                    break;
-                case "Increase Square Speed Max":
-                    item.price = 30;
-                    item.level = 1
-                    break;
-            }
-        });
+        const defaultShop = new prestigeShop();
+        this.items = defaultShop.items;   
+    }
+    removeSquare() {
+        this.items = this.items.filter(item => item.name !== "Unlock Square");
     }
 }
