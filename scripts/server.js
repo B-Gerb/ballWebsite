@@ -112,6 +112,7 @@ class Server {
 
         this.baseUpgradeShop = new baseUpgradeShop();
         this.clickShop = new clickShop();
+        this.prestigeUpgradeShop = new prestigeShop();
         this.loadVersions = window.loadVersions;
 
         // FPS counter variables
@@ -125,11 +126,45 @@ class Server {
         this.isVisible = true;
         this.lastVisibleTime = performance.now();
 
-        // temporary mult
-        this.temporaryMultipliers = {
-            clickValue: 1,
-            ballValue: 1,
-            circleSpeed: 1
+        this.multipliers = {
+            prestigeMultipliers: {
+                clickValue: 1,
+                shapeValue: 1,
+                shapeSpeed: 1,
+                shapes: {
+                    circle: {
+                        speed: 1,
+                        value: 1
+                    },
+                    square: {
+                        speed: 1,
+                        value: 1
+                    },
+                    triangle: {
+                        speed: 1,
+                        value: 1
+                    }
+                }
+            },
+            temporaryMultipliers: {
+                clickValue: 1,
+                shapeValue: 1,
+                shapeSpeed: 1,
+                shapes: {
+                    circle: {
+                        speed: 1,
+                        value: 1
+                    },
+                    square: {
+                        speed: 1,
+                        value: 1
+                    },
+                    triangle: {
+                        speed: 1,
+                        value: 1
+                    }
+                }
+            }
         };
         this.temporaryMultipliersActiveFrames = {};
 
@@ -215,7 +250,7 @@ class Server {
             if(!this.circleBoard.isRunning) return;
             originalHandleClick.call(this.clickerObject); // for animation purposes
 
-            this.clickShop.addBalance(this.clickerValue * this.temporaryMultipliers.clickValue);
+            this.clickShop.addBalance(this.clickerValue * this.multipliers.temporaryMultipliers.clickValue);
 
             this.updateBalanceDisplay();
             this.updateButtonAppearance();
@@ -694,13 +729,13 @@ class Server {
                 
             case "Temporary Click Value Multiplier":
                 if('tclickValue' in this.temporaryMultipliersActiveFrames){
-                    this.temporaryMultipliers.clickValue /= this.temporaryMultipliersActiveFrames.tclickValue.multiplier;
-                    this.temporaryMultipliers.clickValue *= item.getValue();
+                    this.multipliers.temporaryMultipliers.clickValue /= this.temporaryMultipliersActiveFrames.tclickValue.multiplier;
+                    this.multipliers.temporaryMultipliers.clickValue *= item.getValue();
                     this.temporaryMultipliersActiveFrames.tclickValue.frames += 600; // 10 seconds
                     this.temporaryMultipliersActiveFrames.tclickValue.multiplier = item.getValue();
                 }
                 else{
-                    this.temporaryMultipliers.clickValue *= item.getValue();
+                    this.multipliers.temporaryMultipliers.clickValue *= item.getValue();
                     this.temporaryMultipliersActiveFrames.tclickValue = {
                         multiplier: item.getValue(),
                         frames: 600, // 10 seconds
@@ -712,14 +747,14 @@ class Server {
                 
             case "Temporary Ball Value Multiplier":
                 if('tcircleValue' in this.temporaryMultipliersActiveFrames){
-                    this.temporaryMultipliers.ballValue /= this.temporaryMultipliersActiveFrames.tcircleValue.multiplier;
-                    this.temporaryMultipliers.ballValue *= item.getValue();
+                    this.multipliers.temporaryMultipliers.shapeValue /= this.temporaryMultipliersActiveFrames.tcircleValue.multiplier;
+                    this.multipliers.temporaryMultipliers.shapeValue *= item.getValue();
                     this.temporaryMultipliersActiveFrames.tcircleValue.frames += 600; // 10 seconds
                     this.temporaryMultipliersActiveFrames.tcircleValue.multiplier = item.getValue();
                 }
 
                 else{
-                    this.temporaryMultipliers.ballValue *= item.getValue();
+                    this.multipliers.temporaryMultipliers.shapeValue *= item.getValue();
 
                     this.temporaryMultipliersActiveFrames.tcircleValue = {
                         multiplier: item.getValue(),
@@ -731,13 +766,13 @@ class Server {
                 break;
             case "Temporary Speed Multiplier":
                 if('tcircleSpeed' in this.temporaryMultipliersActiveFrames){
-                    this.temporaryMultipliers.circleSpeed /= this.temporaryMultipliersActiveFrames.tcircleSpeed.multiplier;
-                    this.temporaryMultipliers.circleSpeed *= item.getValue();
+                    this.multipliers.temporaryMultipliers.shapeSpeed /= this.temporaryMultipliersActiveFrames.tcircleSpeed.multiplier;
+                    this.multipliers.temporaryMultipliers.shapeSpeed *= item.getValue();
                     this.temporaryMultipliersActiveFrames.tcircleSpeed.frames += 600; // 10 seconds
                     this.temporaryMultipliersActiveFrames.tcircleSpeed.multiplier = item.getValue();
                 }
                 else{
-                    this.temporaryMultipliers.circleSpeed *= item.getValue();
+                    this.multipliers.temporaryMultipliers.shapeSpeed *= item.getValue();
 
                     this.temporaryMultipliersActiveFrames.tcircleSpeed = {
                         multiplier: item.getValue(),
@@ -859,13 +894,47 @@ class Server {
         }
         this.baseUpgradeShop.resetShop();
         this.clickShop.resetShop();
-        this.temporaryMultipliers = {
-            clickValue: 1,
-            ballValue: 1,
-            circleSpeed: 1,
-
+        this.multipliers = {
+            prestigeMultipliers: {
+                clickValue: 1,
+                shapeValue: 1,
+                shapeSpeed: 1,
+                shapes: {
+                    circle: {
+                        speed: 1,
+                        value: 1
+                    },
+                    square: {
+                        speed: 1,
+                        value: 1
+                    },
+                    triangle: {
+                        speed: 1,
+                        value: 1
+                    }
+                }
+            },
+            temporaryMultipliers: {
+                clickValue: 1,
+                shapeValue: 1,
+                shapeSpeed: 1,
+                shapes: {
+                    circle: {
+                        speed: 1,
+                        value: 1
+                    },
+                    square: {
+                        speed: 1,
+                        value: 1
+                    },
+                    triangle: {
+                        speed: 1,
+                        value: 1
+                    }
+                }
+            }
         };
-        this.temporaryMultipliersActiveFrames = {}; 
+        this.temporaryMultipliersActiveFrames = {};
         if (this.clickerObject) {
             this.clickerOjbect = new ClickerObject(this.elements.clickerCanvas.id);
         }
@@ -936,21 +1005,43 @@ class Server {
 
                 // Update physics at fixed time steps
                 while (accumulator >= frameInterval) {
-                    const stats = this.circleBoard.updatePhysics(1 * this.temporaryMultipliers.circleSpeed);
 
-                    if ('Circle' in stats){
-                        this.baseUpgradeShop.addBalance(stats.Circle.totalWallHits * this.temporaryMultipliers.ballValue);
-                        this.updateButtonAppearance();
-                    }
-                    if('Square' in stats) {
-                        this.baseUpgradeShop.addBalance(stats.Square.totalShapeCollisions * this.temporaryMultipliers.ballValue);
-                        this.updateButtonAppearance();
-                    }
-                    if(this.baseUpgradeShop.getBalance() > 100 && !this.baseUpgradeShop.items.squareShop){
-                        this.baseUpgradeShop.addSquaresToShop();
-                        this.setupShopUI();
+                    // Calculate speed multipliers for each shape
+                    const speedMultipliers = {};
+                    for (const shape of this.circleBoard.shapes) {
+                        const shapeName = shape.getName().toLowerCase();
+
+
+                        const totalSpeedMultiplier = this.multipliers.prestigeMultipliers.shapeSpeed * 
+                                                   this.multipliers.temporaryMultipliers.shapeSpeed *
+                                                   this.multipliers.prestigeMultipliers.shapes[shapeName].speed *
+                                                   this.multipliers.temporaryMultipliers.shapes[shapeName].speed;
+                        speedMultipliers[shapeName] = totalSpeedMultiplier;
                     }
 
+                    const stats = this.circleBoard.updatePhysics(speedMultipliers);
+
+                    // Update balances based on shape collisions
+                    for (const [shapeType, shapeStats] of Object.entries(stats)) {
+                        if(shapeType === 'total') continue;
+                        const shapeName = shapeType.toLowerCase();
+                        
+                        // Calculate total value multiplier for this shape
+                        const totalValueMultiplier = this.multipliers.prestigeMultipliers.shapeValue * 
+                                                   this.multipliers.temporaryMultipliers.shapeValue *
+                                                   this.multipliers.prestigeMultipliers.shapes[shapeName].value *
+                                                   this.multipliers.temporaryMultipliers.shapes[shapeName].value;
+                        switch (shapeType) {
+                            case 'Circle':
+                                this.baseUpgradeShop.addBalance(shapeStats.totalWallHits * totalValueMultiplier);
+                                break;
+                            case 'Square':
+                                this.baseUpgradeShop.addBalance(shapeStats.totalShapeCollisions * totalValueMultiplier);
+                                break;
+                        }
+                    }
+
+                    this.updateButtonAppearance();
                     this.updateCollisionDisplay();
                     this.updateBalanceDisplay();
 
@@ -980,15 +1071,15 @@ class Server {
             if (value.frames <= 0) {
                 switch(value.name) {
                     case "tclickValue":
-                        this.temporaryMultipliers.clickValue /= value.multiplier;
+                        this.multipliers.temporaryMultipliers.clickValue /= value.multiplier;
                         delete this.temporaryMultipliersActiveFrames[key];
                         break;
                     case "tcircleValue":
-                        this.temporaryMultipliers.ballValue /= value.multiplier;
+                        this.multipliers.temporaryMultipliers.shapeValue /= value.multiplier;
                         delete this.temporaryMultipliersActiveFrames[key];
                         break;
                     case "tcircleSpeed":
-                        this.temporaryMultipliers.circleSpeed /= value.multiplier;
+                        this.multipliers.temporaryMultipliers.shapeSpeed /= value.multiplier;
                         delete this.temporaryMultipliersActiveFrames[key];
                         break;
                 }

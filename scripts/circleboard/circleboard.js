@@ -303,7 +303,7 @@ class CircleBoard {
      * @param {Object} shop - Shop object for handling currency
      * @return {Object} Statistics for the current frame
      */
-    updatePhysics(speedMultipler = 1) {
+    updatePhysics(speedMultipliers = {}) {
         if (!this.isRunning) return {total: { totalWallHits: 0, totalShapeCollisions: 0 }};
 
         const returnValues = {total: { totalWallHits: 0, totalShapeCollisions: 0 }};
@@ -367,10 +367,12 @@ class CircleBoard {
                         }
                     }
                 }
+
             }
         
         this.shapes.forEach(shape => {
-            shape.update(speedMultipler);
+            // Update shape position and velocity
+            shape.update(speedMultipliers[shape.getName().toLowerCase()] || 1);
         });
         returnValues.total.totalWallHits = totalWallHits;
         returnValues.total.totalShapeCollisions = totalShapeCollisions;

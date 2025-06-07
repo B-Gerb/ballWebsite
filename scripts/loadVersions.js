@@ -22,6 +22,8 @@ function load(server){
                     return load0_0_2(server, gameState);
                 case '0.0.3':
                     return load0_0_3(server, gameState);
+                case '0.0.4':
+                    return load0_0_4(server, gameState);
                 default:
                     console.log('Unknown game version:', version);
                     return false;
@@ -221,6 +223,31 @@ function load0_0_3(server, gameState) {
     return true;
 }
 
+// Add new load function for version 0.0.4
+function load0_0_4(server, gameState) {
+    boardLoad(server, gameState);
+    if ("shops" in gameState) {
+        loadbaseUpgradeShop(server, gameState.shops);
+        loadclickShop(server, gameState.shops);
+    }
+    loadSeed(server, gameState);
+    loadClicker(server, gameState);
+    loadMultipliers(server, gameState);
+    server.updateBalanceDisplay();
+    server.setupShopUI();
+    return true;
+}
+
+// Add new function to load multipliers
+function loadMultipliers(server, gameState) {
+    if (gameState.multipliers) {
+        server.multipliers = gameState.multipliers;
+    }
+    if (gameState.tempMultiplier && gameState.tempMultiplier.frames) {
+        server.temporaryMultipliersActiveFrames = gameState.tempMultiplier.frames;
+    }
+}
+
 // Also update the version switch in the main load function
 function load(server) {
     const savedState = localStorage.getItem('circleBoardGameState');
@@ -242,6 +269,8 @@ function load(server) {
                     return load0_0_2(server, gameState);
                 case '0.0.3':
                     return load0_0_3(server, gameState);
+                case '0.0.4':
+                    return load0_0_4(server, gameState);
                 default:
                     console.log('Unknown game version:', version);
                     return false;
