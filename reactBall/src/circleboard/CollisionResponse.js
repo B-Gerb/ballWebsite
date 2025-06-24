@@ -21,11 +21,11 @@ class CollisionResponse {
         }
 
         // Separate shapes using the MTV
-        CollisionResponse.applyCollision(shapeA, shapeB, mtv.normal, restitution);
-
-        CollisionResponse.separateShapes(shapeA, shapeB, mtv);
 
         // Calculate relative velocity
+        CollisionResponse.applyCollision(shapeA, shapeB, mtv.normal, restitution);
+        CollisionResponse.separateShapes(shapeA, shapeB, mtv);
+
         return true; // Collision handled
 
 
@@ -203,3 +203,4 @@ class CollisionResponse {
     }
 
 }
+export default CollisionResponse;
