@@ -210,31 +210,8 @@ class Server {
     }
     setSeed(seed) {
         this.seed = seed;
-    }    createGameContainer() {
-        // In React, the container structure is already handled by JSX
-        // This method is now simplified to just ensure proper styling
-        const container = document.querySelector('.container');
-        if (container) {
-            container.style.display = 'flex';
-            container.style.flexDirection = 'column';
-            container.style.alignItems = 'center';
-            container.style.width = '100%';
-            container.style.justifyContent = 'flex-start';
-            container.style.gap = '20px';
-            container.style.margin = '0 auto';
-            container.style.padding = '20px';
-        }
-        
-        // Ensure canvas containers have proper styling
-        const canvasContainers = document.querySelectorAll('.canvas-container');
-        canvasContainers.forEach(container => {
-            container.style.position = 'relative';
-            container.style.display = 'flex';
-            container.style.justifyContent = 'center';
-            container.style.alignItems = 'center';
-            container.style.margin = '0 auto';
-        });
-    }
+    }    
+    
     initializeClickerObject() {
         // Use the clickerCanvas element passed in
         if (!this.elements.clickerCanvas) return;
@@ -252,90 +229,78 @@ class Server {
         const windowWidth = window.innerWidth;
         const windowHeight = window.innerHeight;
         
-        // Look for the React-rendered container instead of 'game-container'
+        // Let CSS handle all layout decisions - we just size the canvases
         const container = document.querySelector('.container');
         if (!container) return;
         
-        // Always use vertical layout with shops below
-        container.style.display = 'flex';
-        container.style.flexDirection = 'row';
-        container.style.flexWrap = 'wrap';
-        container.style.alignItems = 'center';
-        container.style.justifyContent = 'flex-start';
-        container.style.width = '100%';
-        container.style.gap = '20px';
+        // Calculate available space for the circle board
+        // Account for container padding, gaps, and shop space
+        const containerPadding = 40; // 20px padding on each side
+        const containerGap = 30; // gap between elements
+        const shopMinWidth = 400; // minimum shop width
         
-        // Get current container dimensions before changes
-        const currentBoardContainer = this.circleBoard.canvas.parentElement;
-        const currentBoardSize = parseInt(currentBoardContainer.style.width) || 500;
-
-
-        // Calculate board size based on screen size and available space
-        let boardSize;
-        const availableWidth = windowWidth * 0.9; // Leave some margin
-        const availableHeight = windowHeight * 0.7; // Leave some margin
-        boardSize = Math.min(availableHeight, availableWidth); 
-        // Only update if size actually changed
-        if (Math.abs(boardSize - currentBoardSize) <= 5) {
-            return;
+        // Calculate how much space is actually available for canvas area
+        let availableWidth;
+        if (windowWidth > (shopMinWidth + 600 + containerGap + containerPadding)) {
+            // Wide screen: shop and canvas side by side
+            availableWidth = windowWidth - shopMinWidth - containerGap - containerPadding;
+        } else {
+            // Narrow screen: canvas gets full width (shop will wrap below)
+            availableWidth = windowWidth - containerPadding;
         }
+        
+        // Leave space for clicker canvas (roughly 300px + gap)
+        const clickerSpace = 320;
+        const boardAvailableWidth = availableWidth - clickerSpace;
+        
+        // Calculate board size
+        const availableHeight = windowHeight * 0.8; // Use 80% of viewport height
+        let boardSize = Math.min(boardAvailableWidth, availableHeight);
+        
+        // Ensure reasonable bounds
+        boardSize = Math.max(boardSize, 100); // Minimum size
+        boardSize = Math.min(boardSize, 1000); // Maximum size
+        
+        // Get current board size
+        const currentBoardSize = this.circleBoard.canvas.width || 500;
 
-        if (Math.abs(boardSize - currentBoardSize) > 5) {
-            const boardContainer = this.circleBoard.canvas.parentElement;
-            
-
-
-            // Update canvas size and properties - this is crucial!
+        // Only update if size changed significantly
+        if (Math.abs(boardSize - currentBoardSize) > 10) {
             this.circleBoard.updateCanvasSize(boardSize);
-            
-
+        }
+        else{
+            return; // No significant change, skip further updates
         }
         
-        // Handle clicker canvas - use the actual canvas element
+        // Handle clicker canvas - size it proportionally to board
         const clickerCanvas = this.elements.clickerCanvas;
         if (clickerCanvas) {
-            let clickerWidth, clickerHeight;
+            let clickerWidth = Math.min(boardSize * 0.6, 300);
+            let clickerHeight = Math.min(boardSize * 0.3, 150);
             
-            if (windowWidth <= 600) {
-                clickerWidth = Math.min(windowWidth * 0.8, 250);
-                clickerHeight = 120;
-            } else if (windowWidth <= 1200) {
-                clickerWidth = Math.min(windowWidth * 0.4, 300);
-                clickerHeight = 150;
-            } else {
-                clickerWidth = 350;
-                clickerHeight = 180;
-            }
+    
             
             clickerWidth = Math.round(clickerWidth);
             clickerHeight = Math.round(clickerHeight);
             
-            clickerCanvas.style.width = `${clickerWidth}px`;
-            clickerCanvas.style.height = `${clickerHeight}px`;
-            clickerCanvas.width = clickerWidth;
-            clickerCanvas.height = clickerHeight;
-            clickerCanvas.style.margin = '10px auto';
-            clickerCanvas.style.display = 'block';
-            
-            // Update the parent container as well
-            const clickerContainer = clickerCanvas.parentElement;
-            if (clickerContainer) {
-                clickerContainer.style.width = `${clickerWidth}px`;
-                clickerContainer.style.height = `${clickerHeight}px`;
-                clickerContainer.style.margin = '10px auto';
-                clickerContainer.style.display = 'block';
+            // Only update if size changed
+            const currentClickerWidth = clickerCanvas.width || 0;
+            if (Math.abs(clickerWidth - currentClickerWidth) > 10) {
+                console.log(`Resizing clicker from ${currentClickerWidth}x${clickerCanvas.height} to ${clickerWidth}x${clickerHeight}`);
+                
+                clickerCanvas.style.width = `${clickerWidth}px`;
+                clickerCanvas.style.height = `${clickerHeight}px`;
+                clickerCanvas.width = clickerWidth;
+                clickerCanvas.height = clickerHeight;
+                
+                // Update the clicker object if it exists
+                if (this.clickerObject) {
+                    this.clickerObject.updateSize?.(clickerWidth, clickerHeight);
+                }
             }
         }
         
-        // Ensure the shop container is properly sized and positioned
-        const shopContainer = this.elements.shopContainer;
-        if (shopContainer) {
-            shopContainer.style.width = '100%';
-            shopContainer.style.maxWidth = `${Math.max(boardSize, 600)}px`;
-            shopContainer.style.margin = '20px auto';
-        }
-        
-        // Force a render after all changes
+        // Force a render after changes
         setTimeout(() => {
             this.circleBoard.render();
             if (this.clickerObject) {
@@ -502,53 +467,70 @@ class Server {
         
         // Clear existing content
         shopContainer.innerHTML = '';
-        shopContainer.appendChild(document.createElement('h2')).textContent = 'Balance Shop';
         
-        // Add shop items
-        for(const [shopName, shop] of Object.entries(this.baseUpgradeShop.items)) {
+        // Create Balance Shop section
+        const balanceShopSection = document.createElement('div');
+        balanceShopSection.className = 'shop-section';
+        balanceShopSection.innerHTML = '<h2>Balance Shop</h2>';
+        shopContainer.appendChild(balanceShopSection);
+        
+        // Add shop items organized by category
+        for (const [shopName, shop] of Object.entries(this.baseUpgradeShop.items)) {
+            // Create category header
+            const categoryHeader = document.createElement('h3');
+            categoryHeader.textContent = shopName;
+            balanceShopSection.appendChild(categoryHeader);
             
-            shopContainer.appendChild(document.createElement('h2')).textContent = shopName;
+            // Create grid container for this category
+            const categoryGrid = document.createElement('div');
+            categoryGrid.className = 'shop-items-grid';
             
-            for(const buttons of shop) {
+            for (const item of shop) {
                 const button = document.createElement('button');
-                // Add both a general class and a shop-specific class
                 button.className = `shop-item-button baseUpgrade-shop-item-button ${shopName}-shop-item-button`;
                 
-                const canAfford = this.baseUpgradeShop.balance >= this.baseUpgradeShop.itemCost(buttons, 1)[0];
+                const canAfford = this.baseUpgradeShop.balance >= this.baseUpgradeShop.itemCost(item, 1)[0];
                 if (!canAfford) {
                     button.classList.add('cannot-afford');
                 }
                 
                 button.innerHTML = `
-
-                    <h3 class="base-upgrade-itemNames">${buttons.name}</h3>
-                    <p>Level: <span id="${buttons.name.replace(/\s+/g, '-')}-level">${buttons.level}</span></p>
-                    <p>Cost: <span id="${buttons.name.replace(/\s+/g, '-')}-cost">${buttons.price.toFixed(2)}</span></p>
+                    <h3 class="base-upgrade-itemNames">${item.name}</h3>
+                    <p>Level: <span id="${item.name.replace(/\s+/g, '-')}-level">${item.level}</span></p>
+                    <p>Cost: <span id="${item.name.replace(/\s+/g, '-')}-cost">${item.price.toFixed(2)}</span></p>
                 `;
                 
-                button.dataset.itemName = buttons.name;
+                button.dataset.itemName = item.name;
                 button.dataset.shopCategory = shopName;
                 
                 button.addEventListener('click', () => {
-                    const success = this.buyItemBShop(buttons.name);
-                    // Update button text after purchase
-                    const levelSpan = button.querySelector(`#${buttons.name.replace(/\s+/g, '-')}-level`);
-                    const costSpan = button.querySelector(`#${buttons.name.replace(/\s+/g, '-')}-cost`);
+                    const success = this.buyItemBShop(item.name);
+                    const levelSpan = button.querySelector(`#${item.name.replace(/\s+/g, '-')}-level`);
+                    const costSpan = button.querySelector(`#${item.name.replace(/\s+/g, '-')}-cost`);
                     
-                    if (levelSpan) levelSpan.textContent = buttons.level;
-                    if (costSpan) costSpan.textContent = buttons.price.toFixed(2);
+                    if (levelSpan) levelSpan.textContent = item.level;
+                    if (costSpan) costSpan.textContent = item.price.toFixed(2);
                     this.updateButtonAppearance();
                 });
                 
-                shopContainer.appendChild(button);
+                categoryGrid.appendChild(button);
             }
+            
+            balanceShopSection.appendChild(categoryGrid);
         }
 
-        shopContainer.appendChild(document.createElement('h2')).textContent = 'Click Shop';
+        // Create Click Shop section
+        const clickShopSection = document.createElement('div');
+        clickShopSection.className = 'shop-section';
+        clickShopSection.innerHTML = '<h2>Click Shop</h2>';
+        
+        const clickShopGrid = document.createElement('div');
+        clickShopGrid.className = 'shop-items-grid';
 
         this.clickShop.items.forEach(item => {
             const button = document.createElement('button');
             button.className = 'shop-item-button click-shop-item-button';
+            
             const canAfford = this.clickShop.balance >= this.clickShop.itemCost(item, 1)[0];
             if (!canAfford) {
                 button.classList.add('cannot-afford');
@@ -564,23 +546,20 @@ class Server {
                 const success = this.buyItemCShop(item.name);
                 
                 if (success) {
-                    // Update button text after purchase
                     const levelSpan = button.querySelector(`#${item.name.replace(/\s+/g, '-')}-level`);
                     const costSpan = button.querySelector(`#${item.name.replace(/\s+/g, '-')}-cost`);
                     
                     if (levelSpan) levelSpan.textContent = item.level;
                     if (costSpan) costSpan.textContent = item.price.toFixed(2);
                     this.updateButtonAppearance();
-
                 }
             });
             
-            shopContainer.appendChild(button);
-
+            clickShopGrid.appendChild(button);
         });
-    
-    // Similarly for clickShop if you have it
-    // ...
+        
+        clickShopSection.appendChild(clickShopGrid);
+        shopContainer.appendChild(clickShopSection);
     }
                     
            
@@ -1071,8 +1050,6 @@ class Server {
     }
     
     initialize() {
-        // Create the game container and initialize layout
-        this.createGameContainer();
 
         // Initialize the clicker object
         this.initializeClickerObject();
@@ -1081,8 +1058,7 @@ class Server {
         this.setupShopUI();
         this.setupMenuButtons();
 
-        // Force initial resize before loading/starting
-        this.handleResize();
+
 
         // Try to load saved state
         if (!this.loadGameState()) {

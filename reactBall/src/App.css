@@ -2,10 +2,8 @@
     margin: 0;
     padding: 0;
     box-sizing: border-box;
-}
-* {
     -webkit-tap-highlight-color: transparent;
-}   
+}
 
 body {
     font-family: Arial, sans-serif;
@@ -14,21 +12,12 @@ body {
     line-height: 1.6;
 }
 
-.container {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    max-width: 100%; 
-    margin: 0 auto;
-    padding: 20px;
-    gap: 20px;
-}
-
 h1 {
     text-align: center;
     margin-bottom: 25px;
     color: #444;
 }
+
 h2 {
     margin-bottom: 15px;
     color: #555;
@@ -41,115 +30,218 @@ h3 {
     text-align: center;
 }
 
-.stat {
-    color : #711e1e;
-    font-size: 18px;
-    font-weight: bold;
-    text-align: center;
-}
-.canvas-container {
-    padding: 0;
-    margin: 0 auto;
-    border: none;
-    box-shadow: none;
-    border-radius: 0;
+/* Main container - holds game-area and shop */
+.container {
     display: flex;
+    flex-wrap: wrap;
+    width: 100%;
+    gap: 30px;
+    padding: 20px;
     justify-content: center;
-    align-items: center;
+    align-items: flex-start;
 }
 
-canvas {
-    display: block;
-    background-color: white;
-    border-radius: 4px;
-    border: 2px solid #ddd;
-}
-
-.controls {
+/* Game area container - holds circleboard and clicker together */
+.canvas-container {
     display: flex;
     flex-wrap: wrap;
     gap: 20px;
-    background-color: #f0f0f0;
-    border-radius: 8px;
+    align-items: flex-start;
+    justify-content: center;
+    flex: 1 1 600px;
+    min-width: 400px;
     padding: 20px;
+    background-color: rgba(255, 255, 255, 0.5);
+    border-radius: 12px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+}
+
+/* Individual canvas styling */
+canvas {
+    display: block;
+    background-color: white;
+    border-radius: 8px;
+    border: 2px solid #ddd;
+}
+
+#bouncingBallsCanvas {
+    border-color: #333;
+    flex: 0 0 auto;
+}
+
+#clickerCanvas {
+    border-color: #666;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    background-color: #f8f8f8;
+    cursor: pointer;
+    flex: 0 0 auto;
+}
+
+/* Shop container */
+.shop-container {
+    flex: 1 1 400px;
+    min-width: 350px;
+    max-width: 500px;
+    padding: 20px;
+    background-color: white;
+    border-radius: 8px;
+    border: 1px solid #ddd;
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    height: fit-content;
 }
 
-.control-group {
-    flex: 1;
-    min-width: 200px;
+/* Shop sections */
+.shop-section {
+    margin-bottom: 30px;
 }
 
-label {
+.shop-section h2 {
+    color: #333;
+    border-bottom: 2px solid #007bff;
+    padding-bottom: 5px;
+    margin-bottom: 15px;
+    text-align: left;
+}
+
+.shop-section h3 {
+    color: #555;
+    margin: 15px 0 10px 0;
+    font-size: 1.1em;
+    text-align: left;
+}
+
+/* Shop items grid */
+.shop-items-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+/* Shop item buttons */
+.shop-item-button {
+    padding: 12px;
+    border: 2px solid #000000;
+    background-color: #080456;
+    color: #acaaaa;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-align: left;
+    display: block;
+    width: 100%;
+}
+
+.shop-item-button:hover {
+    background-color: #0a0663;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.shop-item-button.cannot-afford {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.shop-item-button.cannot-afford:hover {
+    transform: none;
+    box-shadow: none;
+    background-color: #080456;
+}
+
+.base-upgrade-itemNames {
+    font-size: 16px;
+    font-weight: bold;
+    color: #ba5609;
+    text-align: center;
+    margin: 0 0 8px 0;
+}
+
+.shop-item-button h3 {
+    margin: 0 0 8px 0;
+    color: #ba5609;
+    font-size: 16px;
+    font-weight: bold;
+    text-align: center;
+}
+
+.shop-item-button p {
+    margin: 4px 0;
+    color: #acaaaa;
+    font-size: 0.9em;
+}
+
+/* Balance and stats styling - ALWAYS fixed in top right */
+.shop-balance-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background-color: rgba(255, 255, 255, 0.95);
+    padding: 15px;
+    border-radius: 8px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    backdrop-filter: blur(5px);
+    border: 1px solid rgba(0,0,0,0.1);
+}
+
+.shop-balance-container label {
+    font-weight: bold;
+    font-size: 14px;
+    color: #333;
+    margin: 0;
+}
+
+.stats {
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+.stat {
+    color: #711e1e;
+    font-size: 18px;
+    font-weight: bold;
+    text-align: center;
+    display: flex;
+    gap: 20px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.stat label {
     display: block;
     margin-bottom: 10px;
     font-weight: bold;
     font-size: 14px;
 }
 
-
-.slider {
-    width: 100%;
-    height: 8px;
-    background: #ddd;
-    border-radius: 4px;
-    appearance: none;
-    outline: none;
-}
-.slider::-webkit-slider-thumb {
-    appearance: none;
-    width: 18px;
-    height: 18px;
-    background: #3498db;
-    border-radius: 50%;
-    cursor: pointer;
+.controls {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    margin-top: 20px;
+    flex-wrap: wrap;
 }
 
-.slider::-moz-range-thumb {
-    width: 18px;
-    height: 18px;
-    background: #3498db;
-    border-radius: 50%;
-    cursor: pointer;
-    border: none;
-}
-
-.button {
-    background-color: #ffffff00;
+.controls button {
+    padding: 10px 20px;
+    background-color: #007bff;
     color: white;
     border: none;
-    padding: 10px 20px;
-    border-radius: 4px;
+    border-radius: 5px;
     cursor: pointer;
-    font-size: 14px;
-    transition: background-color 0.3s;
-}
-#game-container {
-    display: flex;
-    flex-wrap: wrap;
-    width: 100%;
-    justify-content: center;
-    gap: 20px;
-    margin-bottom: 20px;
+    font-size: 16px;
+    transition: background-color 0.3s ease;
 }
 
-#clickerCanvas {
-    border-radius: 8px;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-    background-color: #f8f8f8;
-    cursor: pointer;
+.controls button:hover {
+    background-color: #0056b3;
 }
 
-/* Style for responsive layout */
-@media (max-width: 800px) {
-    #game-container {
-        flex-direction: column;
-        align-items: center;
-    }
-}
-
-
-
+/* Pop-up styling */
 .pop-up {
     position: fixed;
     z-index: 1000;
@@ -163,8 +255,9 @@ label {
     left: 50%;
     transform: translate(-50%, -50%);
     font-family: Arial, sans-serif;
-    text-align: center;  
+    text-align: center;
 }
+
 .backdrop {
     position: fixed;
     top: 0;
@@ -174,6 +267,7 @@ label {
     background-color: rgba(0, 0, 0, 0.5);
     z-index: 999;
 }
+
 .pop-up-button {
     padding: 8px 20px;
     border: none;
@@ -182,71 +276,11 @@ label {
     font-size: 14px;
     font-weight: bold;
     transition: background-color 0.2s;
-}
-.shop-balance-container {
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    background-color: white;
-    padding: 10px;
-    border-radius: 5px;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-    z-index: 1; 
-  }
-  .shop-item-button {
-    background-color: #080456; 
-    border: 2px solid #000000; 
-    color: #acaaaa;
-    padding: 10px;
+    background-color: #007bff;
+    color: white;
     margin: 5px;
-    border-radius: 5px;
 }
 
-.shop-item-button.cannot-afford {
-    opacity: 0.5;
-}
-.base-upgrade-itemNames{
-    font-size: 16px;
-    font-weight: bold;
-    color: #ba5609;
-    text-align: center;
-}
-
-/* Shop container styling */
-.shop-container {
-    width: 100%;
-    max-width: 800px;
-    margin: 20px auto;
-    padding: 20px;
-    background-color: white;
-    border-radius: 8px;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-}
-
-.tab-content {
-    width: 100%;
-}
-
-/* Make sure shop items are properly spaced */
-.shop-item-button {
-    display: block;
-    width: 100%;
-    max-width: 300px;
-    margin: 10px auto;
-    text-align: left;
-}
-
-/* Responsive shop layout */
-@media (min-width: 768px) {
-    .shop-container {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-        gap: 15px;
-        align-items: start;
-    }
-    
-    .shop-item-button {
-        max-width: none;
-        margin: 5px 0;
-    }
+.pop-up-button:hover {
+    background-color: #0056b3;
 }

@@ -41,13 +41,10 @@ function App() {
       <div className="container">
         <div className="canvas-container">
           <canvas ref={canvasRef} id="bouncingBallsCanvas"></canvas>
-        </div>
-        <div className="canvas-container">
           <canvas ref={clickerCanvasRef} id="clickerCanvas"></canvas>
         </div>
-        <div id="shop" className="tab-content">
-          <div id="shopContainer" className="shop-container"></div>
-        </div>
+        <div id="shopContainer" className="shop-container"></div>
+        
       </div>
       <div className="controls">
         <button id="pauseButton">Pause</button>
