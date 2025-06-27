@@ -1,12 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
 import Server from './Server';
+import PrestigePopup from './components/PrestigePopup';
 import './App.css';
 
 function App() {
   const canvasRef = useRef(null);
   const clickerCanvasRef = useRef(null); // Add ref for clicker canvas
   const [count, setCount] = useState(0);
-  const initialized = useRef(false)
+  const [isPrestigePopupOpen, setIsPrestigePopupOpen] = useState(false);
+  const initialized = useRef(false);
+  const serverRef = useRef(null); // Store server instance
 
   useEffect(() => {
     // Initialize the game when the component mounts
@@ -14,6 +17,7 @@ function App() {
       // Pass both canvas elements directly to Server
       initialized.current = true; // Set initialized to true to prevent re-initialization
       const server = Server.startGame(canvasRef.current, clickerCanvasRef.current);
+      serverRef.current = server; // Store server reference
       // Optionally store server in state/ref if you need to interact with it later
       return () => {
         // Cleanup if needed when component unmounts
@@ -21,6 +25,29 @@ function App() {
       };
     }
   }, []);
+
+  // Handler functions for prestige popup
+  const handleOpenPrestigeShop = () => {
+    setIsPrestigePopupOpen(true);
+  };
+
+  const handleClosePrestigeShop = () => {
+    setIsPrestigePopupOpen(false);
+  };
+
+  const handlePrestigePurchase = (itemName) => {
+    if (serverRef.current) {
+      const success = serverRef.current.buyPrestigeUpgrade(itemName);
+      if (success) {
+        // Update any UI elements or trigger re-renders as needed
+        console.log(`Successfully purchased: ${itemName}`);
+        // Force re-render to update UI
+        setCount(prev => prev + 1);
+      } else {
+        console.log(`Failed to purchase: ${itemName}`);
+      }
+    }
+  };
 
   return (
     <div>
@@ -50,7 +77,20 @@ function App() {
         <button id="pauseButton">Pause</button>
         <button id="saveButton">Save</button>
         <button id="resetButton">Reset</button>
+        <button onClick={handleOpenPrestigeShop} className="prestige-button">
+          Prestige Shop
+        </button>
       </div>
+      
+      {/* Prestige Popup */}
+      {serverRef.current && (
+        <PrestigePopup 
+          isOpen={isPrestigePopupOpen}
+          onClose={handleClosePrestigeShop}
+          prestigeShop={serverRef.current.getPrestigeShopData()}
+          onPurchase={handlePrestigePurchase}
+        />
+      )}
     </div>
   );
 }

@@ -281,6 +281,26 @@ canvas {
     margin: 5px;
 }
 
-.pop-up-button:hover {
-    background-color: #0056b3;
+/* Prestige Shop Button */
+.prestige-button {
+  background: linear-gradient(135deg, #6b46c1, #9333ea);
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 6px rgba(107, 70, 193, 0.3);
+}
+
+.prestige-button:hover {
+  background: linear-gradient(135deg, #553c9a, #7c3aed);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 12px rgba(107, 70, 193, 0.4);
+}
+
+.prestige-button:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 4px rgba(107, 70, 193, 0.3);
 }

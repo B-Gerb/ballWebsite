@@ -5,101 +5,73 @@ class prestigeShop extends AShop{
         this.items = [
             {
                 name: "Unlock Square",
-                price: 1500,
-            }
-            ,
-            {
-                name: "Increase Base Square Value",
-                price: 3000,
-                level: 1,
-                equation: price => function(price) {
-                    if(this.level < 10){
-                        return price + (this.level * 250);
-                    }
-                    if(this.level < 20){
-                        return price + (this.level * 500);
-                    }
-                    if(this.level < 30){
-                        return price + (this.level * 750);
-                    }
-                    if(this.level < 40){
-                        return price + (this.level * 1000);
-                    }
-                    return price * 1.1;
-                },
-                getValue: function() {
-                    return this.level * 0.5;
-                }
+                price: 10,
+                level: 0,
+                maxLevel: 1
             },
             {
-                name: "Increase Base Square Speed",
-                price: 3000,
-                level: 1,
-                equation: price => function(price) {
-                    if(this.level < 10){
-                        return price + (this.level * 250);
+                name: "Increase Base Circle Size",
+                price: 20,
+                level: 0,
+                maxLevel: 10,
+                equation: function(price) {
+                    if(this.level < 10) {
+                        return price + ((this.level/10)+1*price*0.4);
                     }
-                    if(this.level < 20){
-                        return price + (this.level * 500);
+                    if(this.level < 25) {
+                        return price + ((this.level/10)+1*price*0.8);
                     }
-                    if(this.level < 30){
-                        return price + (this.level * 750);
+                    if(this.level < 50) {
+                        return price + ((this.level/10)+1*price*1.2);
                     }
-                    if(this.level < 40){
-                        return price + (this.level * 1000);
+                    else{
+                        return price + ((this.level/10)+1*price*2);
                     }
-                    return price * 1.05;
                 },
-                getValue: function() {
-                    return this.level * 0.5;
-                }
+                getValue: function() { return this.level*3;}
             },
             {
-                name: "Increase Ball Value Multiplier",
-                price: 5000,
-                level: 1,
-                equation: price => function(price) {
-                    if(this.level < 10){
-                        return price + (this.level * 500);
+                name: "Increase Ball Speed",
+                price: 40,
+                maxLevel: 10,
+                level: 0,
+                equation: function(price) {
+                    if(this.level < 10) {
+                        return price + ((this.level/10)+1*price*0.5);
                     }
-                    if(this.level < 20){
-                        return price + (this.level * 1000);
+                    if(this.level < 25) {
+                        return price + ((this.level/10)+1*price*1);
                     }
-                    if(this.level < 30){
-                        return price + (this.level * 1500);
+                    if(this.level < 50) {
+                        return price + ((this.level/10)+1*price*1.5);
                     }
-                    if(this.level < 40){
-                        return price + (this.level * 2000);
+                    else{
+                        return price + ((this.level/10)+1*price*2.5);
                     }
-                    return price * 1.1;
                 },
-                getValue: function() {
-                    return this.level * 0.5;
-                }
+                getValue: function() { return this.level*3;}
             },
             {
-                name: "Increase Ball Speed Multiplier",
-                price: 5000,
-                level: 1,
-                equation: price => function(price) {
-                    if(this.level < 10){
-                        return price + (this.level * 500);
-                    }
-                    if(this.level < 20){
-                        return price + (this.level * 1000);
-                    }
-                    if(this.level < 30){
-                        return price + (this.level * 1500);
-                    }
-                    if(this.level < 40){
-                        return price + (this.level * 2000);
-                    }
-                    return price * 1.05;
+                name: "Increase Ball Value",
+                price: 50,
+                maxLevel: 9,
+                level: 0,
+                equation: function(price) {
+                    return price * (2 + this.level* .5);
                 },
-                getValue: function() {
-                    return this.level * 0.5;
-                }
-            }
+                getValue: function() { return this.level;}
+            },
+            {
+                name: "Increase Click Value",
+                price: 50,
+                maxLevel: 9,
+                level: 0,
+                equation: function(price) {
+                    return price * (2 + this.level* .5);
+                },
+                getValue: function() { return this.level;}
+            },
+            
 
         ];
 
@@ -111,6 +83,23 @@ class prestigeShop extends AShop{
     }
     removeSquare() {
         this.items = this.items.filter(item => item.name !== "Unlock Square");
+    }
+    buyItemByName(itemName, amount = 1) {
+        const item = this.getItem(itemName);
+
+        if (item) {
+            if(item.maxLevel == 1){
+                //signle unlock item
+                if (this.balance >= item.price) {
+                    this.removeBalance(item.price);
+                    item.level = 1;
+                    return true; 
+                }
+            }
+            
+            return this.buyItem(item, amount);
+        }
+        return false;
     }
 }
 

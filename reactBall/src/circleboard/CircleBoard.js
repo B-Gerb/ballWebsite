@@ -244,6 +244,8 @@ class CircleBoard {
 
     getShapeCells(shape, grid) {
         const cellSpots = [];
+        const gridSize = Math.sqrt(grid.cells.length); // Calculate grid size from cells array
+        
         // Use bounding boxes
         if(shape.getName() === "Circle"){
             const radius = shape.radius;
@@ -257,13 +259,21 @@ class CircleBoard {
 
         
 
-            for (let x = startX; x <= endX; x += grid.widthBoxes) {
-                for (let y = startY; y <= endY; y += grid.heightBoxes) {
+            // Calculate which grid cells the shape overlaps
+            const startCellX = Math.max(0, Math.floor((startX - grid.bounds.x) / grid.widthBoxes));
+            const endCellX = Math.min(gridSize - 1, Math.floor((endX - grid.bounds.x) / grid.widthBoxes));
+            const startCellY = Math.max(0, Math.floor((startY - grid.bounds.y) / grid.heightBoxes));
+            const endCellY = Math.min(gridSize - 1, Math.floor((endY - grid.bounds.y) / grid.heightBoxes));
 
-                    cellSpots.push({
-                        x: Math.floor((x - grid.bounds.x) / grid.widthBoxes),
-                        y: Math.floor((y - grid.bounds.y) / grid.heightBoxes)
-                    });
+            // Ensure we have valid cell ranges
+            if (startCellX <= endCellX && startCellY <= endCellY) {
+                for (let cellX = startCellX; cellX <= endCellX; cellX++) {
+                    for (let cellY = startCellY; cellY <= endCellY; cellY++) {
+                        cellSpots.push({
+                            x: cellX,
+                            y: cellY
+                        });
+                    }
                 }
             }
         }
@@ -286,12 +296,22 @@ class CircleBoard {
             endX = Math.min(grid.bounds.x + grid.bounds.width, endX);
             startY = Math.max(grid.bounds.y, startY);
             endY = Math.min(grid.bounds.y + grid.bounds.height, endY);
-            for (let x = startX; x <= endX; x += grid.widthBoxes) {
-                for (let y = startY; y <= endY; y += grid.heightBoxes) {
-                    cellSpots.push({
-                        x: Math.floor((x - grid.bounds.x) / grid.widthBoxes),
-                        y: Math.floor((y - grid.bounds.y) / grid.heightBoxes)
-                    });
+            
+            // Calculate which grid cells the shape overlaps
+            const startCellX = Math.max(0, Math.floor((startX - grid.bounds.x) / grid.widthBoxes));
+            const endCellX = Math.min(gridSize - 1, Math.floor((endX - grid.bounds.x) / grid.widthBoxes));
+            const startCellY = Math.max(0, Math.floor((startY - grid.bounds.y) / grid.heightBoxes));
+            const endCellY = Math.min(gridSize - 1, Math.floor((endY - grid.bounds.y) / grid.heightBoxes));
+            
+            // Ensure we have valid cell ranges
+            if (startCellX <= endCellX && startCellY <= endCellY) {
+                for (let cellX = startCellX; cellX <= endCellX; cellX++) {
+                    for (let cellY = startCellY; cellY <= endCellY; cellY++) {
+                        cellSpots.push({
+                            x: cellX,
+                            y: cellY
+                        });
+                    }
                 }
             }
         }
@@ -333,8 +353,12 @@ class CircleBoard {
             }
             const cells = this.getShapeCells(shape, grid);
             cells.forEach(cell => {
-                const index = cell.x + cell.y * size; //  a 4x4 grid
-                grid.cells[index].push(shape);
+                const index = cell.x + cell.y * size;
+                if (index >= 0 && index < grid.cells.length) {
+                    grid.cells[index].push(shape);
+                } else {
+                    console.warn(`Grid index out of bounds: ${index}, cell: ${cell.x},${cell.y}, gridSize: ${size}`);
+                }
             });
         });
         const proccessedCollisions = new Set();
@@ -351,8 +375,7 @@ class CircleBoard {
                     `${shapeB.id}-${shapeA.id}`;
                     if (!proccessedCollisions.has(pairKey)) {
                         proccessedCollisions.add(pairKey);
-                        if (CollisionResponse.handleCollision(shapeA, shapeB))
-
+                        if (CollisionResponse.handleCollision(shapeA, shapeB)) {
                             totalShapeCollisions++;
                             if(!(shapeA.getName() in returnValues)){
                                 returnValues[shapeA.getName()] = {totalWallHits: 0, totalShapeCollisions: 0};
@@ -363,11 +386,8 @@ class CircleBoard {
                                 returnValues[shapeB.getName()] = {totalWallHits: 0, totalShapeCollisions: 0};
                             }
                             returnValues[shapeB.getName()].totalShapeCollisions += 1;
-   
-
-
-                            
                         }
+                    }
                     }
                 }
 

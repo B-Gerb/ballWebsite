@@ -1,0 +1,277 @@
+/* Prestige Popup Styles */
+.prestige-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.7);
+  z-index: 1000;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.prestige-popup {
+  background: linear-gradient(135deg, #2c3e50, #34495e);
+  border-radius: 15px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  max-width: 90vw;
+  max-height: 90vh;
+  width: 800px;
+  height: 600px;
+  display: flex;
+  flex-direction: column;
+  color: white;
+  overflow: hidden;
+}
+
+.prestige-header {
+  padding: 20px;
+  border-bottom: 2px solid #3498db;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: rgba(52, 152, 219, 0.1);
+}
+
+.prestige-header h2 {
+  margin: 0;
+  color: #3498db;
+  font-size: 24px;
+  font-weight: bold;
+}
+
+.prestige-balance {
+  font-size: 18px;
+  font-weight: bold;
+  color: #f39c12;
+}
+
+.close-button {
+  background: none;
+  border: none;
+  color: #e74c3c;
+  font-size: 30px;
+  cursor: pointer;
+  padding: 0;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: background-color 0.2s;
+}
+
+.close-button:hover {
+  background-color: rgba(231, 76, 60, 0.2);
+}
+
+.prestige-content {
+  flex: 1;
+  display: flex;
+  padding: 20px;
+  gap: 20px;
+}
+
+.upgrade-tree {
+  flex: 2;
+  position: relative;
+  background: rgba(44, 62, 80, 0.3);
+  border-radius: 10px;
+  padding: 20px;
+  overflow: hidden;
+}
+
+.connections-svg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.connection-line {
+  stroke-width: 3;
+  transition: stroke 0.3s ease;
+}
+
+.connection-line.active {
+  stroke: #3498db;
+  stroke-dasharray: none;
+}
+
+.connection-line.inactive {
+  stroke: #7f8c8d;
+  stroke-dasharray: 5,5;
+}
+
+.upgrade-node {
+  position: absolute;
+  width: 100px;
+  height: 50px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: bold;
+  text-align: center;
+  transition: all 0.3s ease;
+  border: 2px solid;
+  background: rgba(0, 0, 0, 0.3);
+  user-select: none;
+}
+
+.upgrade-node.locked {
+  border-color: #7f8c8d;
+  color: #7f8c8d;
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.upgrade-node.affordable {
+  border-color: #27ae60;
+  color: #27ae60;
+  box-shadow: 0 0 10px rgba(39, 174, 96, 0.3);
+}
+
+.upgrade-node.purchased {
+  border-color: #3498db;
+  color: #3498db;
+  background: rgba(52, 152, 219, 0.2);
+  box-shadow: 0 0 15px rgba(52, 152, 219, 0.5);
+}
+
+.upgrade-node:hover:not(.locked) {
+  transform: scale(1.05);
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+}
+
+.node-name {
+  font-size: 9px;
+  margin-bottom: 2px;
+  line-height: 1.1;
+}
+
+.node-level {
+  font-size: 8px;
+  opacity: 0.8;
+}
+
+.lock-icon {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  font-size: 12px;
+}
+
+.item-details {
+  flex: 1;
+  background: rgba(44, 62, 80, 0.3);
+  border-radius: 10px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.item-details h3 {
+  margin: 0 0 10px 0;
+  color: #3498db;
+  font-size: 18px;
+}
+
+.item-details p {
+  margin: 5px 0;
+  line-height: 1.4;
+}
+
+.item-actions {
+  margin-top: auto;
+  display: flex;
+  gap: 10px;
+}
+
+.purchase-button,
+.cancel-button {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: all 0.2s ease;
+  flex: 1;
+}
+
+.purchase-button {
+  background: #27ae60;
+  color: white;
+}
+
+.purchase-button:hover:not(:disabled) {
+  background: #2ecc71;
+  transform: translateY(-2px);
+}
+
+.purchase-button:disabled {
+  background: #7f8c8d;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.cancel-button {
+  background: #e74c3c;
+  color: white;
+}
+
+.cancel-button:hover {
+  background: #c0392b;
+  transform: translateY(-2px);
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .prestige-popup {
+    width: 95vw;
+    height: 95vh;
+  }
+  
+  .prestige-content {
+    flex-direction: column;
+  }
+  
+  .upgrade-tree {
+    flex: none;
+    height: 300px;
+  }
+  
+  .upgrade-node {
+    width: 80px;
+    height: 40px;
+    font-size: 8px;
+  }
+  
+  .node-name {
+    font-size: 7px;
+  }
+  
+  .node-level {
+    font-size: 6px;
+  }
+}
+
+/* Animation for purchased nodes */
+@keyframes purchaseSuccess {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.2); }
+  100% { transform: scale(1); }
+}
+
+.upgrade-node.just-purchased {
+  animation: purchaseSuccess 0.5s ease;
+}
