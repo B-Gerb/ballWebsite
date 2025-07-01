@@ -137,14 +137,23 @@
 .upgrade-node.affordable {
   border-color: #27ae60;
   color: #27ae60;
-  box-shadow: 0 0 10px rgba(39, 174, 96, 0.3);
+  box-shadow: 0 0 10px rgba(39, 174, 96);
 }
 
 .upgrade-node.purchased {
   border-color: #3498db;
-  color: #3498db;
-  background: rgba(52, 152, 219, 0.2);
-  box-shadow: 0 0 15px rgba(52, 152, 219, 0.5);
+  color: #fbb13c;
+  background: rgb(25, 79, 114);
+  box-shadow: 0 0 15px rgba(52, 152, 219);
+}
+.upgrade-node.max {
+    border-color:#dd4a19;
+    color: #000000;
+    opacity: 2;
+    
+    background: rgba(182, 135, 3);
+    box-shadow: 0 0 15px rgba(182, 135, 3, 0.5);
+
 }
 
 .upgrade-node:hover:not(.locked) {

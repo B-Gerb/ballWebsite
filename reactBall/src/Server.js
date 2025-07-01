@@ -767,7 +767,8 @@ class Server {
         switch (upgradeName) {
             case "Unlock Square":
                 // Enable square shapes in the game
-                this.squareUnlocked = true;
+                this.baseUpgradeShop.addSquaresToShop();
+                this.setupShopUI();
                 console.log("Squares unlocked!");
                 break;
                 
@@ -780,7 +781,7 @@ class Server {
                 
             case "Increase Ball Speed":
                 // Increase ball speed multiplier based on item level
-                this.multipliers.prestigeMultipliers.shapeSpeed = 1 + (item.level * 0.2); // 20% per level
+                this.multipliers.prestigeMultipliers.shapeSpeed = 1 + (item.level * 2); // 20% per level
                 console.log(`Ball speed increased by ${item.level * 20}%`);
                 break;
                 
@@ -864,6 +865,19 @@ class Server {
                         return acc;
                     }, {})
                 },
+                prestigeShop: {
+                    balance: this.prestigeUpgradeShop.getBalance(),
+                    items: this.prestigeUpgradeShop.items.map(item => ({
+                        name: item.name,
+                        level: item.level,
+                        cost: item.cost,
+                        dependencies: item.dependencies
+                    }))
+                }
+            },
+            multipliers: {
+                prestigeMultipliers: this.multipliers.prestigeMultipliers,
+                temporaryMultipliers: this.multipliers.temporaryMultipliers
             },
             tempMultiplier: {
                 frames: this.temporaryMultipliersActiveFrames,
@@ -872,7 +886,11 @@ class Server {
             clicker: {
                 clickCount: this.clickerObject ? this.clickerObject.clickCount : 0
             },
-            version: '0.0.3', // Increment version number
+            prestige: {
+                totalPointsEarned: this.totalPointsEarned,
+                prestigePointsEarned: this.prestigePointsEarned
+            },
+            version: '0.0.5', // Increment version number for prestigeShop support
             seed: this.seed,
         };
         
@@ -889,6 +907,8 @@ class Server {
                 return false;
             }
             let success = loadVersions.load(this);
+            this.prestigeUpgradeShop.addBalance(100);
+
             this.handleResize();
             if (!success) {
                 console.error('Failed to load game state: Version mismatch or unsupported version');
@@ -926,6 +946,9 @@ class Server {
         }
         this.baseUpgradeShop.resetShop();
         this.clickShop.resetShop();
+        this.prestigeUpgradeShop.resetShop();
+        this.prestigeUpgradeShop.addBalance(100000);
+
         this.multipliers = {
             prestigeMultipliers: {
                 clickValue: 1,

@@ -3,13 +3,15 @@
  * Handles backward compatibility and migration between versions
  * (Resizing/scaling code removed)
  */
+import prestigeShop from './shops/prestigeShop';
 
 // Version-specific loaders
 const versionLoaders = {
     '0.0.1': load0_0_1,
     '0.0.2': load0_0_2,
     '0.0.3': load0_0_3,
-    '0.0.4': load0_0_4
+    '0.0.4': load0_0_4,
+    '0.0.5': load0_0_5
 };
 
 /**
@@ -335,16 +337,69 @@ function loadTempMultiplier(server, gameState) {
 }
 
 /**
+ * Load prestige shop state
+ * @param {Object} server - Game server instance
+ * @param {Object} gameState - Saved game state
+ */
+function loadPrestigeShop(server, gameState) {
+    if (!gameState.prestigeShop) return;
+
+
+    
+    const { prestigeShop } = gameState;
+    server.prestigeUpgradeShop.balance = prestigeShop.balance || 0;
+    
+    if (prestigeShop.items && Array.isArray(prestigeShop.items)) {
+        prestigeShop.items.forEach(savedItem => {
+            const item = server.prestigeUpgradeShop.items.find(i => i.name === savedItem.name);
+            if (item) {
+                item.level = savedItem.level;
+                item.cost = savedItem.cost;
+                // Note: dependencies are typically static, but we could restore them if needed
+                if (savedItem.dependencies) {
+                    item.dependencies = savedItem.dependencies;
+                }
+            }
+        });
+    }
+}
+
+/**
+ * Load prestige tracking data
+ * @param {Object} server - Game server instance
+ * @param {Object} gameState - Saved game state
+ */
+function loadPrestigeTracking(server, gameState) {
+    if (gameState.prestige) {
+        server.totalPointsEarned = gameState.prestige.totalPointsEarned || 0;
+        server.prestigePointsEarned = gameState.prestige.prestigePointsEarned || 0;
+    }
+}
+
+/**
  * Load multipliers state (current format)
  * @param {Object} server - Game server instance
  * @param {Object} gameState - Saved game state
  */
 function loadMultipliers(server, gameState) {
     if (gameState.multipliers) {
-        server.multipliers = gameState.multipliers;
+        // Load both prestige and temporary multipliers
+        if (gameState.multipliers.prestigeMultipliers) {
+            server.multipliers.prestigeMultipliers = gameState.multipliers.prestigeMultipliers;
+        }
+        if (gameState.multipliers.temporaryMultipliers) {
+            server.multipliers.temporaryMultipliers = gameState.multipliers.temporaryMultipliers;
+        }
     }
+    
+    // Handle legacy temporary multiplier format
     if (gameState.tempMultiplier?.frames) {
         server.temporaryMultipliersActiveFrames = gameState.tempMultiplier.frames;
+    }
+    
+    // Legacy support for old tempMultiplier.values format
+    if (gameState.tempMultiplier?.values && !gameState.multipliers?.temporaryMultipliers) {
+        server.multipliers.temporaryMultipliers = gameState.tempMultiplier.values;
     }
 }
 
@@ -354,6 +409,7 @@ function load0_0_1(server, gameState) {
     loadbaseUpgradeShop(server, gameState);
     loadSeed(server, gameState);
     loadClicker(server, gameState);
+    server.prestigeUpgradeShop = new prestigeShop();
     server.updateBalanceDisplay();
     server.setupClickerUI();
     return true;
@@ -367,6 +423,7 @@ function load0_0_2(server, gameState) {
     }
     loadSeed(server, gameState);
     loadClicker(server, gameState);
+    server.prestigeUpgradeShop = new prestigeShop();
     loadTempMultiplier(server, gameState);
     server.updateBalanceDisplay();
     server.setupShopUI();
@@ -382,6 +439,8 @@ function load0_0_3(server, gameState) {
     loadSeed(server, gameState);
     loadClicker(server, gameState);
     loadTempMultiplier(server, gameState);
+    server.prestigeUpgradeShop = new prestigeShop();
+
     server.updateBalanceDisplay();
     server.setupShopUI();
     return true;
@@ -396,6 +455,28 @@ function load0_0_4(server, gameState) {
     loadSeed(server, gameState);
     loadClicker(server, gameState);
     loadMultipliers(server, gameState);
+    server.prestigeUpgradeShop = new prestigeShop();
+
+    server.updateBalanceDisplay();
+    server.setupShopUI();
+    return true;
+}
+
+function load0_0_5(server, gameState) {
+    boardLoad(server, gameState);
+    if (gameState.shops) {
+        loadbaseUpgradeShop(server, gameState.shops);
+        loadclickShop(server, gameState.shops);
+        loadPrestigeShop(server, gameState.shops);
+    }
+    loadSeed(server, gameState);
+    loadClicker(server, gameState);
+    loadMultipliers(server, gameState);
+    loadPrestigeTracking(server, gameState);
+    
+    // Apply all prestige upgrades after loading to ensure effects are active
+    server.applyAllPrestigeUpgrades();
+    
     server.updateBalanceDisplay();
     server.setupShopUI();
     return true;

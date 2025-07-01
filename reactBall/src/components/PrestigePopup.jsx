@@ -62,6 +62,16 @@ const PrestigePopup = ({ isOpen, onClose, prestigeShop, onPurchase }) => {
     setCanAfford(affordable);
   }, [prestigeShop]);
 
+  // Update selected item when prestigeShop data changes
+  useEffect(() => {
+    if (selectedItem && prestigeShop) {
+      const updatedItem = getItemByName(selectedItem.item.name);
+      if (updatedItem && (updatedItem.level !== selectedItem.item.level || updatedItem.price !== selectedItem.item.price)) {
+        setSelectedItem({ node: selectedItem.node, item: updatedItem });
+      }
+    }
+  }, [prestigeShop, selectedItem]);
+
   const getItemByName = (name) => {
     return prestigeShop?.upgrades?.find(item => item.name === name);
   };
@@ -81,7 +91,6 @@ const PrestigePopup = ({ isOpen, onClose, prestigeShop, onPurchase }) => {
   const handleItemClick = (node) => {
     const item = getItemByName(node.name);
     if (!item) return;
-    console.log("here!");
     
 
     
@@ -92,7 +101,13 @@ const PrestigePopup = ({ isOpen, onClose, prestigeShop, onPurchase }) => {
     if (selectedItem && onPurchase) {
       const success = onPurchase(selectedItem.item.name);
       if (success) {
-        setSelectedItem({ node: selectedItem.node, item: getItemByName(selectedItem.item.name) });
+        // Wait a moment for the parent component to update, then refresh selected item
+        setTimeout(() => {
+          const updatedItem = getItemByName(selectedItem.item.name);
+          if (updatedItem) {
+            setSelectedItem({ node: selectedItem.node, item: updatedItem });
+          }
+        }, 10);
       }
     }
   };
@@ -141,11 +156,18 @@ const PrestigePopup = ({ isOpen, onClose, prestigeShop, onPurchase }) => {
               if (!isUnlocked) return null; 
               const isPurchased = item && item.level > 0;
               const affordable = canAfford[node.name];
+              let value = ''
+              if(item.level == item.maxLevel){
+                value = "max"
+              }
+              else{
+                value = isPurchased ? 'purchased': '';
+              }
               
               return (
                 <div
                   key={node.id}
-                  className={`upgrade-node ${isPurchased ? 'purchased' : ''} ${!isUnlocked ? 'locked' : ''} ${affordable && isUnlocked ? 'affordable' : ''}`}
+                  className={`upgrade-node ${value} ${!isUnlocked ? 'locked' : ''} ${affordable && isUnlocked ? 'affordable' : ''}`}
                   style={{
                     left: node.position.x - 50,
                     top: node.position.y - 25

@@ -8,6 +8,8 @@ class prestigeShop extends AShop{
                 price: 10,
                 level: 0,
                 maxLevel: 1
+                
+
             },
             {
                 name: "Increase Base Circle Size",
