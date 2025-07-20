@@ -234,7 +234,9 @@ class Server {
         this.clickerObject.handleClick = () => {
             if(!this.circleBoard.isRunning) return;
             originalHandleClick.call(this.clickerObject); // for animation purposes
-            this.clickShop.addBalance(this.clickerValue * this.multipliers.temporaryMultipliers.clickValue);
+            this.clickShop.addBalance(
+                this.clickerValue * this.multipliers.temporaryMultipliers.clickValue
+               * this.multipliers.prestigeMultipliers.clickValue);
             this.addPointsAndCheckPrestige(this.clickerValue * this.multipliers.temporaryMultipliers.clickValue);
             this.updateBalanceDisplay();
             this.updateButtonAppearance();
@@ -870,7 +872,7 @@ class Server {
                     items: this.prestigeUpgradeShop.items.map(item => ({
                         name: item.name,
                         level: item.level,
-                        cost: item.cost,
+                        price: item.price,
                         dependencies: item.dependencies
                     }))
                 }

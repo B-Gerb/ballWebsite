@@ -146,12 +146,12 @@
   text-align: center;
   transition: all  ease;
   border: 2px solid;
-  background: rgba(0, 0, 0, 0.8);
+  background: rgba(25, 150, 159, 0.8);
   user-select: none;
   z-index: 2;
   min-height: 5px;
   padding: 8px;
-
+  box-shadow: 0 0 10px rgba(0,0,0,0.5); /* default shadow */
 }
 
 .upgrade-node.locked {
@@ -163,14 +163,20 @@
 
 .upgrade-node.affordable {
   border-color: #27ae60;
-  color: #27ae60;
-  box-shadow: 0 0 10px rgba(39, 174, 96);
+  color: #000000;
+  box-shadow: 0 0 15px 5px rgba(39, 174, 96, 0.7);
+}
+
+.upgrade-node.unaffordable:not(.locked) {
+  border-color: #e74c3c;
+  color: #000000;
+  box-shadow: 0 0 15px 5px rgba(231, 76, 60, 0.7);
 }
 
 .upgrade-node.purchased {
   border-color: #3498db;
-  color: #fbb13c;
-  background: rgb(25, 79, 114);
+  color: #000000;
+  background: rgb(108, 27, 156);
   box-shadow: 0 0 15px rgba(52, 152, 219);
 }
 .upgrade-node.max {
@@ -185,7 +191,7 @@
 
 .upgrade-node:hover:not(.locked) {
   transform: scale(1.05);
-  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 5px 15px rgba(100, 42, 94, 0.3);
 }
 
 .node-name {
@@ -207,13 +213,20 @@
 }
 
 .item-details {
-  flex: 1;
-  background: rgba(44, 62, 80, 0.3);
-  border-radius: 10px;
-  padding: 20px;
+  position: fixed; /* Make the popup float above everything */
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(44, 62, 80, 0.95);
+  border-radius: 12px;
+  padding: 24px;
   display: flex;
   flex-direction: column;
   gap: 10px;
+  z-index: 3000; /* Higher than upgrades and backdrop */
+  max-width: 350px;
+  width: 90vw;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5);
 }
 
 .item-details h3 {
@@ -298,6 +311,11 @@
   
   .node-level {
     font-size: 6px;
+  }
+  
+  .item-details {
+    max-width: 95vw;
+    padding: 12px;
   }
 }
 

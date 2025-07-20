@@ -16,35 +16,35 @@ const PrestigePopup = ({ isOpen, onClose, prestigeShop, onPurchase }) => {
       {
         id: 'unlock-square',
         name: 'Unlock Square',
-        gridPosition: { row: 1, col: 2 }, // Center top
+        gridPosition: { row: 2, col: 3 }, // Center top
         dependencies: [],
         description: 'Unlocks square shapes in the game'
       },
       {
         id: 'increase-circle-size',
         name: 'Increase Base Circle Size',
-        gridPosition: { row: 2, col: 1 }, // Left middle
+        gridPosition: { row: 3, col: 2 }, // Left middle
         dependencies: [],
         description: 'Makes the container circle larger'
       },
       {
         id: 'increase-ball-speed',
         name: 'Increase Ball Speed',
-        gridPosition: { row: 3, col: 3 }, // Right middle
+        gridPosition: { row: 4, col: 4 }, // Right middle
         dependencies: ['unlock-square'],
         description: 'Increases the speed of all shapes'
       },
       {
         id: 'increase-ball-value',
         name: 'Increase Ball Value',
-        gridPosition: { row: 4, col: 1 }, // Left bottom
+        gridPosition: { row: 5, col: 2 }, // Left bottom
         dependencies: ['increase-circle-size'],
         description: 'Increases points earned from collisions'
       },
       {
         id: 'increase-click-value',
         name: 'Increase Click Value',
-        gridPosition: { row: 5, col: 3 }, // Right bottom
+        gridPosition: { row: 6, col: 4 }, // Right bottom
         dependencies: ['increase-ball-speed'],
         description: 'Increases points earned from clicking'
       }
@@ -79,36 +79,44 @@ const PrestigePopup = ({ isOpen, onClose, prestigeShop, onPurchase }) => {
 
   // Zoom handler
   useEffect(() => {
-    if (!isOpen) return;
     const handleWheel = (e) => {
+      if (!treeRef.current || !isOpen) return;
       if (e.ctrlKey) return; // Don't interfere with browser zoom
       e.preventDefault();
       setZoom(z => Math.max(0.5, Math.min(2, z - e.deltaY * 0.001)));
     };
-    window.addEventListener('wheel', handleWheel, { passive: false });
-    return () => window.removeEventListener('wheel', handleWheel);
+    const tree = treeRef.current;
+    tree?.addEventListener('wheel', handleWheel, { passive: false });
+    return () => tree?.removeEventListener('wheel', handleWheel);
   }, [isOpen]);
 
   // Drag handlers
   useEffect(() => {
     const tree = treeRef.current;
     if (!tree) return;
+    let isDragging = false;
+
     const handleMouseDown = (e) => {
       // Only start drag if not clicking on an upgrade node
       if (e.target.classList.contains('upgrade-node')) return;
       setDragging(true);
+      isDragging = true;
       dragStart.current = { x: e.clientX - drag.x, y: e.clientY - drag.y };
     };
     const handleMouseMove = (e) => {
-      if (!dragging) return;
+      if (!dragging && !isDragging) return;
+      // Adjust drag limits based on zoom
+      const limit = 200 * zoom; // scale the drag limit with zoom
       let newX = e.clientX - dragStart.current.x;
       let newY = e.clientY - dragStart.current.y;
-      // Limit drag area (example: -200 to 200 px)
-      newX = Math.max(-200, Math.min(200, newX));
-      newY = Math.max(-200, Math.min(200, newY));
+      newX = Math.max(-limit, Math.min(limit, newX));
+      newY = Math.max(-limit, Math.min(limit, newY));
       setDrag({ x: newX, y: newY });
     };
-    const handleMouseUp = () => setDragging(false);
+    const handleMouseUp = () => {
+      setDragging(false);
+      isDragging = false;
+    };
 
     tree.addEventListener('mousedown', handleMouseDown);
     window.addEventListener('mousemove', handleMouseMove);
@@ -118,7 +126,7 @@ const PrestigePopup = ({ isOpen, onClose, prestigeShop, onPurchase }) => {
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [dragging, drag.x, drag.y]);
+  }, [dragging, drag.x, drag.y, zoom]);
 
   const getItemByName = (name) => {
     return prestigeShop?.upgrades?.find(item => item.name === name);
@@ -153,6 +161,7 @@ const PrestigePopup = ({ isOpen, onClose, prestigeShop, onPurchase }) => {
   const handleItemClick = (node) => {
     const item = getItemByName(node.name);
     if (!item) return;
+    // Do NOT recenter or change drag/zoom when clicking an item
     setSelectedItem({ node, item });
   };
 
@@ -183,6 +192,7 @@ const PrestigePopup = ({ isOpen, onClose, prestigeShop, onPurchase }) => {
           </div>
           <button className="close-button" onClick={onClose}>×</button>
         </div>
+        
         <div className="prestige-content">
           <div
             className="upgrade-tree"
@@ -238,7 +248,7 @@ const PrestigePopup = ({ isOpen, onClose, prestigeShop, onPurchase }) => {
                 return (
                   <div
                     key={node.id}
-                    className={`upgrade-node ${value} ${!isUnlocked ? 'locked' : ''} ${affordable && isUnlocked ? 'affordable' : ''}`}
+                    className={`upgrade-node ${value} ${!isUnlocked ? 'locked' : ''} ${affordable && isUnlocked ? 'affordable' : 'unaffordable'}`}
                     style={{
                       gridRow: node.gridPosition.row,
                       gridColumn: node.gridPosition.col
@@ -256,74 +266,33 @@ const PrestigePopup = ({ isOpen, onClose, prestigeShop, onPurchase }) => {
               })}
             </div>
           </div>
-          {/* Remove inline details, use popup instead */}
-          {/* {selectedItem && ( ... )} */}
+          
+          {selectedItem && (
+            <div className="item-details">
+              <h3>{selectedItem.node.name}</h3>
+              <p>{selectedItem.node.description}</p>
+              <p>Current Level: {selectedItem.item.level}</p>
+              <p>Cost: {selectedItem.item.price.toFixed(2)}</p>
+              {selectedItem.item.maxLevel && (
+                <p>Max Level: {selectedItem.item.maxLevel}</p>
+              )}
+              <div className="item-actions">
+                <button 
+                  onClick={handlePurchase}
+                  disabled={!canAfford[selectedItem.item.name] || (selectedItem.item.maxLevel && selectedItem.item.level >= selectedItem.item.maxLevel)}
+                  className="purchase-button"
+                >
+                  {selectedItem.item.maxLevel && selectedItem.item.level >= selectedItem.item.maxLevel ? 'Max Level' : 'Purchase'}
+                </button>
+                <button onClick={() => setSelectedItem(null)} className="cancel-button">
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
         </div>
-        {/* Render the popup if an item is selected */}
-        {selectedItem && (
-          <UpgradeDetailsPopup
-            selectedItem={selectedItem}
-            canAfford={canAfford}
-            onPurchase={handlePurchase}
-            onCancel={() => setSelectedItem(null)}
-          />
-        )}
       </div>
     </div>
   );
 };
-
-function UpgradeDetailsPopup({ selectedItem, canAfford, onPurchase, onCancel }) {
-  if (!selectedItem) return null;
-
-  // Prevent click propagation inside the popup
-  const handlePopupClick = (e) => {
-    e.stopPropagation();
-  };
-
-  return (
-    <div className="prestige-backdrop" style={{ zIndex: 2000 }} onClick={onCancel}>
-      <div
-        className="item-details"
-        style={{
-          maxWidth: 350,
-          margin: 'auto',
-          background: 'rgba(44,62,80,0.95)',
-          boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
-          borderRadius: 12,
-          position: 'relative',
-        }}
-        onClick={handlePopupClick}
-      >
-        <h3>{selectedItem.node.name}</h3>
-        <p>{selectedItem.node.description}</p>
-        <p>Current Level: {selectedItem.item.level}</p>
-        <p>Cost: {selectedItem.item.price.toFixed(2)}</p>
-        {selectedItem.item.maxLevel && (
-          <p>Max Level: {selectedItem.item.maxLevel}</p>
-        )}
-        <div className="item-actions">
-          <button
-            onClick={onPurchase}
-            disabled={
-              !canAfford[selectedItem.item.name] ||
-              (selectedItem.item.maxLevel &&
-                selectedItem.item.level >= selectedItem.item.maxLevel)
-            }
-            className="purchase-button"
-          >
-            {selectedItem.item.maxLevel &&
-            selectedItem.item.level >= selectedItem.item.maxLevel
-              ? 'Max Level'
-              : 'Purchase'}
-          </button>
-          <button onClick={onCancel} className="cancel-button">
-            Cancel
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export default PrestigePopup;

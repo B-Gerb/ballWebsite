@@ -354,7 +354,7 @@ function loadPrestigeShop(server, gameState) {
             const item = server.prestigeUpgradeShop.items.find(i => i.name === savedItem.name);
             if (item) {
                 item.level = savedItem.level;
-                item.cost = savedItem.cost;
+                item.price = savedItem.price;
                 // Note: dependencies are typically static, but we could restore them if needed
                 if (savedItem.dependencies) {
                     item.dependencies = savedItem.dependencies;
