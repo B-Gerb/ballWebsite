@@ -188,7 +188,7 @@ const PrestigePopup = ({ isOpen, onClose, prestigeShop, onPurchase }) => {
         <div className="prestige-header">
           <h2>Prestige Upgrades</h2>
           <div className="prestige-balance">
-            Balance: {prestigeShop?.balance?.toFixed(2) || '0.00'}
+            Balance: {prestigeShop?.balance !== undefined ? prestigeShop.balance.toFixed(2) : '0.00'}
           </div>
           <button className="close-button" onClick={onClose}>×</button>
         </div>
@@ -272,7 +272,7 @@ const PrestigePopup = ({ isOpen, onClose, prestigeShop, onPurchase }) => {
               <h3>{selectedItem.node.name}</h3>
               <p>{selectedItem.node.description}</p>
               <p>Current Level: {selectedItem.item.level}</p>
-              <p>Cost: {selectedItem.item.price.toFixed(2)}</p>
+              <p>Cost: {selectedItem.item.price !== undefined ? selectedItem.item.price.toFixed(2) : 'N/A'}</p>
               {selectedItem.item.maxLevel && (
                 <p>Max Level: {selectedItem.item.maxLevel}</p>
               )}

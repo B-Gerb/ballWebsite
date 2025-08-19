@@ -1,26 +1,12 @@
-# Bouncing Balls Physics Simulation Game
+# React + Vite
 
-A web-based physics simulation game where balls bounce inside a circular container, featuring realistic collision physics, a shop system for upgrades, and persistent game state.
-Currently working on adding more to gameplay
-## Features
+This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
-- **Realistic Physics Simulation**: Balls bounce off each other and the container wall with accurate momentum transfer and collision detection
-- **Interactive Shop System**: Earn currency with each wall collision to purchase various upgrades
-- **Persistent Game State**: Progress is automatically saved to localStorage
-- **Responsive Design**: Adapts to different screen sizes
-- **Performance Tracking**: Real-time statistics on wall hits and ball collisions
+Currently, two official plugins are available:
 
+- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
+- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
 
-## Shop Upgrades
+## Expanding the ESLint configuration
 
-- **Add Ball**: Adds an additional ball to the simulation
-- **Increase Ball Size Range (Min/Max)**: Adjusts the possible sizes of balls
-- **Increase Ball Speed Range (Min/Max)**: Adjusts the possible speeds of balls
-- **Decrease Large Circle Size**: Makes the container smaller, leading to more frequent collisions
-
-## Future Features
-- **Prestige**: Adding prestige to create a gameplay loop
-- **Interactive Element**: Allow for user to have some sort of input to change gameplay
-- **achievmenets**: Adding achievments that give user rewards
-- **challenges**: Adding challenges that boost user stats
-- **modifeirs**: Allow for the game play to be modified in some way that could possibly help or harm the player
+If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.

@@ -1,63 +1,13 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/seedrandom/3.0.5/seedrandom.min.js"></script>
-<script src="scripts/circleboard/circleboard.js"></script>
-<script src="scripts/circleboard/circle.js"></script>
-<script src="scripts/circleboard/square.js"></script>
-<script src="scripts/circleboard/CollisionResponse.js"></script>
-
-<script src="scripts/shops/AShop.js"></script>
-<script src="scripts/shops/baseUpgradeShop.js"></script>
-<script src="scripts/shops/clickShop.js"></script> 
-<script src="scripts/shops/prestigeUpgradeShop.js"></script> 
-
-<script src="scripts/clicking.js"></script>
-<script src="scripts/loadVersions.js"></script>
-
-<script src="scripts/server.js"></script>
-
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bouncing Balls Inside Circle</title>
-    <link rel="stylesheet" href="styles/style.css">
-</head>
-<body>
-    <h1>Bouncing Balls Inside Circle</h1>
-
-    <div class="shop-balance-container">
-        <label for="shopBalance"> Balance: <span id="shopBalance">0</span></label>
-        <label for="clickShopBalance"> Click Shop Balance: <span id="clickShopBalance"> 0 </span></label>
-        <label for="fpsCounter"> FPS: <span id="fpsCounter">0</span></label>
-    </div>
-    <div class="stats">
-        <h3>Stats</h3>
-        <div class="stat">
-            <label for="offWallB"> Collision off wall per/sec: <span id="offWallB">0</span></label>
-            <label for="offBallB"> Collision off other Balls per/sec: <span id="offBallB">0</span></label>
-
-        </div>
-
-    </div>
-    <div class="container">
-        
-        <div class="canvas-container">
-            <canvas id="bouncingBallsCanvas"></canvas>
-        </div>
-        <div id="shop" class="tab-content">
-            <div id="shopContainer" class="shop-container"></div>
-        </div>
-
-   
-    </div>
-    <div class ="controls">
-        <button id="pauseButton">Pause</button>
-        <button id="saveButton">Save</button>
-        <button id="resetButton">Reset</button>
-
-    </div>
-
-    
-    <script src="scripts/script.js"></script>
-</body>
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Vite + React</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
 </html>

@@ -7,8 +7,9 @@
     - **PRIORITY** 
 - [ ] possibly add rotations
 ### Features
-- [ ] prestige
+- [X] prestige
     - **PRIORITY** 
+- [ ] add functionality on how to prestige and move prestige shop to be on the left, and the prestige button to allow for prestiges to be right below clicking object
 - [ ] full screen shop
 - [ ] accension shop
 - [ ] other upgrades with more interesting functionality
@@ -20,4 +21,5 @@
 
 ### Bugs
 - [X] refreshing on different sized windows after a save causes speed multiplier errors.
+- [ ] UI lines to connect prestige upgrades does not work
 
