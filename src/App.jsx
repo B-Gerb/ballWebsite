@@ -39,14 +39,12 @@ function App() {
     if (serverRef.current) {
       const success = serverRef.current.buyPrestigeUpgrade(itemName);
       if (success) {
-        // Update any UI elements or trigger re-renders as needed
-        console.log(`Successfully purchased: ${itemName}`);
-        // Force re-render to update UI
+        // Force re-render so the prestige tree picks up the new level/price
         setCount(prev => prev + 1);
-      } else {
-        console.log(`Failed to purchase: ${itemName}`);
       }
+      return success;
     }
+    return false;
   };
 
   return (

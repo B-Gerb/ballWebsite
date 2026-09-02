@@ -1,298 +1,562 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { BRANCHES, LAYOUT, buildTree, edgePath } from '../data/prestigeTree';
 import './PrestigePopup.css';
 
+const MIN_ZOOM = 0.35;
+const MAX_ZOOM = 1.8;
+const DRAG_THRESHOLD = 6;
+
+const clamp = (value, lo, hi) => Math.max(lo, Math.min(hi, value));
+
+const formatNumber = (value) => {
+  if (value === undefined || value === null || Number.isNaN(value)) return '—';
+  const abs = Math.abs(value);
+  if (abs >= 1e12) return `${(value / 1e12).toFixed(2)}T`;
+  if (abs >= 1e9) return `${(value / 1e9).toFixed(2)}B`;
+  if (abs >= 1e6) return `${(value / 1e6).toFixed(2)}M`;
+  if (abs >= 1e4) return `${(value / 1e3).toFixed(2)}K`;
+  return value.toFixed(2);
+};
+
+const branchOf = (node) => BRANCHES[node.branch] ?? { label: 'Upgrade', color: '#94a3b8' };
+
 const PrestigePopup = ({ isOpen, onClose, prestigeShop, onPurchase }) => {
-  const [selectedItem, setSelectedItem] = useState(null);
-  const [canAfford, setCanAfford] = useState({});
-  const [zoom, setZoom] = useState(1);
-  const [drag, setDrag] = useState({ x: 0, y: 0 });
-  const [dragging, setDragging] = useState(false);
-  const dragStart = useRef({ x: 0, y: 0 });
-  const treeRef = useRef();
+  const tree = useMemo(() => buildTree(), []);
+  const [selectedId, setSelectedId] = useState(null);
+  const [view, setView] = useState({ x: 0, y: 0, zoom: 1 });
 
-  // Define the upgrade tree structure with grid positions
-  const upgradeTree = {
-    nodes: [
-      {
-        id: 'unlock-square',
-        name: 'Unlock Square',
-        gridPosition: { row: 2, col: 3 }, // Center top
-        dependencies: [],
-        description: 'Unlocks square shapes in the game'
-      },
-      {
-        id: 'increase-circle-size',
-        name: 'Increase Base Circle Size',
-        gridPosition: { row: 3, col: 2 }, // Left middle
-        dependencies: [],
-        description: 'Makes the container circle larger'
-      },
-      {
-        id: 'increase-ball-speed',
-        name: 'Increase Ball Speed',
-        gridPosition: { row: 4, col: 4 }, // Right middle
-        dependencies: ['unlock-square'],
-        description: 'Increases the speed of all shapes'
-      },
-      {
-        id: 'increase-ball-value',
-        name: 'Increase Ball Value',
-        gridPosition: { row: 5, col: 2 }, // Left bottom
-        dependencies: ['increase-circle-size'],
-        description: 'Increases points earned from collisions'
-      },
-      {
-        id: 'increase-click-value',
-        name: 'Increase Click Value',
-        gridPosition: { row: 6, col: 4 }, // Right bottom
-        dependencies: ['increase-ball-speed'],
-        description: 'Increases points earned from clicking'
-      }
-    ],
-    connections: [
-      { from: 'unlock-square', to: 'increase-ball-speed' },
-      { from: 'increase-circle-size', to: 'increase-ball-value' },
-      { from: 'increase-ball-speed', to: 'increase-click-value' }
-    ]
-  };
+  const viewportRef = useRef(null);
+  const pointers = useRef(new Map());
+  const panRef = useRef(null);
+  const pinchRef = useRef(null);
+  const movedRef = useRef(false);
+  const userMovedViewRef = useRef(false);
 
-  // Update affordability when shop changes
-  useEffect(() => {
-    const affordable = {};
-    if (prestigeShop && prestigeShop.upgrades) {
-      prestigeShop.upgrades.forEach(item => {
-        affordable[item.name] = item.canAfford;
+  const balance = prestigeShop?.balance ?? 0;
+  const upgrades = prestigeShop?.upgrades;
+
+  const itemsByName = useMemo(() => {
+    const map = new Map();
+    (upgrades ?? []).forEach((item) => map.set(item.name, item));
+    return map;
+  }, [upgrades]);
+
+  /**
+   * Everything the UI needs per node, derived straight from props so a
+   * purchase re-render is automatically reflected here (no mirrored state).
+   */
+  const nodeStates = useMemo(() => {
+    const map = new Map();
+
+    tree.nodes.forEach((node) => {
+      const item = itemsByName.get(node.item);
+      if (!item) return; // upgrade not present in this save (e.g. removed) — hide the node
+
+      const requirements = node.requires.map((req) => {
+        const dep = tree.byId.get(req.id);
+        const depItem = dep ? itemsByName.get(dep.item) : null;
+        return {
+          id: req.id,
+          level: req.level,
+          label: dep?.label ?? req.id,
+          current: depItem?.level ?? 0,
+          // A requirement whose upgrade no longer exists is treated as met so a
+          // consumed one-off unlock can never dead-end the rest of the tree.
+          met: !dep || !depItem || depItem.level >= req.level,
+        };
       });
-    }
-    setCanAfford(affordable);
-  }, [prestigeShop]);
 
-  // Update selected item when prestigeShop data changes
-  useEffect(() => {
-    if (selectedItem && prestigeShop) {
-      const updatedItem = getItemByName(selectedItem.item.name);
-      if (updatedItem && (updatedItem.level !== selectedItem.item.level || updatedItem.price !== selectedItem.item.price)) {
-        setSelectedItem({ node: selectedItem.node, item: updatedItem });
-      }
-    }
-  }, [prestigeShop, selectedItem]);
+      const unlocked = requirements.every((req) => req.met);
+      const maxed = item.maxLevel != null && item.level >= item.maxLevel;
+      const affordable = balance >= item.price;
 
-  // Zoom handler
-  useEffect(() => {
-    const handleWheel = (e) => {
-      if (!treeRef.current || !isOpen) return;
-      if (e.ctrlKey) return; // Don't interfere with browser zoom
-      e.preventDefault();
-      setZoom(z => Math.max(0.5, Math.min(2, z - e.deltaY * 0.001)));
-    };
-    const tree = treeRef.current;
-    tree?.addEventListener('wheel', handleWheel, { passive: false });
-    return () => tree?.removeEventListener('wheel', handleWheel);
-  }, [isOpen]);
-
-  // Drag handlers
-  useEffect(() => {
-    const tree = treeRef.current;
-    if (!tree) return;
-    let isDragging = false;
-
-    const handleMouseDown = (e) => {
-      // Only start drag if not clicking on an upgrade node
-      if (e.target.classList.contains('upgrade-node')) return;
-      setDragging(true);
-      isDragging = true;
-      dragStart.current = { x: e.clientX - drag.x, y: e.clientY - drag.y };
-    };
-    const handleMouseMove = (e) => {
-      if (!dragging && !isDragging) return;
-      // Adjust drag limits based on zoom
-      const limit = 200 * zoom; // scale the drag limit with zoom
-      let newX = e.clientX - dragStart.current.x;
-      let newY = e.clientY - dragStart.current.y;
-      newX = Math.max(-limit, Math.min(limit, newX));
-      newY = Math.max(-limit, Math.min(limit, newY));
-      setDrag({ x: newX, y: newY });
-    };
-    const handleMouseUp = () => {
-      setDragging(false);
-      isDragging = false;
-    };
-
-    tree.addEventListener('mousedown', handleMouseDown);
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
-    return () => {
-      tree.removeEventListener('mousedown', handleMouseDown);
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, [dragging, drag.x, drag.y, zoom]);
-
-  const getItemByName = (name) => {
-    return prestigeShop?.upgrades?.find(item => item.name === name);
-  };
-
-  // Calculate SVG connection positions based on grid layout
-  const getConnectionPosition = (gridPos) => {
-    // Convert grid position to percentage-based coordinates for SVG
-    // Grid is 3 columns x 3 rows, so each cell is roughly 33.33% wide/tall
-    const cellWidth = 100 / 9; // 11.11%
-    const cellHeight = 100 / 9; // 11.11%
-
-    // Center of each grid cell
-    const x = (gridPos.col - 0.5) * cellWidth;
-    const y = (gridPos.row - 0.5) * cellHeight;
-    
-    return { x, y };
-  };
-
-  const isItemUnlocked = (dependencies) => {
-    if (!dependencies || dependencies.length === 0) return true;
-    
-    return dependencies.every(depId => {
-      const depNode = upgradeTree.nodes.find(n => n.id === depId);
-      if (!depNode) return true;
-      
-      const depItem = getItemByName(depNode.name);
-      return depItem && depItem.level > 0;
+      map.set(node.id, {
+        node,
+        item,
+        requirements,
+        unlocked,
+        maxed,
+        affordable,
+        owned: item.level > 0,
+        status: !unlocked ? 'locked' : maxed ? 'maxed' : affordable ? 'affordable' : 'unaffordable',
+      });
     });
+
+    return map;
+  }, [tree, itemsByName, balance]);
+
+  const visibleNodes = useMemo(
+    () =>
+      tree.nodes.filter((node) => {
+        const state = nodeStates.get(node.id);
+        return Boolean(state?.unlocked);
+      }),
+    [tree, nodeStates],
+  );
+
+  const visibleKey = visibleNodes.map((node) => node.id).join('|');
+
+  const contentBox = useMemo(() => {
+    const half = LAYOUT.nodeSize / 2;
+    const pad = 64;
+    if (visibleNodes.length === 0) {
+      return { minX: 0, minY: 0, width: tree.width, height: tree.height };
+    }
+    const xs = visibleNodes.map((node) => node.x);
+    const ys = visibleNodes.map((node) => node.y);
+    const minX = Math.min(...xs) - half - pad;
+    const maxX = Math.max(...xs) + half + pad;
+    const minY = Math.min(...ys) - half - pad;
+    const maxY = Math.max(...ys) + half + pad;
+    return { minX, minY, width: Math.max(1, maxX - minX), height: Math.max(1, maxY - minY) };
+  }, [visibleNodes, tree.width, tree.height]);
+
+  const selected = selectedId ? nodeStates.get(selectedId) : null;
+
+  /* ── view helpers ─────────────────────────────────────────────────── */
+
+  const clampView = useCallback(
+    (x, y, zoom) => {
+      const el = viewportRef.current;
+      if (!el) return { x, y, zoom };
+
+      const vw = el.clientWidth;
+      const vh = el.clientHeight;
+      const w = contentBox.width * zoom;
+      const h = contentBox.height * zoom;
+      const margin = 48;
+      const minX = contentBox.minX * zoom;
+      const minY = contentBox.minY * zoom;
+      const maxX = minX + w;
+      const maxY = minY + h;
+
+      return {
+        zoom,
+        x: w <= vw ? (vw - w) / 2 - minX : clamp(x, vw - maxX - margin, margin - minX),
+        y: h <= vh ? (vh - h) / 2 - minY : clamp(y, vh - maxY - margin, margin - minY),
+      };
+    },
+    [contentBox],
+  );
+
+  const fitToView = useCallback(() => {
+    const el = viewportRef.current;
+    if (!el) return;
+    const zoom = clamp(
+      Math.min(el.clientWidth / contentBox.width, el.clientHeight / contentBox.height),
+      MIN_ZOOM,
+      1,
+    );
+    userMovedViewRef.current = false;
+    setView(clampView(0, 0, zoom));
+  }, [clampView, contentBox.width, contentBox.height]);
+
+  const zoomBy = useCallback(
+    (factor) => {
+      const el = viewportRef.current;
+      if (!el) return;
+      userMovedViewRef.current = true;
+      setView((v) => {
+        const zoom = clamp(v.zoom * factor, MIN_ZOOM, MAX_ZOOM);
+        const ax = el.clientWidth / 2;
+        const ay = el.clientHeight / 2;
+        const ratio = zoom / v.zoom;
+        return clampView(ax - (ax - v.x) * ratio, ay - (ay - v.y) * ratio, zoom);
+      });
+    },
+    [clampView],
+  );
+
+  /* ── open / resize / escape ───────────────────────────────────────── */
+
+  useLayoutEffect(() => {
+    if (isOpen) fitToView();
+  }, [isOpen, visibleKey, fitToView]);
+
+  useEffect(() => {
+    if (!selectedId) return;
+    const stillVisible = visibleNodes.some((node) => node.id === selectedId);
+    if (!stillVisible) setSelectedId(null);
+  }, [selectedId, visibleNodes]);
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape') onClose?.();
+    };
+    window.addEventListener('keydown', onKeyDown);
+
+    const el = viewportRef.current;
+    const syncView = () => {
+      if (userMovedViewRef.current) setView((v) => clampView(v.x, v.y, v.zoom));
+      else fitToView();
+    };
+
+    window.addEventListener('resize', syncView);
+    const observer = el ? new ResizeObserver(syncView) : null;
+    observer?.observe(el);
+
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('resize', syncView);
+      observer?.disconnect();
+    };
+  }, [isOpen, fitToView, clampView, onClose]);
+
+  /* ── pan & pinch (pointer events cover mouse, touch and pen) ──────── */
+
+  const handlePointerDown = (e) => {
+    pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    movedRef.current = false;
+
+    if (pointers.current.size === 1) {
+      panRef.current = { startX: e.clientX, startY: e.clientY, viewX: view.x, viewY: view.y };
+      pinchRef.current = null;
+    } else if (pointers.current.size === 2) {
+      const [a, b] = [...pointers.current.values()];
+      pinchRef.current = {
+        distance: Math.hypot(a.x - b.x, a.y - b.y) || 1,
+        centerX: (a.x + b.x) / 2,
+        centerY: (a.y + b.y) / 2,
+        zoom: view.zoom,
+        viewX: view.x,
+        viewY: view.y,
+      };
+      panRef.current = null;
+      movedRef.current = true;
+    }
   };
 
-  const handleItemClick = (node) => {
-    const item = getItemByName(node.name);
-    if (!item) return;
-    // Do NOT recenter or change drag/zoom when clicking an item
-    setSelectedItem({ node, item });
+  useEffect(() => {
+    if (!isOpen) return undefined;
+
+    const activePointers = pointers.current;
+
+    const handleMove = (e) => {
+      if (!activePointers.has(e.pointerId)) return;
+      activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      const el = viewportRef.current;
+      if (!el) return;
+
+      if (activePointers.size >= 2 && pinchRef.current) {
+        const [a, b] = [...activePointers.values()];
+        const pinch = pinchRef.current;
+        const zoom = clamp(
+          (pinch.zoom * Math.hypot(a.x - b.x, a.y - b.y)) / pinch.distance,
+          MIN_ZOOM,
+          MAX_ZOOM,
+        );
+        const rect = el.getBoundingClientRect();
+        const ax = pinch.centerX - rect.left;
+        const ay = pinch.centerY - rect.top;
+        const ratio = zoom / pinch.zoom;
+        userMovedViewRef.current = true;
+        setView(clampView(ax - (ax - pinch.viewX) * ratio, ay - (ay - pinch.viewY) * ratio, zoom));
+        return;
+      }
+
+      const pan = panRef.current;
+      if (!pan) return;
+      const dx = e.clientX - pan.startX;
+      const dy = e.clientY - pan.startY;
+      if (Math.hypot(dx, dy) > DRAG_THRESHOLD) movedRef.current = true;
+      if (!movedRef.current) return;
+      userMovedViewRef.current = true;
+      setView((v) => clampView(pan.viewX + dx, pan.viewY + dy, v.zoom));
+    };
+
+    const handleUp = (e) => {
+      activePointers.delete(e.pointerId);
+      if (activePointers.size < 2) pinchRef.current = null;
+      if (activePointers.size === 0) panRef.current = null;
+    };
+
+    window.addEventListener('pointermove', handleMove);
+    window.addEventListener('pointerup', handleUp);
+    window.addEventListener('pointercancel', handleUp);
+    return () => {
+      window.removeEventListener('pointermove', handleMove);
+      window.removeEventListener('pointerup', handleUp);
+      window.removeEventListener('pointercancel', handleUp);
+      activePointers.clear();
+      panRef.current = null;
+      pinchRef.current = null;
+    };
+  }, [isOpen, clampView]);
+
+  useEffect(() => {
+    const el = viewportRef.current;
+    if (!isOpen || !el) return undefined;
+
+    const handleWheel = (e) => {
+      if (e.ctrlKey) return; // leave browser zoom alone
+      e.preventDefault();
+      const rect = el.getBoundingClientRect();
+      const ax = e.clientX - rect.left;
+      const ay = e.clientY - rect.top;
+      userMovedViewRef.current = true;
+      setView((v) => {
+        const zoom = clamp(v.zoom * Math.exp(-e.deltaY * 0.0015), MIN_ZOOM, MAX_ZOOM);
+        const ratio = zoom / v.zoom;
+        return clampView(ax - (ax - v.x) * ratio, ay - (ay - v.y) * ratio, zoom);
+      });
+    };
+
+    el.addEventListener('wheel', handleWheel, { passive: false });
+    return () => el.removeEventListener('wheel', handleWheel);
+  }, [isOpen, clampView]);
+
+  /* ── actions ──────────────────────────────────────────────────────── */
+
+  const handleNodeClick = (nodeId) => {
+    if (movedRef.current) return; // the click was the end of a drag
+    setSelectedId((current) => (current === nodeId ? null : nodeId));
   };
 
   const handlePurchase = () => {
-    if (selectedItem && onPurchase) {
-      const success = onPurchase(selectedItem.item.name);
-      if (success) {
-        // Wait a moment for the parent component to update, then refresh selected item
-        setTimeout(() => {
-          const updatedItem = getItemByName(selectedItem.item.name);
-          if (updatedItem) {
-            setSelectedItem({ node: selectedItem.node, item: updatedItem });
-          }
-        }, 10);
-      }
-    }
+    if (!selected || !selected.unlocked || selected.maxed || !selected.affordable) return;
+    onPurchase?.(selected.item.name);
   };
 
   if (!isOpen) return null;
 
-  return (
-    <div className="prestige-backdrop">
-      <div className="prestige-popup">
-        <div className="prestige-header">
-          <h2>Prestige Upgrades</h2>
-          <div className="prestige-balance">
-            Balance: {prestigeShop?.balance !== undefined ? prestigeShop.balance.toFixed(2) : '0.00'}
-          </div>
-          <button className="close-button" onClick={onClose}>×</button>
-        </div>
-        
-        <div className="prestige-content">
-          <div
-            className="upgrade-tree"
-            ref={treeRef}
-            style={{
-              transform: `scale(${zoom}) translate(${drag.x / zoom}px, ${drag.y / zoom}px)`,
-              transition: dragging ? 'none' : 'transform 0.2s'
-            }}
-          >
-            <svg className="connections-svg" viewBox="0 0 100 100" preserveAspectRatio="none">
-              {upgradeTree.connections.map((connection, index) => {
-                const fromNode = upgradeTree.nodes.find(n => n.id === connection.from);
-                const toNode = upgradeTree.nodes.find(n => n.id === connection.to);
-                
-                if (!fromNode || !toNode) return null;
-                if (!isItemUnlocked(toNode.dependencies)) return null; // Skip if toNode is not unlocked
+  const totalLevels = [...nodeStates.values()].reduce((sum, s) => sum + s.item.level, 0);
+  const maxLevels = [...nodeStates.values()].reduce((sum, s) => sum + (s.item.maxLevel ?? 0), 0);
 
-                const fromPos = getConnectionPosition(fromNode.gridPosition);
-                const toPos = getConnectionPosition(toNode.gridPosition);
-                
-                const fromItem = getItemByName(fromNode.name);
-                const isConnectionActive = fromItem && fromItem.level > 0;
-                
-                return (
-                  <line
-                    key={index}
-                    x1={fromPos.x}
-                    y1={fromPos.y}
-                    x2={toPos.x}
-                    y2={toPos.y}
-                    className={`connection-line ${isConnectionActive ? 'active' : 'inactive'}`}
-                    vectorEffect="non-scaling-stroke"
-                  />
-                );
-              })}
-            </svg>
-            
-            <div className="upgrade-grid">
-              {upgradeTree.nodes.map((node) => {
-                const item = getItemByName(node.name);
-                const isUnlocked = isItemUnlocked(node.dependencies);
-                if (!isUnlocked) return null; 
-                const isPurchased = item && item.level > 0;
-                const affordable = canAfford[node.name];
-                let value = ''
-                if(item.level == item.maxLevel){
-                  value = "max"
-                }
-                else{
-                  value = isPurchased ? 'purchased': '';
-                }
-                
-                return (
-                  <div
-                    key={node.id}
-                    className={`upgrade-node ${value} ${!isUnlocked ? 'locked' : ''} ${affordable && isUnlocked ? 'affordable' : 'unaffordable'}`}
-                    style={{
-                      gridRow: node.gridPosition.row,
-                      gridColumn: node.gridPosition.col
-                    }}
-                    onClick={() => handleItemClick(node)}
-                    title={node.description}
-                  >
-                    <div className="node-name">{node.name}</div>
-                    {item && (
-                      <div className="node-level">Level: {item.level}</div>
-                    )}
-                    {!isUnlocked && <div className="lock-icon">🔒</div>}
-                  </div>
-                );
-              })}
-            </div>
+  return (
+    <div className="pt-backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose?.()}>
+      <div className="pt-popup" role="dialog" aria-modal="true" aria-label="Prestige upgrades">
+        <header className="pt-header">
+          <div className="pt-title">
+            <h2>Prestige Upgrades</h2>
+            <span className="pt-progress">
+              {totalLevels}/{maxLevels} levels
+            </span>
           </div>
-          
-          {selectedItem && (
-            <div className="item-details">
-              <h3>{selectedItem.node.name}</h3>
-              <p>{selectedItem.node.description}</p>
-              <p>Current Level: {selectedItem.item.level}</p>
-              <p>Cost: {selectedItem.item.price !== undefined ? selectedItem.item.price.toFixed(2) : 'N/A'}</p>
-              {selectedItem.item.maxLevel && (
-                <p>Max Level: {selectedItem.item.maxLevel}</p>
-              )}
-              <div className="item-actions">
-                <button 
-                  onClick={handlePurchase}
-                  disabled={!canAfford[selectedItem.item.name] || (selectedItem.item.maxLevel && selectedItem.item.level >= selectedItem.item.maxLevel)}
-                  className="purchase-button"
+          <div className="pt-header-actions">
+            <div className="pt-balance">
+              <span className="pt-balance-label">Prestige points</span>
+              <span className="pt-balance-value">{formatNumber(balance)}</span>
+            </div>
+            <button className="pt-close" onClick={onClose} aria-label="Close prestige shop">
+              ×
+            </button>
+          </div>
+        </header>
+
+        <div className="pt-body">
+          <div className="pt-tree">
+            <div
+              className="pt-viewport"
+              ref={viewportRef}
+              onPointerDown={handlePointerDown}
+              role="presentation"
+            >
+              <div
+                className="pt-canvas"
+                style={{
+                  width: tree.width,
+                  height: tree.height,
+                  transform: `translate(${view.x}px, ${view.y}px) scale(${view.zoom})`,
+                }}
+              >
+                <svg
+                  className="pt-links"
+                  width={tree.width}
+                  height={tree.height}
+                  viewBox={`0 0 ${tree.width} ${tree.height}`}
+                  aria-hidden="true"
                 >
-                  {selectedItem.item.maxLevel && selectedItem.item.level >= selectedItem.item.maxLevel ? 'Max Level' : 'Purchase'}
+                  {tree.edges.map((edge) => {
+                    const toState = nodeStates.get(edge.to.id);
+                    const fromState = nodeStates.get(edge.from.id);
+                    if (!toState?.unlocked || !fromState?.unlocked) return null;
+
+                    const state = toState.owned
+                      ? 'owned'
+                      : toState.unlocked
+                        ? 'ready'
+                        : 'locked';
+
+                    return (
+                      <path
+                        key={edge.id}
+                        d={edgePath(edge.from, edge.to)}
+                        className={`pt-link is-${state}`}
+                        style={{ '--branch': branchOf(edge.to).color }}
+                      />
+                    );
+                  })}
+                </svg>
+
+                {visibleNodes.map((node) => {
+                  const state = nodeStates.get(node.id);
+                  const { item, status, owned, maxed, unlocked } = state;
+                  const branch = branchOf(node);
+
+                  return (
+                    <button
+                      key={node.id}
+                      type="button"
+                      className={[
+                        'pt-node',
+                        `is-${status}`,
+                        owned ? 'is-owned' : '',
+                        selectedId === node.id ? 'is-selected' : '',
+                      ]
+                        .filter(Boolean)
+                        .join(' ')}
+                      style={{
+                        left: node.x - LAYOUT.nodeSize / 2,
+                        top: node.y - LAYOUT.nodeSize / 2,
+                        width: LAYOUT.nodeSize,
+                        height: LAYOUT.nodeSize,
+                        '--branch': branch.color,
+                      }}
+                      onClick={() => handleNodeClick(node.id)}
+                      aria-pressed={selectedId === node.id}
+                    >
+                      <span className="pt-node-icon">{unlocked ? node.icon : '🔒'}</span>
+                      <span className="pt-node-label">{node.label}</span>
+                      <span className="pt-node-level">
+                        {maxed ? 'MAX' : `Lv ${item.level}${item.maxLevel ? `/${item.maxLevel}` : ''}`}
+                      </span>
+                      {!maxed && unlocked && (
+                        <span className="pt-node-cost">{formatNumber(item.price)}</span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="pt-controls">
+                <button type="button" onClick={() => zoomBy(1.2)} aria-label="Zoom in">
+                  +
                 </button>
-                <button onClick={() => setSelectedItem(null)} className="cancel-button">
-                  Cancel
+                <button type="button" onClick={() => zoomBy(1 / 1.2)} aria-label="Zoom out">
+                  −
+                </button>
+                <button type="button" onClick={fitToView} aria-label="Fit tree to view">
+                  ⤢
                 </button>
               </div>
+
+              <div className="pt-legend">
+                <span className="pt-legend-item is-affordable">Can buy</span>
+                <span className="pt-legend-item is-unaffordable">Too costly</span>
+                <span className="pt-legend-item is-maxed">Maxed</span>
+              </div>
             </div>
-          )}
+          </div>
+
+          <aside className={`pt-details ${selected ? '' : 'is-empty'}`}>
+            {!selected ? (
+              <div className="pt-details-placeholder">
+                <p className="pt-details-hint">Select an upgrade to see what it does.</p>
+                <p className="pt-details-hint pt-details-hint--muted">
+                  Drag to pan · scroll or pinch to zoom
+                </p>
+              </div>
+            ) : (
+              <>
+                <div className="pt-details-head">
+                  <span className="pt-branch-tag" style={{ '--branch': branchOf(selected.node).color }}>
+                    {branchOf(selected.node).label}
+                  </span>
+                  <h3>{selected.node.label}</h3>
+                  <button
+                    className="pt-details-close"
+                    onClick={() => setSelectedId(null)}
+                    aria-label="Close details"
+                  >
+                    ×
+                  </button>
+                </div>
+
+                <p className="pt-details-description">{selected.node.description}</p>
+
+                {selected.item.maxLevel ? (
+                  <div className="pt-level">
+                    <div className="pt-level-row">
+                      <span>Level</span>
+                      <span>
+                        {selected.item.level} / {selected.item.maxLevel}
+                      </span>
+                    </div>
+                    <div className="pt-level-bar">
+                      <div
+                        className="pt-level-fill"
+                        style={{
+                          width: `${(selected.item.level / selected.item.maxLevel) * 100}%`,
+                          '--branch': branchOf(selected.node).color,
+                        }}
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="pt-level-row">
+                    <span>Level</span>
+                    <span>{selected.item.level}</span>
+                  </div>
+                )}
+
+                {selected.node.effect && (
+                  <dl className="pt-effects">
+                    <div>
+                      <dt>Now</dt>
+                      <dd>{selected.node.effect(selected.item.level)}</dd>
+                    </div>
+                    {!selected.maxed && (
+                      <div>
+                        <dt>Next</dt>
+                        <dd className="pt-effect-next">
+                          {selected.node.effect(selected.item.level + 1)}
+                        </dd>
+                      </div>
+                    )}
+                  </dl>
+                )}
+
+                {!selected.unlocked && (
+                  <ul className="pt-requirements">
+                    {selected.requirements.map((req) => (
+                      <li key={req.id} className={req.met ? 'is-met' : ''}>
+                        {req.met ? '✔' : '✖'} {req.label}
+                        {req.level > 1 ? ` — level ${req.current}/${req.level}` : ''}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+
+                <div className="pt-buy">
+                  <div className="pt-cost">
+                    <span>Cost</span>
+                    <strong className={selected.affordable ? '' : 'is-short'}>
+                      {selected.maxed ? '—' : formatNumber(selected.item.price)}
+                    </strong>
+                  </div>
+                  <button
+                    className="pt-buy-button"
+                    onClick={handlePurchase}
+                    disabled={!selected.unlocked || selected.maxed || !selected.affordable}
+                  >
+                    {selected.maxed
+                      ? 'Maxed out'
+                      : !selected.unlocked
+                        ? 'Locked'
+                        : selected.affordable
+                          ? 'Purchase'
+                          : 'Not enough points'}
+                  </button>
+                </div>
+              </>
+            )}
+          </aside>
         </div>
       </div>
     </div>
   );
 };
+
 export default PrestigePopup;
