@@ -27,13 +27,41 @@
   background: rgba(4, 12, 22, 0.72);
   backdrop-filter: blur(4px);
   overscroll-behavior: contain;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.pt-award-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  width: 100%;
+  padding: 6px 10px;
+  color: var(--pt-text);
+  background: #16304d;
+  border: 1px solid rgba(251, 191, 36, 0.45);
+  border-radius: 7px;
+  box-shadow: none;
+}
+
+.pt-award-banner span {
+  color: #fcd34d;
+  font-size: 0.85rem;
+}
+
+.pt-award-banner strong {
+  color: #fbbf24;
+  font-size: 1.15rem;
+  font-variant-numeric: tabular-nums;
 }
 
 .pt-popup {
   display: flex;
   flex-direction: column;
   width: min(1200px, 100%);
-  height: min(820px, 100%);
+  height: min(820px, calc(100dvh - 80px));
+  max-height: calc(100dvh - 80px);
   overflow: hidden;
   color: var(--pt-text);
   background: var(--pt-surface);
@@ -94,7 +122,7 @@
 
 .pt-summary {
   display: grid;
-  grid-template-columns: repeat(5, minmax(90px, 1fr)) auto;
+  grid-template-columns: repeat(auto-fit, minmax(125px, 1fr));
   gap: 10px;
   padding: 12px 18px;
   background: rgba(15, 23, 42, 0.65);
@@ -131,6 +159,90 @@
 .pt-prestige-button:disabled {
   cursor: not-allowed;
   opacity: 0.5;
+}
+
+.pt-prestige-action {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+}
+
+.pt-prestige-action .pt-award-banner {
+  flex: 0 0 auto;
+}
+
+.pt-buffs-panel {
+  flex: 1;
+  min-height: 0;
+  padding: 20px;
+  overflow-y: auto;
+  background: var(--pt-surface-2);
+}
+
+.pt-buffs-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.pt-buffs-heading h3 {
+  text-align: left;
+}
+
+.pt-buffs-heading p {
+  color: var(--pt-muted);
+  font-size: 0.85rem;
+}
+
+.pt-buffs-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.pt-buff-card {
+  display: grid;
+  gap: 6px;
+  padding: 14px;
+  background: rgba(10, 25, 41, 0.5);
+  border: 1px solid var(--pt-border);
+  border-radius: 10px;
+}
+
+.pt-buff-card > span {
+  color: var(--pt-gold);
+  font-size: 0.8rem;
+}
+
+.pt-buff-card p {
+  margin: 0;
+  color: var(--pt-muted);
+  font-size: 0.85rem;
+}
+
+.pt-prestige-confirmation {
+  color: var(--pt-muted);
+  font-size: 0.75rem;
+  line-height: 1.25;
+}
+
+.pt-prestige-confirmation-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pt-prestige-cancel {
+  border: 1px solid var(--pt-border);
+  border-radius: 6px;
+  padding: 8px 10px;
+  color: var(--pt-text);
+  background: transparent;
+  cursor: pointer;
 }
 
 .pt-balance {
@@ -648,12 +760,13 @@
 @media (max-width: 900px) {
   .pt-backdrop {
     padding: 0;
+    gap: 0;
   }
 
   .pt-popup {
     width: 100%;
-    height: 100%;
-    max-height: 100dvh;
+    height: calc(100dvh - 58px);
+    max-height: calc(100dvh - 58px);
     border-radius: 0;
     border: none;
   }
@@ -695,7 +808,17 @@
   }
 
   .pt-summary {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 6px;
+    padding: 8px 10px;
+  }
+
+  .pt-summary span {
+    font-size: 0.62rem;
+  }
+
+  .pt-summary strong {
+    font-size: 0.78rem;
   }
 
   .pt-prestige-button {
@@ -707,6 +830,11 @@
     gap: 4px 8px;
     padding: 5px 8px;
   }
+
+  .pt-buffs-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
 }
 
 @media (max-width: 480px) {
@@ -716,6 +844,18 @@
 
   .pt-details {
     max-height: 52%;
+  }
+
+  .pt-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .pt-prestige-action {
+    grid-column: span 2;
+  }
+
+  .pt-award-banner {
+    font-size: 0.8rem;
   }
 }
 

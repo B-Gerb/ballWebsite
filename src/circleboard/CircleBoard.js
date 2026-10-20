@@ -1,6 +1,7 @@
 import seedrandom from 'seedrandom';
 import Circle from './circle.js';
 import Square from './square.js';
+import Triangle from './triangle.js';
 import CollisionResponse from './CollisionResponse.js';
 class CircleBoard {
     constructor(canvasElement) {
@@ -20,6 +21,12 @@ class CircleBoard {
                 baseMaxBallSpeed: 15,
             },
             'Square': {
+                baseMinSide: 5,
+                baseMaxSide: 15,
+                baseMinSpeed: 5,
+                baseMaxSpeed: 15,
+            },
+            'Triangle': {
                 baseMinSide: 5,
                 baseMaxSide: 15,
                 baseMinSpeed: 5,
@@ -54,6 +61,12 @@ class CircleBoard {
                 baseMaxBallSpeed: 15,
             },
             Square: {
+                baseMinSide: 5,
+                baseMaxSide: 15,
+                baseMinSpeed: 5,
+                baseMaxSpeed: 15,
+            },
+            Triangle: {
                 baseMinSide: 5,
                 baseMaxSide: 15,
                 baseMinSpeed: 5,
@@ -192,6 +205,31 @@ class CircleBoard {
 
         square.id = this.counter++;
         return square;
+    }
+
+    addNewTriangles(amount = 1) {
+        for (let i = 0; i < amount; i++) this.shapes.push(this.createTriangle());
+    }
+
+    createTriangle() {
+        const info = this.shapeInfo.Triangle;
+        const side = info.baseMinSide + this.rng() * (info.baseMaxSide - info.baseMinSide);
+        const speed = info.baseMinSpeed + this.rng() * (info.baseMaxSpeed - info.baseMinSpeed);
+        const angle = this.rng() * Math.PI * 2;
+        const distance = this.rng() * Math.max(0, this.container.radius - side - this.container.thickness) * 0.9;
+        const velocityAngle = this.rng() * Math.PI * 2;
+        const triangle = Triangle.create(
+            this.container.x + Math.cos(angle) * distance,
+            this.container.y + Math.sin(angle) * distance,
+            side * this.scaleFactor,
+            this.rng() * 360,
+            `rgb(${Math.floor(this.rng() * 255)}, ${Math.floor(this.rng() * 255)}, ${Math.floor(this.rng() * 255)})`,
+            Math.cos(velocityAngle) * speed * (this.rng() - 0.5),
+            Math.sin(velocityAngle) * speed * (this.rng() - 0.5),
+            side,
+        );
+        triangle.id = this.counter++;
+        return triangle;
     }
 
     
@@ -486,6 +524,10 @@ class CircleBoard {
             // Scale side if it's a Square
             else if (shape instanceof Square) {
                 shape.side = shape.baseSide * this.scaleFactor;
+            }
+            else if (shape instanceof Triangle) {
+                shape.side = shape.baseSide * this.scaleFactor;
+                shape.mass = (Math.sqrt(3) / 4) * shape.side * shape.side;
             }
         });
         

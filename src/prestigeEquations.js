@@ -22,8 +22,28 @@ export const describePrestigeEffect = (effectKey, value) => {
             return `×${value} collision value`;
         case 'clickValue':
             return `×${value} click value`;
+        case 'circleWallValue':
+            return `×${value.toFixed(2)} circle wall-hit value`;
+        case 'clickUpgradeEffectiveness':
+            return `×${value.toFixed(2)} click upgrade effectiveness`;
+        case 'currencyMultiplier':
+            return `×${value.toFixed(2)} global currency`;
+        case 'globalSpeed':
+            return `×${value.toFixed(2)} global speed`;
+        case 'globalSize':
+            return `×${value.toFixed(2)} global size`;
         case 'prestigeGain':
-            return `×${value.toFixed(2)} prestige gain`;
+            return `×${value.toFixed(2)} prestige value`;
+        case 'speedCollisionValue':
+            return `×${value.toFixed(2)} speed collision value`;
+        case 'sizeCollisionValue':
+            return `×${value.toFixed(2)} size collision value`;
+        case 'massCollisionValue':
+            return `×${value.toFixed(2)} mass collision value`;
+        case 'circleCostScaling':
+        case 'squareCostScaling':
+        case 'triangleCostScaling':
+            return `−${((1 - 1 / value) * 100).toFixed(1)}% cost scaling`;
         default:
             return String(value);
     }

@@ -6,6 +6,10 @@ class AShop {
         }
     }
     addBalance(amount) {
+        if (!Number.isFinite(amount)) {
+            console.warn('Ignored non-finite shop balance update:', amount);
+            return this.balance;
+        }
         this.balance += amount;
     }
     removeBalance(amount) {
@@ -13,13 +17,18 @@ class AShop {
         if (this.balance < 0) this.balance = 0;
     }
     getBalance() {
+        if (!Number.isFinite(this.balance) || this.balance < 0) {
+            console.warn('Resetting invalid shop balance:', this.balance);
+            this.balance = 0;
+        }
         return this.balance;
     }
     itemCost(item, amount) {
         let cost = 0;
         let currentPrice = item.price;
+        const costScalingMultiplier = item.costScalingMultiplier ?? 1;
         for (let i = 0; i < amount; ++i) {
-            cost += currentPrice;
+            cost += currentPrice * costScalingMultiplier;
             const priceEquation = item.priceEquation ?? ((price) => item.equation(price));
             currentPrice = priceEquation(currentPrice, item.level + i);
         }

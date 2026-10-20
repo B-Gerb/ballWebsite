@@ -19,12 +19,12 @@ class ClickerObject {
         this.clickAnimationDuration = 300; // ms
         this.clickAnimationStart = 0;
         this.isAnimating = false;
+        this.animationFrameId = null;
+        this.handleMouseUp = this.handleMouseUp.bind(this);
         
         // Set up event listeners
         this.setupEventListeners();
         
-        // Start animation loop
-        this.startAnimationLoop();
     }
 
     
@@ -32,7 +32,10 @@ class ClickerObject {
     setupEventListeners() {
         // Mouse up and click handling
 
-        this.canvas.addEventListener('mouseup', (e) => {
+        this.canvas.addEventListener('mouseup', this.handleMouseUp);
+    }
+
+    handleMouseUp(e) {
             const rect = this.canvas.getBoundingClientRect();
             const x = e.clientX - rect.left;
             const y = e.clientY - rect.top;
@@ -40,8 +43,6 @@ class ClickerObject {
 
                 this.handleClick();
             }
-            
-        });
     }
     setSeed(seed) { 
         this.seed = seed;
@@ -122,13 +123,25 @@ class ClickerObject {
     
     // Animation loop for the clicker
     startAnimationLoop() {
+        if (this.animationFrameId) return;
+
         const animate = () => {
             this.draw();
-            requestAnimationFrame(animate);
+            this.animationFrameId = requestAnimationFrame(animate);
         };
         
-        requestAnimationFrame(animate);
+        this.animationFrameId = requestAnimationFrame(animate);
+    }
+
+    stopAnimationLoop() {
+        if (this.animationFrameId) {
+            cancelAnimationFrame(this.animationFrameId);
+            this.animationFrameId = null;
+        }
+    }
+
+    destroy() {
+        this.canvas.removeEventListener('mouseup', this.handleMouseUp);
     }
 }
 export default ClickerObject;
-

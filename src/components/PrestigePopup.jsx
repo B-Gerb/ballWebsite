@@ -21,10 +21,19 @@ const formatNumber = (value) => {
 
 const branchOf = (node) => BRANCHES[node.branch] ?? { label: 'Upgrade', color: '#94a3b8' };
 
-const PrestigePopup = ({ isOpen, onClose, prestigeShop, onPurchase, onPrestige }) => {
+const PrestigePopup = ({
+  isOpen,
+  onClose,
+  mode = 'shop',
+  onModeChange,
+  prestigeShop,
+  onPurchase,
+  onPrestige,
+}) => {
   const tree = useMemo(() => buildTree(), []);
   const [selectedId, setSelectedId] = useState(null);
   const [view, setView] = useState({ x: 0, y: 0, zoom: 1 });
+  const [isConfirmingPrestige, setIsConfirmingPrestige] = useState(false);
 
   const viewportRef = useRef(null);
   const pointers = useRef(new Map());
@@ -320,6 +329,20 @@ const PrestigePopup = ({ isOpen, onClose, prestigeShop, onPurchase, onPrestige }
     onPurchase?.(selected.item.name);
   };
 
+  const handlePrestigeClick = () => {
+    if (!prestigeShop?.canPrestige) return;
+    if (!isConfirmingPrestige) {
+      setIsConfirmingPrestige(true);
+      return;
+    }
+    const success = onPrestige?.();
+    if (success) setIsConfirmingPrestige(false);
+  };
+
+  useEffect(() => {
+    if (!isOpen) setIsConfirmingPrestige(false);
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   const totalLevels = [...nodeStates.values()].reduce((sum, s) => sum + s.item.level, 0);
@@ -346,6 +369,32 @@ const PrestigePopup = ({ isOpen, onClose, prestigeShop, onPurchase, onPrestige }
           </div>
         </header>
 
+        {mode === 'buffs' ? (
+          <section className="pt-buffs-panel" aria-label="Active prestige buffs">
+            <div className="pt-buffs-heading">
+              <div>
+                <h3>Active prestige buffs</h3>
+                <p>Permanent effects from your purchased upgrades.</p>
+              </div>
+              <button type="button" className="pt-prestige-cancel" onClick={() => onModeChange?.('shop')}>
+                Open upgrade shop
+              </button>
+            </div>
+            <div className="pt-buffs-grid">
+              {(upgrades ?? []).filter((item) => item.level > 0).map((item) => (
+                <article className="pt-buff-card" key={item.name}>
+                  <strong>{item.name}</strong>
+                  <span>Level {item.level}{item.maxLevel ? ` / ${item.maxLevel}` : ''}</span>
+                  <p>{describePrestigeEffect(item.effectKey, item.valueEquation?.(item.level))}</p>
+                </article>
+              ))}
+              {(upgrades ?? []).every((item) => item.level === 0) && (
+                <p className="pt-details-hint">Purchase an upgrade to see its active buff here.</p>
+              )}
+            </div>
+          </section>
+        ) : (
+        <>
         <section className="pt-summary" aria-label="Prestige preview">
           <div><span>Prestige points</span><strong>{formatNumber(balance)}</strong></div>
           <div><span>Estimated award</span><strong>{formatNumber(prestigeShop?.estimatedAward)}</strong></div>
@@ -353,13 +402,38 @@ const PrestigePopup = ({ isOpen, onClose, prestigeShop, onPurchase, onPrestige }
           <div><span>Collisions</span><strong>{formatNumber(prestigeShop?.totalCollisions)}</strong></div>
           <div><span>Collision multiplier</span><strong>×{formatNumber(prestigeShop?.collisionMultiplier)}</strong></div>
           <div><span>Minimum run</span><strong>{formatNumber(prestigeShop?.minimumRunPoints)}</strong></div>
-          <button
-            className="pt-prestige-button"
-            onClick={onPrestige}
-            disabled={!prestigeShop?.canPrestige}
-          >
-            {prestigeShop?.canPrestige ? 'Prestige now' : 'Not ready'}
-          </button>
+          <div className="pt-prestige-action">
+            <div className="pt-award-banner" aria-live="polite">
+              <span>Points available</span>
+              <strong>{formatNumber(prestigeShop?.estimatedAward)}</strong>
+            </div>
+            {isConfirmingPrestige ? (
+              <>
+                <span className="pt-prestige-confirmation">
+                  Reset this run for {formatNumber(prestigeShop?.estimatedAward)} points?
+                </span>
+                <div className="pt-prestige-confirmation-actions">
+                  <button className="pt-prestige-button" onClick={handlePrestigeClick}>
+                    Confirm prestige
+                  </button>
+                  <button
+                    className="pt-prestige-cancel"
+                    onClick={() => setIsConfirmingPrestige(false)}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </>
+            ) : (
+              <button
+                className="pt-prestige-button"
+                onClick={handlePrestigeClick}
+                disabled={!prestigeShop?.canPrestige}
+              >
+                {prestigeShop?.canPrestige ? 'Prestige now' : 'Not ready'}
+              </button>
+            )}
+          </div>
         </section>
 
         <div className="pt-body">
@@ -448,13 +522,13 @@ const PrestigePopup = ({ isOpen, onClose, prestigeShop, onPurchase, onPrestige }
               </div>
 
               <div className="pt-controls">
-                <button type="button" onClick={() => zoomBy(1.2)} aria-label="Zoom in">
+                <button type="button" onPointerDown={(e) => e.stopPropagation()} onClick={() => zoomBy(1.2)} aria-label="Zoom in">
                   +
                 </button>
-                <button type="button" onClick={() => zoomBy(1 / 1.2)} aria-label="Zoom out">
+                <button type="button" onPointerDown={(e) => e.stopPropagation()} onClick={() => zoomBy(1 / 1.2)} aria-label="Zoom out">
                   −
                 </button>
-                <button type="button" onClick={fitToView} aria-label="Fit tree to view">
+                <button type="button" onPointerDown={(e) => e.stopPropagation()} onClick={fitToView} aria-label="Fit tree to view">
                   ⤢
                 </button>
               </div>
@@ -577,6 +651,8 @@ const PrestigePopup = ({ isOpen, onClose, prestigeShop, onPurchase, onPrestige }
             )}
           </aside>
         </div>
+        </>
+        )}
       </div>
     </div>
   );

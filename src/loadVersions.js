@@ -31,6 +31,7 @@ function nonNegativeInteger(value, fallback = 0) {
  */
 import Circle from './circleboard/circle.js';
 import Square from './circleboard/square.js';
+import Triangle from './circleboard/triangle.js';
 function load(server) {
     const savedState = localStorage.getItem('circleBoardGameState');
     
@@ -90,7 +91,14 @@ function boardLoad(server, gameState) {
  */
 function loadShapeInfo(server, circleBoard) {
     if (circleBoard.shapeInfo) {
-        server.circleBoard.shapeInfo = circleBoard.shapeInfo;
+        server.circleBoard.shapeInfo = {
+            ...server.circleBoard.shapeInfo,
+            ...circleBoard.shapeInfo,
+            Triangle: {
+                ...server.circleBoard.shapeInfo.Triangle,
+                ...(circleBoard.shapeInfo.Triangle || {})
+            }
+        };
     } else {
         // Legacy support: Map old properties to new shapeInfo structure
         server.circleBoard.shapeInfo = server.circleBoard.shapeInfo || {
@@ -206,6 +214,19 @@ function createShape(savedShape, id) {
                 savedShape.baseSide
             );
             break;
+
+        case 'Triangle':
+            shape = Triangle.create(
+                savedShape.center.x,
+                savedShape.center.y,
+                savedShape.side,
+                savedShape.rotation,
+                savedShape.color,
+                savedShape.velocity.x,
+                savedShape.velocity.y,
+                savedShape.baseSide
+            );
+            break;
             
         default:
             console.error('Unknown shape type:', savedShape.name);
@@ -269,6 +290,9 @@ function loadCategorizedShopItems(server, items) {
         // Handle square shop category
         if (category === 'squareShop' && !server.baseUpgradeShop.items.squareShop) {
             server.baseUpgradeShop.addSquaresToShop();
+        }
+        if (category === 'triangleShop' && !server.baseUpgradeShop.items.triangleShop) {
+            server.baseUpgradeShop.addTrianglesToShop();
         }
         
         if (server.baseUpgradeShop.items[category]) {
@@ -411,7 +435,25 @@ function loadMultipliers(server, gameState) {
     if (gameState.multipliers) {
         // Load both prestige and temporary multipliers
         if (gameState.multipliers.prestigeMultipliers) {
-            server.multipliers.prestigeMultipliers = gameState.multipliers.prestigeMultipliers;
+            const savedPrestige = gameState.multipliers.prestigeMultipliers;
+            server.multipliers.prestigeMultipliers = {
+                ...server.multipliers.prestigeMultipliers,
+                ...savedPrestige,
+                costScaling: {
+                    ...server.multipliers.prestigeMultipliers.costScaling,
+                    ...(savedPrestige.costScaling || {})
+                },
+                shapes: {
+                    ...server.multipliers.prestigeMultipliers.shapes,
+                    ...(savedPrestige.shapes || {})
+                }
+            };
+            Object.keys(server.multipliers.prestigeMultipliers.shapes).forEach((shape) => {
+                server.multipliers.prestigeMultipliers.shapes[shape] = {
+                    ...server.multipliers.prestigeMultipliers.shapes[shape],
+                    ...(savedPrestige.shapes?.[shape] || {})
+                };
+            });
         }
         if (gameState.multipliers.temporaryMultipliers) {
             server.multipliers.temporaryMultipliers = gameState.multipliers.temporaryMultipliers;

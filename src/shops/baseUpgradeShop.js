@@ -114,6 +114,17 @@ class baseUpgradeShop extends AShop {
         ];
     }
 
+    addTrianglesToShop() {
+        if (this.items.triangleShop) return;
+        this.items.triangleShop = [
+            { name: "Add Triangle", price: 1, level: 1, equation: price => price * 1.1 + 1, getValue() { return this.level + 1; } },
+            { name: "Increase Triangle Size Range Min", price: 20, level: 1, equation: price => (price + 10) ** 1.2, getValue() { return this.level + 4; } },
+            { name: "Increase Triangle Size Range Max", price: 20, level: 1, equation: price => (price + 10) ** 1.2, getValue() { return this.level + 14; } },
+            { name: "Increase Triangle Speed Min", price: 30, level: 1, equation: price => (price + 10) ** 1.4, getValue() { return this.level + 4; } },
+            { name: "Increase Triangle Speed Max", price: 30, level: 1, equation: price => (price + 10) ** 1.4, getValue() { return this.level + 14; } },
+        ];
+    }
+
 }
 
 export default baseUpgradeShop;

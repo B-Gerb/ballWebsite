@@ -9,6 +9,7 @@ function App() {
   const [, setCount] = useState(0);
   const [prestigeData, setPrestigeData] = useState(null);
   const [isPrestigePopupOpen, setIsPrestigePopupOpen] = useState(false);
+  const [prestigeMode, setPrestigeMode] = useState('shop');
   const initialized = useRef(false);
   const serverRef = useRef(null); // Store server instance
 
@@ -22,13 +23,18 @@ function App() {
       setPrestigeData(server.getPrestigeShopData());
       // Optionally store server in state/ref if you need to interact with it later
       return () => {
-        // Cleanup if needed when component unmounts
-        // e.g., server.stopGame();
+        server.destroy();
+        serverRef.current = null;
+        initialized.current = false;
       };
     }
   }, []);
 
   useEffect(() => {
+    if (!isPrestigePopupOpen) {
+      return undefined;
+    }
+
     const refreshPrestigeData = () => {
       const server = serverRef.current;
       if (server) {
@@ -38,10 +44,20 @@ function App() {
 
     const refreshInterval = window.setInterval(refreshPrestigeData, 250);
     return () => window.clearInterval(refreshInterval);
+  }, [isPrestigePopupOpen]);
+
+  useEffect(() => {
+    const openPrestigeFocus = () => handleOpenPrestigeShop('shop');
+    window.addEventListener('open-prestige-focus', openPrestigeFocus);
+    return () => window.removeEventListener('open-prestige-focus', openPrestigeFocus);
   }, []);
 
   // Handler functions for prestige popup
-  const handleOpenPrestigeShop = () => {
+  const handleOpenPrestigeShop = (mode = 'shop') => {
+    if (serverRef.current) {
+      setPrestigeData(serverRef.current.getPrestigeShopData());
+    }
+    setPrestigeMode(mode);
     setIsPrestigePopupOpen(true);
   };
 
@@ -67,23 +83,17 @@ function App() {
     if (!server) return false;
     const preview = server.calculatePrestigePreview();
     if (!preview.canPrestige) {
-      window.alert(`Cannot prestige: earn at least ${preview.minimumRunPoints} run points first.`);
       return false;
     }
-    const confirmed = window.confirm(
-      `Prestige for ${preview.estimatedAward} points?\n\nRun points, shapes, and shop progress will reset. Permanent prestige upgrades remain.`
-    );
-    if (!confirmed) return false;
 
     const result = server.prestige();
     if (result.success) {
       setCount(prev => prev + 1);
       setPrestigeData(server.getPrestigeShopData());
-      window.alert(`Prestige complete! You earned ${result.awarded} prestige points.`);
+      setIsPrestigePopupOpen(true);
       return true;
     }
     setPrestigeData(server.getPrestigeShopData());
-    window.alert(result.reason);
     return false;
   };
 
@@ -115,17 +125,6 @@ function App() {
         <button id="pauseButton">Pause</button>
         <button id="saveButton">Save</button>
         <button id="resetButton">Reset</button>
-        <button
-          onClick={handlePrestige}
-          className="prestige-button"
-          disabled={!prestigeData?.canPrestige}
-          title={prestigeData?.canPrestige ? 'Convert this run into prestige points' : 'Earn more run points to prestige'}
-        >
-          Prestige
-        </button>
-        <button onClick={handleOpenPrestigeShop} className="prestige-button">
-          Prestige Shop
-        </button>
       </div>
       
       {/* Prestige Popup */}
@@ -133,6 +132,8 @@ function App() {
         <PrestigePopup 
           isOpen={isPrestigePopupOpen}
           onClose={handleClosePrestigeShop}
+          mode={prestigeMode}
+          onModeChange={setPrestigeMode}
           prestigeShop={prestigeData}
           onPurchase={handlePrestigePurchase}
           onPrestige={handlePrestige}

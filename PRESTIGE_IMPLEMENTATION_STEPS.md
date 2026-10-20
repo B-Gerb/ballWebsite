@@ -293,36 +293,45 @@ production prestige loop.
 ### Equation tests
 
 - Zero points and zero collisions produce zero or the documented minimum result.
+- The exact minimum threshold is accepted, while one point below it is rejected.
 - A run below the threshold cannot prestige.
 - Increasing collisions increases the award according to the equation.
+- Increasing the prestige-gain upgrade changes only the final award multiplier.
 - Repeating the same preview without state changes returns the same result.
+- Negative, non-finite, and otherwise invalid inputs are handled safely.
 - Very large values remain finite and do not overflow the UI.
-- Prestige gain upgrades affect only the multiplier they own.
 
 ### Reset tests
 
 - Prestige awards points exactly once.
 - A second click after success cannot award the same run again.
 - Run points and run collision totals reset.
+- A failed prestige attempt does not mutate balances, counters, or prestige statistics.
 - Permanent prestige upgrades remain purchased.
 - The upgrade menu shows the new balance immediately.
 - A normal full reset still removes prestige progress if that remains intended.
+- Saving occurs after a successful prestige and does not itself award points.
 
 ### UI tests
 
 - The main button is disabled or explains why it cannot be used.
 - Confirmation text accurately lists what resets.
 - The popup preview and server award match.
+- The popup renders zero, large, and unavailable preview values without `NaN` or `Infinity`.
 - The triangle connection appears through the tree dependency data.
+- Every shop upgrade has exactly one matching tree node.
 - Locked upgrades remain inaccessible until their requirements are met.
 - Purchase failures are visible instead of silently ignored.
+- Keyboard dismissal, focus behavior, and touch pan/pinch remain usable in the popup.
 
 ### Regression checks
 
 - Existing collision physics remains unchanged.
 - Existing wall/shape collision rate displays still work.
 - Save/load works with both old and new save versions.
+- Invalid or partial legacy prestige data loads with safe defaults and never awards points.
 - `npm run build` completes successfully.
+- `npm run test` passes.
 - Test the feature in a narrow viewport and on a touch device because the
   prestige tree supports pan and pinch interactions.
 

@@ -155,22 +155,37 @@ class Server {
         this.multipliers = {
             prestigeMultipliers: {
                 clickValue: 1,
+                clickUpgradeEffectiveness: 1,
+                circleWallValue: 1,
                 shapeValue: 1,
                 shapeSpeed: 1,
-                circleSize: 1,
+                currencyMultiplier: 1,
+                globalSpeed: 1,
+                globalSize: 1,
+                speedCollisionValue: 1,
+                sizeCollisionValue: 1,
+                massCollisionValue: 1,
                 prestigeGain: 1,
+                costScaling: {
+                    circle: 1,
+                    square: 1,
+                    triangle: 1
+                },
                 shapes: {
                     circle: {
                         speed: 1,
-                        value: 1
+                        value: 1,
+                        size: 1
                     },
                     square: {
                         speed: 1,
-                        value: 1
+                        value: 1,
+                        size: 1
                     },
                     triangle: {
                         speed: 1,
-                        value: 1
+                        value: 1,
+                        size: 1
                     }
                 }
             },
@@ -219,9 +234,12 @@ class Server {
 
         // Animation and physics timing
         this.animationFrameId = null;
+        this.saveTimerId = null;
+        this.saveIdleCallbackId = null;
         this.physicsUpdateInterval = 1000 / 60; 
         this.lastPhysicsUpdate = 0;
         this.physicsTimerId = null;
+        this.handleWindowResize = this.handleWindowResize.bind(this);
 
         this.setupEventListeners();
         this.seed = seedrandom();
@@ -239,14 +257,29 @@ class Server {
         this.clickerObject.handleClick = () => {
             if(!this.circleBoard.isRunning) return;
             originalHandleClick.call(this.clickerObject); // for animation purposes
-            this.clickShop.addBalance(
-                this.clickerValue * this.multipliers.temporaryMultipliers.clickValue
-               * this.multipliers.prestigeMultipliers.clickValue);
-            this.addPointsAndCheckPrestige(this.clickerValue * this.multipliers.temporaryMultipliers.clickValue);
+                const clickMultiplier = this.getSafeMultiplier(
+                    this.multipliers.temporaryMultipliers.clickValue
+                    * this.multipliers.prestigeMultipliers.clickValue
+                    * this.multipliers.prestigeMultipliers.clickUpgradeEffectiveness
+                    * this.multipliers.prestigeMultipliers.currencyMultiplier
+                );
+                const clickPoints = this.getSafeMultiplier(this.clickerValue) * clickMultiplier;
+                this.clickShop.addBalance(clickPoints);
+                this.addPointsAndCheckPrestige(clickPoints);
             this.updateBalanceDisplay();
             this.updateButtonAppearance();
         };
         this.clickerObject.setSeed(this.seed);    }
+
+    getSafeMultiplier(value) {
+        return Number.isFinite(value) && value >= 0 ? value : 1;
+    }
+
+    getSafeProduct(...values) {
+        return values.reduce((product, value) => (
+            product * this.getSafeMultiplier(value)
+        ), 1);
+    }
     handleResize() { 
         const windowWidth = window.innerWidth;
         const windowHeight = window.innerHeight;
@@ -333,17 +366,22 @@ class Server {
 
     // Setup event listeners for pause, reset and save
     setupMenuButtons() {
+        this.removeMenuButtonListeners();
+
+        this.menuButtonHandlers = {};
+
         if (this.elements.pauseButton) {
-            this.elements.pauseButton.addEventListener('click', () => {
+            this.menuButtonHandlers.pause = () => {
                 console.log("pauseButton");
                 const isRun = this.toggleAnimation();
                 const buttonText = isRun ? 'Pause' : 'Resume';
                 this.elements.pauseButton.textContent = buttonText;
-            });
+            };
+            this.elements.pauseButton.addEventListener('click', this.menuButtonHandlers.pause);
         }
         
         if (this.elements.resetButton) {
-            this.elements.resetButton.addEventListener('click', () => {
+            this.menuButtonHandlers.reset = () => {
                 // Create the popup with a seed input field
                 const popup = popUps({
                     message: 'Are you sure you want to reset the game?',
@@ -386,23 +424,42 @@ class Server {
                 seedLabel.appendChild(input);
                 seedDiv.appendChild(seedLabel);
                 popup.appendChild(seedDiv);
-
-            });
+            };
+            this.elements.resetButton.addEventListener('click', this.menuButtonHandlers.reset);
         }
 
         if (this.elements.saveButton) {
-            this.elements.saveButton.addEventListener('click', () => {
+            this.menuButtonHandlers.save = () => {
                 this.saveGameState();
-            });
+            };
+            this.elements.saveButton.addEventListener('click', this.menuButtonHandlers.save);
         }
+    }
+
+    removeMenuButtonListeners() {
+        const handlers = this.menuButtonHandlers;
+        if (!handlers) return;
+
+        if (handlers.pause) {
+            this.elements.pauseButton?.removeEventListener('click', handlers.pause);
+        }
+        if (handlers.reset) {
+            this.elements.resetButton?.removeEventListener('click', handlers.reset);
+        }
+        if (handlers.save) {
+            this.elements.saveButton?.removeEventListener('click', handlers.save);
+        }
+        this.menuButtonHandlers = null;
     }
     
     // Set up all event listeners
     setupEventListeners() {
         // Window resize
-        window.addEventListener('resize', () => {
-            this.handleResize();
-        });
+        window.addEventListener('resize', this.handleWindowResize);
+    }
+
+    handleWindowResize() {
+        this.handleResize();
     }
     
     
@@ -430,11 +487,11 @@ class Server {
     updateBalanceDisplay() {
         if (this.elements.shopBalanceDisplay) {
             this.elements.shopBalanceDisplay.textContent = this.baseUpgradeShop.getBalance().toFixed(2);
-
         }
         if(this.elements.clickShopDisplay){
             this.elements.clickShopDisplay.textContent = this.clickShop.getBalance().toFixed(2);
         }
+        this.updatePrestigeFocusButton();
 
     }
     updateBaseUpgradeShopAppearance() {
@@ -493,7 +550,29 @@ class Server {
         // Create Balance Shop section
         const balanceShopSection = document.createElement('div');
         balanceShopSection.className = 'shop-section';
-        balanceShopSection.innerHTML = '<h2>Balance Shop</h2>';
+        balanceShopSection.innerHTML = `
+            <div class="shop-tabs" role="tablist" aria-label="Upgrade menus">
+                <button type="button" class="shop-tab is-active" role="tab" aria-selected="true">
+                    Balance Shop
+                </button>
+                <button
+                    type="button"
+                    class="shop-tab prestige-focus-button is-locked"
+                    role="tab"
+                    aria-selected="false"
+                    aria-label="Prestige locked. Earn 1 prestige point to unlock"
+                    title="Earn 1 prestige point to unlock Prestige"
+                >
+                    <span class="prestige-focus-icon" aria-hidden="true">🔒</span>
+                    <span class="prestige-focus-label">Prestige</span>
+                </button>
+            </div>
+        `;
+        balanceShopSection.querySelector('.prestige-focus-button').addEventListener('click', (event) => {
+            if (event.currentTarget.disabled) return;
+            window.dispatchEvent(new CustomEvent('open-prestige-focus'));
+        });
+        this.updatePrestigeFocusButton(balanceShopSection);
         shopContainer.appendChild(balanceShopSection);
         
         // Add shop items organized by category
@@ -501,8 +580,12 @@ class Server {
             // Create category header
             const categoryHeader = document.createElement('h3');
             categoryHeader.textContent = shopName;
-            balanceShopSection.appendChild(categoryHeader);
-            
+            const categoryDetails = document.createElement('details');
+            categoryDetails.open = true;
+            const categorySummary = document.createElement('summary');
+            categorySummary.textContent = shopName;
+            categoryDetails.appendChild(categorySummary);
+
             // Create grid container for this category
             const categoryGrid = document.createElement('div');
             categoryGrid.className = 'shop-items-grid';
@@ -538,7 +621,8 @@ class Server {
                 categoryGrid.appendChild(button);
             }
             
-            balanceShopSection.appendChild(categoryGrid);
+            categoryDetails.appendChild(categoryGrid);
+            balanceShopSection.appendChild(categoryDetails);
         }
 
         // Create Click Shop section
@@ -582,6 +666,28 @@ class Server {
         
         clickShopSection.appendChild(clickShopGrid);
         shopContainer.appendChild(clickShopSection);
+    }
+
+    updatePrestigeFocusButton(root = document) {
+        const button = root.querySelector?.('.prestige-focus-button');
+        if (!button) return;
+
+        const unlocked = this.prestigeStats.totalPrestiges > 0
+            || this.calculatePrestigePreview().estimatedAward >= 1;
+        button.classList.toggle('is-locked', !unlocked);
+        button.classList.toggle('is-unlocked', unlocked);
+        button.disabled = !unlocked;
+        button.setAttribute(
+            'aria-label',
+            unlocked
+                ? 'Open Prestige'
+                : 'Prestige locked. Earn 1 prestige point to unlock',
+        );
+        button.title = unlocked
+            ? 'Open Prestige'
+            : 'Earn 1 prestige point to unlock Prestige';
+        const icon = button.querySelector('.prestige-focus-icon');
+        if (icon) icon.textContent = unlocked ? '🔓' : '🔒';
     }
                     
            
@@ -656,6 +762,25 @@ class Server {
                         
                     case "Increase Square Speed Max":
                         this.circleBoard.shapeInfo.Square.baseMaxSpeed = item[0].getValue();
+                        break;
+                }
+                break;
+            case "triangleShop":
+                switch (item[0].name) {
+                    case "Add Triangle":
+                        this.circleBoard.addNewTriangles(amount);
+                        break;
+                    case "Increase Triangle Size Range Min":
+                        this.circleBoard.shapeInfo.Triangle.baseMinSide = item[0].getValue();
+                        break;
+                    case "Increase Triangle Size Range Max":
+                        this.circleBoard.shapeInfo.Triangle.baseMaxSide = item[0].getValue();
+                        break;
+                    case "Increase Triangle Speed Min":
+                        this.circleBoard.shapeInfo.Triangle.baseMinSpeed = item[0].getValue();
+                        break;
+                    case "Increase Triangle Speed Max":
+                        this.circleBoard.shapeInfo.Triangle.baseMaxSpeed = item[0].getValue();
                         break;
                 }
                 break;
@@ -767,6 +892,14 @@ class Server {
         return success;
     }
 
+    applyCostScalingMultiplier(shopName, multiplier) {
+        const items = this.baseUpgradeShop.items[shopName];
+        if (!items) return;
+        items.forEach((item) => {
+            item.costScalingMultiplier = multiplier;
+        });
+    }
+
     applyPrestigeUpgradeEffect(upgradeName) {
         const item = this.prestigeUpgradeShop.getItem(upgradeName);
         if (!item) return;
@@ -782,32 +915,96 @@ class Server {
 
             case "unlockTriangle":
                 this.triangleUnlocked = true;
+                this.baseUpgradeShop.addTrianglesToShop();
+                this.setupShopUI();
                 break;
                 
-            case "circleSize":
-            {
-                // Increase the circle board size based on item level
-                this.multipliers.prestigeMultipliers.circleSize = value;
-                console.log(`Circle size increased to ${value}x`);
+            case "circleWallValue":
+                this.multipliers.prestigeMultipliers.circleWallValue = value;
                 break;
-            }
-                
-            case "shapeSpeed":
-                // Increase ball speed multiplier based on item level
-                this.multipliers.prestigeMultipliers.shapeSpeed = value;
-                console.log(`Ball speed increased to ${value}x`);
+
+            case "triangleValue":
+            case "triangleCollisionValue":
+                this.multipliers.prestigeMultipliers.shapes.triangle.value =
+                    Math.max(this.multipliers.prestigeMultipliers.shapes.triangle.value, value);
                 break;
-                
-            case "shapeValue":
-                // Increase points from ball collisions based on item level
-                this.multipliers.prestigeMultipliers.shapeValue = value;
-                console.log(`Ball value increased to ${value}x`);
+
+            case "triangleSize":
+                this.multipliers.prestigeMultipliers.shapes.triangle.size = value;
                 break;
-                
+
+            case "triangleSpeed":
+                this.multipliers.prestigeMultipliers.shapes.triangle.speed = value;
+                break;
+
+            case "squareValue":
+            case "squareCollisionValue":
+                this.multipliers.prestigeMultipliers.shapes.square.value =
+                    Math.max(this.multipliers.prestigeMultipliers.shapes.square.value, value);
+                break;
+
+            case "squareSize":
+                this.multipliers.prestigeMultipliers.shapes.square.size = value;
+                break;
+
+            case "squareSpeed":
+                this.multipliers.prestigeMultipliers.shapes.square.speed = value;
+                break;
+
             case "clickValue":
-                // Increase click value multiplier based on item level
                 this.multipliers.prestigeMultipliers.clickValue = value;
-                console.log(`Click value increased to ${value}x`);
+                break;
+
+            case "clickUpgradeEffectiveness":
+                this.multipliers.prestigeMultipliers.clickUpgradeEffectiveness = value;
+                break;
+
+            case "currencyMultiplier":
+                this.multipliers.prestigeMultipliers.currencyMultiplier = value;
+                break;
+
+            case "globalSpeed":
+                this.multipliers.prestigeMultipliers.globalSpeed = value;
+                break;
+
+            case "globalSize":
+                this.multipliers.prestigeMultipliers.globalSize = value;
+                break;
+
+            case "circleCostScaling":
+                this.multipliers.prestigeMultipliers.costScaling.circle = 1 / value;
+                this.applyCostScalingMultiplier(
+                    'ballShop',
+                    this.multipliers.prestigeMultipliers.costScaling.circle
+                );
+                break;
+
+            case "squareCostScaling":
+                this.multipliers.prestigeMultipliers.costScaling.square = 1 / value;
+                this.applyCostScalingMultiplier(
+                    'squareShop',
+                    this.multipliers.prestigeMultipliers.costScaling.square
+                );
+                break;
+
+            case "triangleCostScaling":
+                this.multipliers.prestigeMultipliers.costScaling.triangle = 1 / value;
+                this.applyCostScalingMultiplier(
+                    'triangleShop',
+                    this.multipliers.prestigeMultipliers.costScaling.triangle
+                );
+                break;
+
+            case "speedCollisionValue":
+                this.multipliers.prestigeMultipliers.speedCollisionValue = value;
+                break;
+
+            case "sizeCollisionValue":
+                this.multipliers.prestigeMultipliers.sizeCollisionValue = value;
+                break;
+
+            case "massCollisionValue":
+                this.multipliers.prestigeMultipliers.massCollisionValue = value;
                 break;
 
             case "prestigeGain":
@@ -984,18 +1181,11 @@ class Server {
             }
             let success = loadVersions.load(this);
 
-            this.handleResize();
             if (!success) {
                 console.error('Failed to load game state: Version mismatch or unsupported version');
                 return false;
             }
-            
-            
-            
-            
-            // Start animation and physics loop
-            this.startGame();
-            
+
             console.log('Game state loaded successfully');
             return true;
         } catch (error) {
@@ -1036,22 +1226,37 @@ class Server {
         this.multipliers = {
             prestigeMultipliers: {
                 clickValue: 1,
+                clickUpgradeEffectiveness: 1,
+                circleWallValue: 1,
                 shapeValue: 1,
                 shapeSpeed: 1,
-                circleSize: 1,
+                currencyMultiplier: 1,
+                globalSpeed: 1,
+                globalSize: 1,
+                speedCollisionValue: 1,
+                sizeCollisionValue: 1,
+                massCollisionValue: 1,
                 prestigeGain: 1,
+                costScaling: {
+                    circle: 1,
+                    square: 1,
+                    triangle: 1
+                },
                 shapes: {
                     circle: {
                         speed: 1,
-                        value: 1
+                        value: 1,
+                        size: 1
                     },
                     square: {
                         speed: 1,
-                        value: 1
+                        value: 1,
+                        size: 1
                     },
                     triangle: {
                         speed: 1,
-                        value: 1
+                        value: 1,
+                        size: 1
                     }
                 }
             },
@@ -1120,6 +1325,8 @@ class Server {
             this.frameCount = 0;
             this.frames = 0;
             this.lastFpsUpdate = performance.now();
+            this.lastUiUpdate = lastFrameTime;
+            this.lastSaveTime = lastFrameTime;
 
             const gameLoop = (currentTime) => {
                 if (!this.circleBoard.isRunning) {
@@ -1161,19 +1368,28 @@ class Server {
 
                     // Calculate speed multipliers for each shape
                     const speedMultipliers = {};
-                                        let subIntervals = 8;
-                    if( this.circleBoard.shapes.length > 450){
-                        subIntervals = subIntervals - Math.min(5, Math.round(this.circleBoard.shapes.length - 500) / 35)
-
-                    }
+                                        const shapeCount = this.circleBoard.shapes.length;
+                                        // A single shape cannot collide with another shape, so
+                                        // substeps are only needed as the board fills.
+                                        const subIntervals = shapeCount < 25
+                                            ? 1
+                                            : Math.min(8, Math.max(2, Math.ceil(shapeCount / 75)));
                     for (const shape of this.circleBoard.shapes) {
                         const shapeName = shape.getName().toLowerCase();
 
 
-                        const totalSpeedMultiplier = this.multipliers.prestigeMultipliers.shapeSpeed * 
-                                                   this.multipliers.temporaryMultipliers.shapeSpeed *
-                                                   this.multipliers.prestigeMultipliers.shapes[shapeName].speed *
-                                                   this.multipliers.temporaryMultipliers.shapes[shapeName].speed;
+                        const shapeMultipliers = this.multipliers.prestigeMultipliers.shapes[shapeName]
+                            || { speed: 1, value: 1, size: 1 };
+                        const temporaryShapeMultipliers =
+                            this.multipliers.temporaryMultipliers.shapes[shapeName]
+                            || { speed: 1, value: 1 };
+                        const totalSpeedMultiplier = this.getSafeProduct(
+                            this.multipliers.prestigeMultipliers.shapeSpeed,
+                            this.multipliers.prestigeMultipliers.globalSpeed,
+                            this.multipliers.temporaryMultipliers.shapeSpeed,
+                            shapeMultipliers.speed,
+                            temporaryShapeMultipliers.speed
+                        );
                         speedMultipliers[shapeName] = totalSpeedMultiplier/subIntervals;
                     }
 
@@ -1187,16 +1403,31 @@ class Server {
                         for (const [shapeType, shapeStats] of Object.entries(stats)) {
                             if(shapeType === 'total') continue;
                             const shapeName = shapeType.toLowerCase();
+                            const shapeMultipliers = this.multipliers.prestigeMultipliers.shapes[shapeName]
+                                || { speed: 1, value: 1, size: 1 };
+                            const temporaryShapeMultipliers =
+                                this.multipliers.temporaryMultipliers.shapes[shapeName]
+                                || { speed: 1, value: 1 };
                             
                             // Calculate total value multiplier for this shape
-                            const totalValueMultiplier = this.multipliers.prestigeMultipliers.shapeValue * 
-                                                    this.multipliers.temporaryMultipliers.shapeValue *
-                                                    this.multipliers.prestigeMultipliers.shapes[shapeName].value *
-                                                    this.multipliers.temporaryMultipliers.shapes[shapeName].value;
+                            const totalValueMultiplier = this.getSafeProduct(
+                                this.multipliers.prestigeMultipliers.shapeValue,
+                                this.multipliers.prestigeMultipliers.currencyMultiplier,
+                                this.multipliers.prestigeMultipliers.globalSize,
+                                this.multipliers.prestigeMultipliers.speedCollisionValue,
+                                this.multipliers.prestigeMultipliers.sizeCollisionValue,
+                                this.multipliers.prestigeMultipliers.massCollisionValue,
+                                this.multipliers.temporaryMultipliers.shapeValue,
+                                shapeMultipliers.size,
+                                shapeMultipliers.value,
+                                temporaryShapeMultipliers.value
+                            );
                             switch (shapeType) {
                                 case 'Circle':
                                 {
-                                    const wallHitPoints = shapeStats.totalWallHits * totalValueMultiplier;
+                                    const wallHitPoints = shapeStats.totalWallHits
+                                        * totalValueMultiplier
+                                        * this.multipliers.prestigeMultipliers.circleWallValue;
                                     this.baseUpgradeShop.addBalance(wallHitPoints);
                                     this.addPointsAndCheckPrestige(wallHitPoints);
                                     break;
@@ -1212,15 +1443,18 @@ class Server {
                         }
                     }
 
-                    this.updateButtonAppearance();
-                    this.updateCollisionDisplay();
-                    this.updateBalanceDisplay();
+                    if (currentTime - this.lastUiUpdate >= 100) {
+                        this.updateButtonAppearance();
+                        this.updateCollisionDisplay();
+                        this.updateBalanceDisplay();
+                        this.lastUiUpdate = currentTime;
+                    }
 
                     this.processTemporaryMultipliers();
 
-                    if (this.frameCount > 60) {
-                        this.saveGameState();
-                        this.frameCount = 0;
+                    if (currentTime - this.lastSaveTime >= 1000) {
+                        this.scheduleSave();
+                        this.lastSaveTime = currentTime;
                     }
 
                     accumulator -= frameInterval;
@@ -1228,6 +1462,7 @@ class Server {
 
                 // Render at the current frame rate
                 this.circleBoard.render();
+                this.clickerObject?.draw();
                 this.animationFrameId = requestAnimationFrame(gameLoop);
             };
 
@@ -1264,14 +1499,49 @@ class Server {
             this.animationFrameId = null;
         }
     }
+
+    scheduleSave() {
+        if (this.saveTimerId || this.saveIdleCallbackId) return;
+
+        const save = () => {
+            this.saveTimerId = null;
+            this.saveIdleCallbackId = null;
+            this.saveGameState();
+        };
+
+        if ('requestIdleCallback' in window) {
+            this.saveIdleCallbackId = window.requestIdleCallback(save, { timeout: 2000 });
+        } else {
+            this.saveTimerId = window.setTimeout(save, 0);
+        }
+    }
+
+    cancelScheduledSave() {
+        if (this.saveTimerId) {
+            window.clearTimeout(this.saveTimerId);
+            this.saveTimerId = null;
+        }
+        if (this.saveIdleCallbackId) {
+            window.cancelIdleCallback(this.saveIdleCallbackId);
+            this.saveIdleCallbackId = null;
+        }
+    }
+
+    destroy() {
+        this.stopGame();
+        this.cancelScheduledSave();
+        this.clickerObject?.destroy();
+        this.removeMenuButtonListeners();
+        window.removeEventListener('resize', this.handleWindowResize);
+    }
     
     initialize() {
 
         // Initialize the clicker object
         this.initializeClickerObject();
 
-        // Setup UI components
-        this.setupShopUI();
+        // Setup menu listeners before loading so saved-state controls remain
+        // available. The shop is built once by the selected initialization path.
         this.setupMenuButtons();
 
 
@@ -1283,6 +1553,7 @@ class Server {
             this.circleBoard.addNewBalls(1);
 
             // Force resize and render BEFORE starting the game loop
+            this.setupShopUI();
             this.handleResize();
             this.circleBoard.render();
 
@@ -1301,13 +1572,6 @@ class Server {
         this.updateCollisionDisplay();
         this.updateBalanceDisplay();
 
-        // Final resize after everything is loaded to ensure proper scaling
-        setTimeout(() => {
-            this.handleResize();
-            if (this.clickerObject) {
-                this.clickerObject.draw();
-            }
-        }, 100);
     }
         
     // Static method to start the game
