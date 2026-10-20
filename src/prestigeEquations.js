@@ -1,13 +1,31 @@
+export const MINIMUM_RUN_POINTS = 1000;
+
+const nonNegativeFinite = (value) => (
+    Number.isFinite(value) && value > 0 ? value : 0
+);
+
+export const basePrestigePoints = (runPoints) =>
+    Math.floor(nonNegativeFinite(runPoints) / MINIMUM_RUN_POINTS);
+
+export const collisionMultiplier = (totalCollisions) =>
+    1 + Math.log10(nonNegativeFinite(totalCollisions) + 1);
+
+export const prestigeAward = (runPoints, totalCollisions, upgradeMultiplier) => {
+    const safeUpgradeMultiplier = Number.isFinite(upgradeMultiplier) && upgradeMultiplier >= 0
+        ? upgradeMultiplier
+        : 1;
+    const result = Math.floor(
+        basePrestigePoints(runPoints)
+        * collisionMultiplier(totalCollisions)
+        * safeUpgradeMultiplier
+    );
+
+    return Number.isFinite(result) ? Math.max(0, result) : 0;
+};
+
 export const PRESTIGE_EQUATIONS = {
-    minimumRunPoints: 1000,
-    basePoints: (runPoints) => Math.floor(Math.max(0, runPoints) / 1000),
-    collisionMultiplier: (totalCollisions) => 1 + Math.log10(Math.max(0, totalCollisions) + 1),
-    finalAward: (runPoints, totalCollisions, upgradeMultiplier) => {
-        const basePoints = PRESTIGE_EQUATIONS.basePoints(runPoints);
-        const collisionMultiplier = PRESTIGE_EQUATIONS.collisionMultiplier(totalCollisions);
-        const safeUpgradeMultiplier = Number.isFinite(upgradeMultiplier) && upgradeMultiplier >= 0
-            ? upgradeMultiplier
-            : 1;
-        return Math.max(0, Math.floor(basePoints * collisionMultiplier * safeUpgradeMultiplier));
-    },
+    minimumRunPoints: MINIMUM_RUN_POINTS,
+    basePoints: basePrestigePoints,
+    collisionMultiplier,
+    finalAward: prestigeAward,
 };
