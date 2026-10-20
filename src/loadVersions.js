@@ -383,9 +383,9 @@ function loadPrestigeTracking(server, gameState) {
         server.prestige.totalPrestiges = Number.isFinite(saved.totalPrestiges)
             ? Math.max(0, saved.totalPrestiges)
             : 0;
-        server.run.totalCollisions = Number.isFinite(saved.totalCollisions)
-            ? Math.max(0, saved.totalCollisions)
-            : 0;
+        server.circleBoard.restoreTotalShapeCollisions(
+            Number.isFinite(saved.totalCollisions) ? Math.max(0, saved.totalCollisions) : 0
+        );
         server.run.totalWallHits = Number.isFinite(saved.totalWallHits)
             ? Math.max(0, saved.totalWallHits)
             : 0;

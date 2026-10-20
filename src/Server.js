@@ -134,7 +134,6 @@ class Server {
         };
         this.run = {
             totalPointsEarned: 0,
-            totalCollisions: 0,
             totalWallHits: 0
         };
         
@@ -840,7 +839,7 @@ class Server {
 
     calculatePrestigePreview() {
         const totalPointsEarned = this.run.totalPointsEarned;
-        const totalCollisions = this.run.totalCollisions;
+        const totalCollisions = this.circleBoard.getTotalShapeCollisions();
         const basePrestigePoints = PRESTIGE_EQUATIONS.basePoints(totalPointsEarned);
         const collisionMultiplier = PRESTIGE_EQUATIONS.collisionMultiplier(totalCollisions);
         const prestigeUpgradeMultiplier = this.multipliers.prestigeMultipliers.prestigeGain || 1;
@@ -957,7 +956,7 @@ class Server {
                 totalPrestiges: this.prestige.totalPrestiges,
                 totalPointsEarned: this.run.totalPointsEarned,
                 prestigePointsEarned: this.prestige.lifetimePoints,
-                totalCollisions: this.run.totalCollisions,
+                totalCollisions: this.circleBoard.getTotalShapeCollisions(),
                 totalWallHits: this.run.totalWallHits
             },
             version: '0.0.6',
@@ -1079,7 +1078,6 @@ class Server {
         this.clickerObject.setSeed(this.seed);
         this.run = {
             totalPointsEarned: 0,
-            totalCollisions: 0,
             totalWallHits: 0
         };
         this.applyAllPrestigeUpgrades();
@@ -1177,7 +1175,6 @@ class Server {
                         const stats = this.circleBoard.updatePhysics(speedMultipliers);
 
                         // Update balances based on shape collisions
-                        this.run.totalCollisions += stats.total.totalShapeCollisions;
                         this.run.totalWallHits += stats.total.totalWallHits;
                         for (const [shapeType, shapeStats] of Object.entries(stats)) {
                             if(shapeType === 'total') continue;

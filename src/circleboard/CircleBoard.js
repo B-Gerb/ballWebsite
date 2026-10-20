@@ -38,6 +38,7 @@ class CircleBoard {
         this.ballCollisions = 0;
         this.wallHitsStack = [];
         this.ballCollisionsStack = [];
+        this.totalShapeCollisions = 0;
 
         
 
@@ -377,6 +378,7 @@ class CircleBoard {
                         proccessedCollisions.add(pairKey);
                         if (CollisionResponse.handleCollision(shapeA, shapeB)) {
                             totalShapeCollisions++;
+                            this.totalShapeCollisions++;
                             if(!(shapeA.getName() in returnValues)){
                                 returnValues[shapeA.getName()] = {totalWallHits: 0, totalShapeCollisions: 0};
                             }
@@ -509,6 +511,17 @@ class CircleBoard {
         if (this.ballCollisionsStack.length === 0) return 0;
         return 60 * this.ballCollisions / this.ballCollisionsStack.length;
     }
+
+    getTotalShapeCollisions() {
+        return this.totalShapeCollisions;
+    }
+
+    restoreTotalShapeCollisions(totalShapeCollisions) {
+        if (Number.isFinite(totalShapeCollisions) && totalShapeCollisions >= 0) {
+            this.totalShapeCollisions = totalShapeCollisions;
+        }
+    }
+
     updateWallHits(amount) {
         this.wallHits += amount;
         if (this.wallHitsStack.length >= 120) {
