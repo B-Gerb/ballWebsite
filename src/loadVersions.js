@@ -376,11 +376,11 @@ function loadPrestigeTracking(server, gameState) {
         server.run.totalPointsEarned = Number.isFinite(saved.totalPointsEarned)
             ? Math.max(0, saved.totalPointsEarned)
             : 0;
-        server.prestige.lifetimePoints = Number.isFinite(saved.lifetimePoints)
+        server.prestigeStats.lifetimePoints = Number.isFinite(saved.lifetimePoints)
             ? Math.max(0, saved.lifetimePoints)
             : Math.max(0, saved.prestigePointsEarned || 0);
-        server.prestige.lastAward = Number.isFinite(saved.lastAward) ? Math.max(0, saved.lastAward) : null;
-        server.prestige.totalPrestiges = Number.isFinite(saved.totalPrestiges)
+        server.prestigeStats.lastAward = Number.isFinite(saved.lastAward) ? Math.max(0, saved.lastAward) : null;
+        server.prestigeStats.totalPrestiges = Number.isFinite(saved.totalPrestiges)
             ? Math.max(0, saved.totalPrestiges)
             : 0;
         server.circleBoard.restoreTotalShapeCollisions(

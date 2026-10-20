@@ -127,7 +127,7 @@ class Server {
         this.prestigeUpgradeShop = new prestigeShop();
         
         // Permanent prestige state and run-only state.
-        this.prestige = {
+        this.prestigeStats = {
             lifetimePoints: 0,
             lastAward: null,
             totalPrestiges: 0
@@ -826,7 +826,7 @@ class Server {
         return {
             balance: this.prestigeUpgradeShop.getBalance(),
             ...preview,
-            prestige: this.prestige,
+            prestige: this.prestigeStats,
             upgrades: this.prestigeUpgradeShop.items.map(item => ({
                 name: item.name,
                 level: item.level,
@@ -872,9 +872,9 @@ class Server {
         }
 
         this.prestigeUpgradeShop.addBalance(preview.estimatedAward);
-        this.prestige.lifetimePoints += preview.estimatedAward;
-        this.prestige.lastAward = preview.estimatedAward;
-        this.prestige.totalPrestiges += 1;
+        this.prestigeStats.lifetimePoints += preview.estimatedAward;
+        this.prestigeStats.lastAward = preview.estimatedAward;
+        this.prestigeStats.totalPrestiges += 1;
         this.resetRunState();
         this.saveGameState();
 
@@ -951,11 +951,11 @@ class Server {
             },
             prestige: {
                 points: this.prestigeUpgradeShop.getBalance(),
-                lifetimePoints: this.prestige.lifetimePoints,
-                lastAward: this.prestige.lastAward,
-                totalPrestiges: this.prestige.totalPrestiges,
+                lifetimePoints: this.prestigeStats.lifetimePoints,
+                lastAward: this.prestigeStats.lastAward,
+                totalPrestiges: this.prestigeStats.totalPrestiges,
                 totalPointsEarned: this.run.totalPointsEarned,
-                prestigePointsEarned: this.prestige.lifetimePoints,
+                prestigePointsEarned: this.prestigeStats.lifetimePoints,
                 totalCollisions: this.circleBoard.getTotalShapeCollisions(),
                 totalWallHits: this.run.totalWallHits
             },
@@ -1000,7 +1000,7 @@ class Server {
     resetGameState(seed=null) {
         this.resetRunState(seed);
         this.prestigeUpgradeShop.resetShop();
-        this.prestige = {
+        this.prestigeStats = {
             lifetimePoints: 0,
             lastAward: null,
             totalPrestiges: 0
