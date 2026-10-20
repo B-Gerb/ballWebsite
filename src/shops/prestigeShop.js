@@ -1,4 +1,10 @@
 import AShop from './AShop';
+import {
+    linearValue,
+    prestigeGainMultiplier,
+    scaledPrice,
+} from '../prestigeEquations';
+
 class prestigeShop extends AShop{
     constructor() {
         super();
@@ -7,81 +13,64 @@ class prestigeShop extends AShop{
                 name: "Unlock Square",
                 price: 10,
                 level: 0,
-                maxLevel: 1
-                
-
+                maxLevel: 1,
+                priceEquation: scaledPrice(1),
+                valueEquation: linearValue(0, 1),
+                effectKey: 'unlockSquare'
+            },
+            {
+                name: "Unlock Triangle",
+                price: 75,
+                level: 0,
+                maxLevel: 1,
+                priceEquation: scaledPrice(1),
+                valueEquation: linearValue(0, 1),
+                effectKey: 'unlockTriangle'
             },
             {
                 name: "Increase Base Circle Size",
                 price: 20,
                 level: 0,
                 maxLevel: 10,
-                equation: function(price) {
-                    if(this.level < 10) {
-                        return price + ((this.level/10)+1*price*0.4);
-                    }
-                    if(this.level < 25) {
-                        return price + ((this.level/10)+1*price*0.8);
-                    }
-                    if(this.level < 50) {
-                        return price + ((this.level/10)+1*price*1.2);
-                    }
-                    else{
-                        return price + ((this.level/10)+1*price*2);
-                    }
-                },
-                getValue: function() { return this.level*3;}
+                priceEquation: scaledPrice(1.4, 0.1),
+                valueEquation: linearValue(1, 0.1),
+                effectKey: 'circleSize'
             },
             {
                 name: "Increase Ball Speed",
                 price: 40,
                 maxLevel: 10,
                 level: 0,
-                equation: function(price) {
-                    if(this.level < 10) {
-                        return price + ((this.level/10)+1*price*0.5);
-                    }
-                    if(this.level < 25) {
-                        return price + ((this.level/10)+1*price*1);
-                    }
-                    if(this.level < 50) {
-                        return price + ((this.level/10)+1*price*1.5);
-                    }
-                    else{
-                        return price + ((this.level/10)+1*price*2.5);
-                    }
-                },
-                getValue: function() { return this.level*3;}
+                priceEquation: scaledPrice(1.5, 0.1),
+                valueEquation: linearValue(1, 2),
+                effectKey: 'shapeSpeed'
             },
             {
                 name: "Increase Ball Value",
                 price: 50,
                 maxLevel: 9,
                 level: 0,
-                equation: function(price) {
-                    return price * (2 + this.level* .5);
-                },
-                getValue: function() { return this.level;}
+                priceEquation: scaledPrice(2, 0.5),
+                valueEquation: linearValue(1, 1),
+                effectKey: 'shapeValue'
             },
             {
                 name: "Increase Click Value",
                 price: 50,
                 maxLevel: 9,
                 level: 0,
-                equation: function(price) {
-                    return price * (2 + this.level* .5);
-                },
-                getValue: function() { return this.level;}
+                priceEquation: scaledPrice(2, 0.5),
+                valueEquation: linearValue(1, 1),
+                effectKey: 'clickValue'
             },
             {
                 name: "Increase Prestige Gain",
                 price: 100,
                 maxLevel: 10,
                 level: 0,
-                equation: function(price) {
-                    return price * (2 + this.level * 0.5);
-                },
-                getValue: function() { return 1 + this.level * 0.25;}
+                priceEquation: scaledPrice(2, 0.5),
+                valueEquation: prestigeGainMultiplier,
+                effectKey: 'prestigeGain'
             },
             
 
@@ -102,6 +91,7 @@ class prestigeShop extends AShop{
         if (item) {
             if(item.maxLevel == 1){
                 //signle unlock item
+                if (item.level >= item.maxLevel) return false;
                 if (this.balance >= item.price) {
                     this.removeBalance(item.price);
                     item.level = 1;

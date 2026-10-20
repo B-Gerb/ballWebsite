@@ -139,6 +139,7 @@ class Server {
         
         // Prestige unlock states
         this.squareUnlocked = false;
+        this.triangleUnlocked = false;
         
         // FPS counter variables
         this.fpsCounter = document.getElementById('fpsCounter');
@@ -352,7 +353,7 @@ class Server {
                                 const seedInput = document.getElementById('game-seed-input');
                                 const seed = seedInput ? seedInput.value : null;
                                 
-                                this.resetGameState(seed);
+                                this.resetAllProgress(seed);
                             }
                         },
                         {
@@ -769,44 +770,48 @@ class Server {
     applyPrestigeUpgradeEffect(upgradeName) {
         const item = this.prestigeUpgradeShop.getItem(upgradeName);
         if (!item) return;
+        const value = item.valueEquation(item.level);
         
-        switch (upgradeName) {
-            case "Unlock Square":
+        switch (item.effectKey) {
+            case "unlockSquare":
                 // Enable square shapes in the game
                 this.baseUpgradeShop.addSquaresToShop();
                 this.setupShopUI();
                 console.log("Squares unlocked!");
                 break;
+
+            case "unlockTriangle":
+                this.triangleUnlocked = true;
+                break;
                 
-            case "Increase Base Circle Size":
+            case "circleSize":
             {
                 // Increase the circle board size based on item level
-                const sizeIncrease = item.level * 0.1; // 10% per level
-                this.multipliers.prestigeMultipliers.circleSize = 1 + sizeIncrease;
-                console.log(`Circle size increased by ${sizeIncrease * 100}%`);
+                this.multipliers.prestigeMultipliers.circleSize = value;
+                console.log(`Circle size increased to ${value}x`);
                 break;
             }
                 
-            case "Increase Ball Speed":
+            case "shapeSpeed":
                 // Increase ball speed multiplier based on item level
-                this.multipliers.prestigeMultipliers.shapeSpeed = 1 + (item.level * 2); // 20% per level
-                console.log(`Ball speed increased by ${item.level * 20}%`);
+                this.multipliers.prestigeMultipliers.shapeSpeed = value;
+                console.log(`Ball speed increased to ${value}x`);
                 break;
                 
-            case "Increase Ball Value":
+            case "shapeValue":
                 // Increase points from ball collisions based on item level
-                this.multipliers.prestigeMultipliers.shapeValue = 1 + item.level; // 100% per level
-                console.log(`Ball value increased by ${item.level * 100}%`);
+                this.multipliers.prestigeMultipliers.shapeValue = value;
+                console.log(`Ball value increased to ${value}x`);
                 break;
                 
-            case "Increase Click Value":
+            case "clickValue":
                 // Increase click value multiplier based on item level
-                this.multipliers.prestigeMultipliers.clickValue = 1 + item.level; // 100% per level
-                console.log(`Click value increased by ${item.level * 100}%`);
+                this.multipliers.prestigeMultipliers.clickValue = value;
+                console.log(`Click value increased to ${value}x`);
                 break;
 
-            case "Increase Prestige Gain":
-                this.multipliers.prestigeMultipliers.prestigeGain = 1 + item.level * 0.25;
+            case "prestigeGain":
+                this.multipliers.prestigeMultipliers.prestigeGain = value;
                 break;
         }
     }
@@ -832,6 +837,8 @@ class Server {
                 level: item.level,
                 maxLevel: item.maxLevel,
                 price: item.price,
+                valueEquation: item.valueEquation,
+                effectKey: item.effectKey,
                 canAfford: this.prestigeUpgradeShop.getBalance() >= item.price
             }))
         };
@@ -959,7 +966,7 @@ class Server {
                 totalCollisions: this.circleBoard.getTotalShapeCollisions(),
                 totalWallHits: this.run.totalWallHits
             },
-            version: '0.0.6',
+            version: '0.0.7',
             seed: this.seed,
         };
         
@@ -997,15 +1004,15 @@ class Server {
         }
     }
     
-    resetGameState(seed=null) {
-        this.resetRunState(seed);
+    // Reset the complete account, including permanent prestige progress.
+    resetAllProgress(seed=null) {
         this.prestigeUpgradeShop.resetShop();
         this.prestigeStats = {
             lifetimePoints: 0,
             lastAward: null,
             totalPrestiges: 0
         };
-        this.prestigeUpgradeShop.addBalance(0);
+        this.resetRunState(seed);
         this.saveGameState();
     }
 
@@ -1015,7 +1022,6 @@ class Server {
         this.stopGame();
         
         // Reset CircleBoard
-        localStorage.removeItem('circleBoardGameState');
         const canvas = this.circleBoard.canvas;
         this.circleBoard = new CircleBoard(canvas);
         if (!seed){
@@ -1026,6 +1032,7 @@ class Server {
         }
         this.baseUpgradeShop.resetShop();
         this.clickShop.resetShop();
+        this.triangleUnlocked = false;
         this.multipliers = {
             prestigeMultipliers: {
                 clickValue: 1,
@@ -1070,8 +1077,9 @@ class Server {
         };
         this.temporaryMultipliersActiveFrames = {};
         if (this.clickerObject) {
-            this.clickerOjbect = new ClickerObject(this.elements.clickerCanvas);
+            this.clickerObject.clickCount = 0;
         }
+        this.clickerValue = 1;
         // Initialize the CircleBoard
         this.circleBoard.initialize(this.seed);
         this.circleBoard.setSeed(this.seed);

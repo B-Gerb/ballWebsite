@@ -29,7 +29,7 @@
  *   requires    [] | ['other-id'] | [{ id: 'other-id', level: 3 }]
  *               A bare string means "at least level 1".
  *   description one line shown in the detail panel
- *   effect      (level) => string, the bonus at that level (optional)
+ *   effectKey   key used by the matching shop item to format its effect
  */
 
 export const BRANCHES = {
@@ -50,7 +50,19 @@ export const PRESTIGE_NODES = [
     row: 0,
     requires: [],
     description: 'Unlocks square shapes in the shop so they can be spawned on the board.',
-    effect: (level) => (level > 0 ? 'Squares available' : 'Squares locked'),
+    effectKey: 'unlockSquare',
+  },
+  {
+    id: 'unlock-triangle',
+    item: 'Unlock Triangle',
+    label: 'Unlock Triangle',
+    icon: '🔺',
+    branch: 'core',
+    col: 2,
+    row: 0,
+    requires: [],
+    description: 'Unlocks the triangle route in the prestige tree.',
+    effectKey: 'unlockTriangle',
   },
   {
     id: 'increase-circle-size',
@@ -62,7 +74,7 @@ export const PRESTIGE_NODES = [
     row: 0,
     requires: [],
     description: 'Grows the container circle so more shapes fit and travel further.',
-    effect: (level) => `×${(1 + level * 0.1).toFixed(2)} arena size`,
+    effectKey: 'circleSize',
   },
   {
     id: 'increase-ball-speed',
@@ -74,7 +86,7 @@ export const PRESTIGE_NODES = [
     row: 1,
     requires: ['unlock-square'],
     description: 'Every shape moves faster, so collisions — and points — come in quicker.',
-    effect: (level) => `×${1 + level * 2} shape speed`,
+    effectKey: 'shapeSpeed',
   },
   {
     id: 'increase-ball-value',
@@ -86,7 +98,7 @@ export const PRESTIGE_NODES = [
     row: 1,
     requires: ['increase-circle-size'],
     description: 'Each collision is worth more points.',
-    effect: (level) => `×${1 + level} collision value`,
+    effectKey: 'shapeValue',
   },
   {
     id: 'increase-click-value',
@@ -98,7 +110,7 @@ export const PRESTIGE_NODES = [
     row: 2,
     requires: ['increase-ball-speed'],
     description: 'Each click on the clicker canvas is worth more points.',
-    effect: (level) => `×${1 + level} click value`,
+    effectKey: 'clickValue',
   },
   {
     id: 'increase-prestige-gain',
@@ -106,11 +118,11 @@ export const PRESTIGE_NODES = [
     label: 'Prestige Gain',
     icon: '✨',
     branch: 'core',
-    col: 2,
+    col: 3,
     row: 2,
-    requires: ['increase-ball-value'],
+    requires: ['increase-ball-value', 'unlock-triangle'],
     description: 'Increases future prestige awards without changing points already earned.',
-    effect: (level) => `×${(1 + level * 0.25).toFixed(2)} prestige gain`,
+    effectKey: 'prestigeGain',
   },
 ];
 

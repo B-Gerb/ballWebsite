@@ -1,5 +1,34 @@
 export const MINIMUM_RUN_POINTS = 1000;
 
+export const linearValue = (base, perLevel) => (level) =>
+    base + level * perLevel;
+
+export const scaledPrice = (multiplier, additive = 0) => (currentPrice, level) =>
+    currentPrice * multiplier + level * additive;
+
+export const prestigeGainMultiplier = linearValue(1, 0.25);
+
+export const describePrestigeEffect = (effectKey, value) => {
+    switch (effectKey) {
+        case 'unlockSquare':
+            return value > 0 ? 'Squares available' : 'Squares locked';
+        case 'unlockTriangle':
+            return value > 0 ? 'Triangle route available' : 'Triangle route locked';
+        case 'circleSize':
+            return `×${value.toFixed(2)} arena size`;
+        case 'shapeSpeed':
+            return `×${value} shape speed`;
+        case 'shapeValue':
+            return `×${value} collision value`;
+        case 'clickValue':
+            return `×${value} click value`;
+        case 'prestigeGain':
+            return `×${value.toFixed(2)} prestige gain`;
+        default:
+            return String(value);
+    }
+};
+
 const nonNegativeFinite = (value) => (
     Number.isFinite(value) && value > 0 ? value : 0
 );

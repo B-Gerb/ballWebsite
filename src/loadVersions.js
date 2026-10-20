@@ -12,8 +12,17 @@ const versionLoaders = {
     '0.0.3': load0_0_3,
     '0.0.4': load0_0_4,
     '0.0.5': load0_0_5,
-    '0.0.6': load0_0_6
+    '0.0.6': load0_0_6,
+    '0.0.7': load0_0_7
 };
+
+function nonNegativeFinite(value, fallback = 0) {
+    return Number.isFinite(value) ? Math.max(0, value) : fallback;
+}
+
+function nonNegativeInteger(value, fallback = 0) {
+    return Number.isFinite(value) ? Math.max(0, Math.floor(value)) : fallback;
+}
 
 /**
  * Main load function - entry point for loading saved game state
@@ -34,7 +43,7 @@ function load(server) {
         const gameState = JSON.parse(savedState);
         
         if (!gameState.version) {
-             loadPreVersion(server, gameState);
+            return loadPreVersion(server, gameState);
         }
 
         const versionLoader = versionLoaders[gameState.version];
@@ -219,7 +228,7 @@ function loadbaseUpgradeShop(server, gameState) {
     if (!gameState.baseUpgradeShop) return;
     
     const { baseUpgradeShop } = gameState;
-    server.baseUpgradeShop.balance = baseUpgradeShop.balance || 0;
+    server.baseUpgradeShop.balance = nonNegativeFinite(baseUpgradeShop.balance);
     
     if (!baseUpgradeShop.items) return;
     
@@ -242,8 +251,8 @@ function loadLegacyShopItems(server, items) {
         for (const category in server.baseUpgradeShop.items) {
             const item = server.baseUpgradeShop.items[category].find(i => i.name === savedItem.name);
             if (item) {
-                item.price = savedItem.price;
-                item.level = savedItem.level;
+                item.price = nonNegativeFinite(savedItem.price, item.price);
+                item.level = nonNegativeInteger(savedItem.level);
                 break;
             }
         }
@@ -266,8 +275,8 @@ function loadCategorizedShopItems(server, items) {
             items[category].forEach(savedItem => {
                 const item = server.baseUpgradeShop.items[category].find(i => i.name === savedItem.name);
                 if (item) {
-                    item.price = savedItem.price;
-                    item.level = savedItem.level;
+                    item.price = nonNegativeFinite(savedItem.price, item.price);
+                    item.level = nonNegativeInteger(savedItem.level);
                 }
             });
         }
@@ -283,14 +292,14 @@ function loadclickShop(server, gameState) {
     if (!gameState.clickShop) return;
     
     const { clickShop } = gameState;
-    server.clickShop.balance = clickShop.balance || 0;
+    server.clickShop.balance = nonNegativeFinite(clickShop.balance);
     
     if (clickShop.items && Array.isArray(clickShop.items)) {
         clickShop.items.forEach(savedItem => {
             const item = server.clickShop.getItem(savedItem.name);
             if (item) {
-                item.price = savedItem.price;
-                item.level = savedItem.level;
+                item.price = nonNegativeFinite(savedItem.price, item.price);
+                item.level = nonNegativeInteger(savedItem.level);
                 
                 // Special handling for click value
                 if (savedItem.name === "Increase Click Value") {
@@ -348,14 +357,18 @@ function loadPrestigeShop(server, gameState) {
 
     
     const { prestigeShop } = gameState;
-    server.prestigeUpgradeShop.balance = prestigeShop.balance || 0;
+    server.prestigeUpgradeShop.balance = nonNegativeFinite(prestigeShop.balance);
     
     if (prestigeShop.items && Array.isArray(prestigeShop.items)) {
         prestigeShop.items.forEach(savedItem => {
             const item = server.prestigeUpgradeShop.items.find(i => i.name === savedItem.name);
             if (item) {
-                item.level = savedItem.level;
-                item.price = savedItem.price;
+                const maxLevel = Number.isFinite(item.maxLevel) ? item.maxLevel : Infinity;
+                item.level = Math.min(
+                    maxLevel,
+                    nonNegativeInteger(savedItem.level)
+                );
+                item.price = nonNegativeFinite(savedItem.price, item.price);
                 // Note: dependencies are typically static, but we could restore them if needed
                 if (savedItem.dependencies) {
                     item.dependencies = savedItem.dependencies;
@@ -373,22 +386,19 @@ function loadPrestigeShop(server, gameState) {
 function loadPrestigeTracking(server, gameState) {
     if (gameState.prestige) {
         const saved = gameState.prestige;
-        server.run.totalPointsEarned = Number.isFinite(saved.totalPointsEarned)
-            ? Math.max(0, saved.totalPointsEarned)
-            : 0;
-        server.prestigeStats.lifetimePoints = Number.isFinite(saved.lifetimePoints)
-            ? Math.max(0, saved.lifetimePoints)
-            : Math.max(0, saved.prestigePointsEarned || 0);
-        server.prestigeStats.lastAward = Number.isFinite(saved.lastAward) ? Math.max(0, saved.lastAward) : null;
-        server.prestigeStats.totalPrestiges = Number.isFinite(saved.totalPrestiges)
-            ? Math.max(0, saved.totalPrestiges)
-            : 0;
-        server.circleBoard.restoreTotalShapeCollisions(
-            Number.isFinite(saved.totalCollisions) ? Math.max(0, saved.totalCollisions) : 0
+        server.run.totalPointsEarned = nonNegativeFinite(saved.totalPointsEarned);
+        server.prestigeStats.lifetimePoints = nonNegativeFinite(
+            saved.lifetimePoints,
+            nonNegativeFinite(saved.prestigePointsEarned)
         );
-        server.run.totalWallHits = Number.isFinite(saved.totalWallHits)
-            ? Math.max(0, saved.totalWallHits)
-            : 0;
+        server.prestigeStats.lastAward = Number.isFinite(saved.lastAward)
+            ? Math.max(0, saved.lastAward)
+            : null;
+        server.prestigeStats.totalPrestiges = nonNegativeInteger(saved.totalPrestiges);
+        server.circleBoard.restoreTotalShapeCollisions(
+            nonNegativeFinite(saved.totalCollisions)
+        );
+        server.run.totalWallHits = nonNegativeFinite(saved.totalWallHits);
     }
 }
 
@@ -503,19 +513,23 @@ function load0_0_6(server, gameState) {
     return load0_0_5(server, gameState);
 }
 
+function load0_0_7(server, gameState) {
+    return load0_0_5(server, gameState);
+}
+
 function loadPreVersion(server, gameState) {
     boardLoad(server, gameState);
     
     // Load legacy shop format
     if (gameState.shop) {
-        server.baseUpgradeShop.balance = gameState.shop.balance || 0;
+        server.baseUpgradeShop.balance = nonNegativeFinite(gameState.shop.balance);
         
         if (gameState.shop.items && Array.isArray(gameState.shop.items)) {
             gameState.shop.items.forEach(savedItem => {
                 const item = server.baseUpgradeShop.getItem(savedItem.name)[0];
                 if (item) {
-                    item.price = savedItem.price;
-                    item.level = savedItem.level;
+                    item.price = nonNegativeFinite(savedItem.price, item.price);
+                    item.level = nonNegativeInteger(savedItem.level);
                 }
             });
         }

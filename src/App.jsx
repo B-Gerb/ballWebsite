@@ -7,6 +7,7 @@ function App() {
   const canvasRef = useRef(null);
   const clickerCanvasRef = useRef(null); // Add ref for clicker canvas
   const [, setCount] = useState(0);
+  const [prestigeData, setPrestigeData] = useState(null);
   const [isPrestigePopupOpen, setIsPrestigePopupOpen] = useState(false);
   const initialized = useRef(false);
   const serverRef = useRef(null); // Store server instance
@@ -18,12 +19,25 @@ function App() {
       initialized.current = true; // Set initialized to true to prevent re-initialization
       const server = Server.startGame(canvasRef.current, clickerCanvasRef.current);
       serverRef.current = server; // Store server reference
+      setPrestigeData(server.getPrestigeShopData());
       // Optionally store server in state/ref if you need to interact with it later
       return () => {
         // Cleanup if needed when component unmounts
         // e.g., server.stopGame();
       };
     }
+  }, []);
+
+  useEffect(() => {
+    const refreshPrestigeData = () => {
+      const server = serverRef.current;
+      if (server) {
+        setPrestigeData(server.getPrestigeShopData());
+      }
+    };
+
+    const refreshInterval = window.setInterval(refreshPrestigeData, 250);
+    return () => window.clearInterval(refreshInterval);
   }, []);
 
   // Handler functions for prestige popup
@@ -41,6 +55,7 @@ function App() {
       if (success) {
         // Force re-render so the prestige tree picks up the new level/price
         setCount(prev => prev + 1);
+        setPrestigeData(serverRef.current.getPrestigeShopData());
       }
       return success;
     }
@@ -63,14 +78,14 @@ function App() {
     const result = server.prestige();
     if (result.success) {
       setCount(prev => prev + 1);
+      setPrestigeData(server.getPrestigeShopData());
       window.alert(`Prestige complete! You earned ${result.awarded} prestige points.`);
       return true;
     }
+    setPrestigeData(server.getPrestigeShopData());
     window.alert(result.reason);
     return false;
   };
-
-  const prestigeData = serverRef.current?.getPrestigeShopData();
 
   return (
     <div>

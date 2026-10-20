@@ -20,11 +20,16 @@ class AShop {
         let currentPrice = item.price;
         for (let i = 0; i < amount; ++i) {
             cost += currentPrice;
-            currentPrice = item.equation(currentPrice);
+            const priceEquation = item.priceEquation ?? ((price) => item.equation(price));
+            currentPrice = priceEquation(currentPrice, item.level + i);
         }
         return [cost, currentPrice];
     }
     buyItem(item, amount = 1) {
+        if (!Number.isInteger(amount) || amount < 1 ||
+            (item.maxLevel != null && item.level + amount > item.maxLevel)) {
+            return false;
+        }
         const [cost, newPrice] = this.itemCost(item, amount);
         if (this.balance >= cost) {
             this.removeBalance(cost);

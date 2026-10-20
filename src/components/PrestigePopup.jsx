@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { BRANCHES, LAYOUT, buildTree, edgePath } from '../data/prestigeTree';
+import { describePrestigeEffect } from '../prestigeEquations';
 import './PrestigePopup.css';
 
 const MIN_ZOOM = 0.35;
@@ -346,7 +347,8 @@ const PrestigePopup = ({ isOpen, onClose, prestigeShop, onPurchase, onPrestige }
         </header>
 
         <section className="pt-summary" aria-label="Prestige preview">
-          <div><span>Available now</span><strong>{formatNumber(prestigeShop?.estimatedAward)}</strong></div>
+          <div><span>Prestige points</span><strong>{formatNumber(balance)}</strong></div>
+          <div><span>Estimated award</span><strong>{formatNumber(prestigeShop?.estimatedAward)}</strong></div>
           <div><span>Run points</span><strong>{formatNumber(prestigeShop?.totalPointsEarned)}</strong></div>
           <div><span>Collisions</span><strong>{formatNumber(prestigeShop?.totalCollisions)}</strong></div>
           <div><span>Collision multiplier</span><strong>×{formatNumber(prestigeShop?.collisionMultiplier)}</strong></div>
@@ -516,17 +518,23 @@ const PrestigePopup = ({ isOpen, onClose, prestigeShop, onPurchase, onPrestige }
                   </div>
                 )}
 
-                {selected.node.effect && (
+                {selected.item.valueEquation && (
                   <dl className="pt-effects">
                     <div>
                       <dt>Now</dt>
-                      <dd>{selected.node.effect(selected.item.level)}</dd>
+                      <dd>{describePrestigeEffect(
+                        selected.item.effectKey,
+                        selected.item.valueEquation(selected.item.level),
+                      )}</dd>
                     </div>
                     {!selected.maxed && (
                       <div>
                         <dt>Next</dt>
                         <dd className="pt-effect-next">
-                          {selected.node.effect(selected.item.level + 1)}
+                          {describePrestigeEffect(
+                            selected.item.effectKey,
+                            selected.item.valueEquation(selected.item.level + 1),
+                          )}
                         </dd>
                       </div>
                     )}
