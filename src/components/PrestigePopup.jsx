@@ -20,7 +20,7 @@ const formatNumber = (value) => {
 
 const branchOf = (node) => BRANCHES[node.branch] ?? { label: 'Upgrade', color: '#94a3b8' };
 
-const PrestigePopup = ({ isOpen, onClose, prestigeShop, onPurchase }) => {
+const PrestigePopup = ({ isOpen, onClose, prestigeShop, onPurchase, onPrestige }) => {
   const tree = useMemo(() => buildTree(), []);
   const [selectedId, setSelectedId] = useState(null);
   const [view, setView] = useState({ x: 0, y: 0, zoom: 1 });
@@ -344,6 +344,21 @@ const PrestigePopup = ({ isOpen, onClose, prestigeShop, onPurchase }) => {
             </button>
           </div>
         </header>
+
+        <section className="pt-summary" aria-label="Prestige preview">
+          <div><span>Available now</span><strong>{formatNumber(prestigeShop?.estimatedAward)}</strong></div>
+          <div><span>Run points</span><strong>{formatNumber(prestigeShop?.totalPointsEarned)}</strong></div>
+          <div><span>Collisions</span><strong>{formatNumber(prestigeShop?.totalCollisions)}</strong></div>
+          <div><span>Collision multiplier</span><strong>×{formatNumber(prestigeShop?.collisionMultiplier)}</strong></div>
+          <div><span>Minimum run</span><strong>{formatNumber(prestigeShop?.minimumRunPoints)}</strong></div>
+          <button
+            className="pt-prestige-button"
+            onClick={onPrestige}
+            disabled={!prestigeShop?.canPrestige}
+          >
+            {prestigeShop?.canPrestige ? 'Prestige now' : 'Not ready'}
+          </button>
+        </section>
 
         <div className="pt-body">
           <div className="pt-tree">

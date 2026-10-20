@@ -6,7 +6,7 @@ import './App.css';
 function App() {
   const canvasRef = useRef(null);
   const clickerCanvasRef = useRef(null); // Add ref for clicker canvas
-  const [count, setCount] = useState(0);
+  const [, setCount] = useState(0);
   const [isPrestigePopupOpen, setIsPrestigePopupOpen] = useState(false);
   const initialized = useRef(false);
   const serverRef = useRef(null); // Store server instance
@@ -47,6 +47,31 @@ function App() {
     return false;
   };
 
+  const handlePrestige = () => {
+    const server = serverRef.current;
+    if (!server) return false;
+    const preview = server.calculatePrestigePreview();
+    if (!preview.canPrestige) {
+      window.alert(`Cannot prestige: earn at least ${preview.minimumRunPoints} run points first.`);
+      return false;
+    }
+    const confirmed = window.confirm(
+      `Prestige for ${preview.estimatedAward} points?\n\nRun points, shapes, and shop progress will reset. Permanent prestige upgrades remain.`
+    );
+    if (!confirmed) return false;
+
+    const result = server.prestige();
+    if (result.success) {
+      setCount(prev => prev + 1);
+      window.alert(`Prestige complete! You earned ${result.awarded} prestige points.`);
+      return true;
+    }
+    window.alert(result.reason);
+    return false;
+  };
+
+  const prestigeData = serverRef.current?.getPrestigeShopData();
+
   return (
     <div>
       <h1>Bouncing Balls Inside Circle</h1>
@@ -75,6 +100,14 @@ function App() {
         <button id="pauseButton">Pause</button>
         <button id="saveButton">Save</button>
         <button id="resetButton">Reset</button>
+        <button
+          onClick={handlePrestige}
+          className="prestige-button"
+          disabled={!prestigeData?.canPrestige}
+          title={prestigeData?.canPrestige ? 'Convert this run into prestige points' : 'Earn more run points to prestige'}
+        >
+          Prestige
+        </button>
         <button onClick={handleOpenPrestigeShop} className="prestige-button">
           Prestige Shop
         </button>
@@ -85,8 +118,9 @@ function App() {
         <PrestigePopup 
           isOpen={isPrestigePopupOpen}
           onClose={handleClosePrestigeShop}
-          prestigeShop={serverRef.current.getPrestigeShopData()}
+          prestigeShop={prestigeData}
           onPurchase={handlePrestigePurchase}
+          onPrestige={handlePrestige}
         />
       )}
     </div>

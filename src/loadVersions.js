@@ -11,7 +11,8 @@ const versionLoaders = {
     '0.0.2': load0_0_2,
     '0.0.3': load0_0_3,
     '0.0.4': load0_0_4,
-    '0.0.5': load0_0_5
+    '0.0.5': load0_0_5,
+    '0.0.6': load0_0_6
 };
 
 /**
@@ -371,8 +372,23 @@ function loadPrestigeShop(server, gameState) {
  */
 function loadPrestigeTracking(server, gameState) {
     if (gameState.prestige) {
-        server.totalPointsEarned = gameState.prestige.totalPointsEarned || 0;
-        server.prestigePointsEarned = gameState.prestige.prestigePointsEarned || 0;
+        const saved = gameState.prestige;
+        server.run.totalPointsEarned = Number.isFinite(saved.totalPointsEarned)
+            ? Math.max(0, saved.totalPointsEarned)
+            : 0;
+        server.prestige.lifetimePoints = Number.isFinite(saved.lifetimePoints)
+            ? Math.max(0, saved.lifetimePoints)
+            : Math.max(0, saved.prestigePointsEarned || 0);
+        server.prestige.lastAward = Number.isFinite(saved.lastAward) ? Math.max(0, saved.lastAward) : null;
+        server.prestige.totalPrestiges = Number.isFinite(saved.totalPrestiges)
+            ? Math.max(0, saved.totalPrestiges)
+            : 0;
+        server.run.totalCollisions = Number.isFinite(saved.totalCollisions)
+            ? Math.max(0, saved.totalCollisions)
+            : 0;
+        server.run.totalWallHits = Number.isFinite(saved.totalWallHits)
+            ? Math.max(0, saved.totalWallHits)
+            : 0;
     }
 }
 
@@ -469,6 +485,7 @@ function load0_0_5(server, gameState) {
         loadclickShop(server, gameState.shops);
         loadPrestigeShop(server, gameState.shops);
     }
+
     loadSeed(server, gameState);
     loadClicker(server, gameState);
     loadMultipliers(server, gameState);
@@ -480,6 +497,10 @@ function load0_0_5(server, gameState) {
     server.updateBalanceDisplay();
     server.setupShopUI();
     return true;
+}
+
+function load0_0_6(server, gameState) {
+    return load0_0_5(server, gameState);
 }
 
 function loadPreVersion(server, gameState) {

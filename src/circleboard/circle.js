@@ -48,10 +48,7 @@ class Circle {
             baseRadius: this.baseRadius
         };
     }
-    static create(x, y, radius, color, dx, dy) {
-        return new Circle(x, y, radius, color, dx, dy);
-    }
-    static create(x, y, radius, color, dx, dy, baseRadius) {
+    static create(x, y, radius, color, dx, dy, baseRadius = radius) {
         const circle = new Circle(x, y, radius, color, dx, dy);
         circle.baseRadius = baseRadius;
         return circle;

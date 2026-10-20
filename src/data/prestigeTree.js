@@ -100,6 +100,18 @@ export const PRESTIGE_NODES = [
     description: 'Each click on the clicker canvas is worth more points.',
     effect: (level) => `×${1 + level} click value`,
   },
+  {
+    id: 'increase-prestige-gain',
+    item: 'Increase Prestige Gain',
+    label: 'Prestige Gain',
+    icon: '✨',
+    branch: 'core',
+    col: 2,
+    row: 2,
+    requires: ['increase-ball-value'],
+    description: 'Increases future prestige awards without changing points already earned.',
+    effect: (level) => `×${(1 + level * 0.25).toFixed(2)} prestige gain`,
+  },
 ];
 
 /*

@@ -29,7 +29,7 @@ class Square {
         
         ctx.restore();
     }
-    axes(shape){
+    axes(){
 
         const setAxises = new Set();
         const radians = (this.rotation * Math.PI) / 180;
@@ -84,11 +84,7 @@ class Square {
             color: this.color,
         };
     }
-    static create(x, y, side, rotation, color, dx, dy) {
-       
-        return new Square(x, y, side, rotation, color, dx, dy);
-    }
-    static create(x, y, side, rotation, color, dx, dy, baseSide) {
+    static create(x, y, side, rotation, color, dx, dy, baseSide = side) {
         const square = new Square(x, y, side, rotation, color, dx, dy);
         square.baseSide = baseSide;
         return square;

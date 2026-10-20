@@ -6,6 +6,7 @@ import baseUpgradeShop from './shops/baseUpgradeShop';
 import clickShop from './shops/clickShop';
 import prestigeShop from './shops/prestigeShop';
 import ClickerObject from './clicking/ClickerObject';
+import { PRESTIGE_EQUATIONS } from './prestigeEquations';
 
 // TODO: Import or define dependencies like CircleBoard, baseUpgradeShop, clickShop, prestigeShop, ClickerObject, etc.
 
@@ -125,18 +126,20 @@ class Server {
         this.clickShop = new clickShop();
         this.prestigeUpgradeShop = new prestigeShop();
         
-        // Prestige tracking
-        this.totalPointsEarned = 0;
-        this.prestigePointsEarned = 0;
-        
-        // Give some initial prestige points for testing
-        this.prestigeUpgradeShop.addBalance(100);
+        // Permanent prestige state and run-only state.
+        this.prestige = {
+            lifetimePoints: 0,
+            lastAward: null,
+            totalPrestiges: 0
+        };
+        this.run = {
+            totalPointsEarned: 0,
+            totalCollisions: 0,
+            totalWallHits: 0
+        };
         
         // Prestige unlock states
         this.squareUnlocked = false;
-        
-        // Apply any existing prestige upgrades
-        this.applyAllPrestigeUpgrades();
         
         // FPS counter variables
         this.fpsCounter = document.getElementById('fpsCounter');
@@ -155,6 +158,7 @@ class Server {
                 shapeValue: 1,
                 shapeSpeed: 1,
                 circleSize: 1,
+                prestigeGain: 1,
                 shapes: {
                     circle: {
                         speed: 1,
@@ -190,6 +194,7 @@ class Server {
                 }
             }
         };
+        this.applyAllPrestigeUpgrades();
         this.temporaryMultipliersActiveFrames = {};
 
         // DOM elements
@@ -521,7 +526,7 @@ class Server {
                 button.dataset.shopCategory = shopName;
                 
                 button.addEventListener('click', () => {
-                    const success = this.buyItemBShop(item.name);
+                    this.buyItemBShop(item.name);
                     const levelSpan = button.querySelector(`#${item.name.replace(/\s+/g, '-')}-level`);
                     const costSpan = button.querySelector(`#${item.name.replace(/\s+/g, '-')}-cost`);
                     
@@ -775,11 +780,13 @@ class Server {
                 break;
                 
             case "Increase Base Circle Size":
+            {
                 // Increase the circle board size based on item level
                 const sizeIncrease = item.level * 0.1; // 10% per level
                 this.multipliers.prestigeMultipliers.circleSize = 1 + sizeIncrease;
                 console.log(`Circle size increased by ${sizeIncrease * 100}%`);
                 break;
+            }
                 
             case "Increase Ball Speed":
                 // Increase ball speed multiplier based on item level
@@ -798,6 +805,10 @@ class Server {
                 this.multipliers.prestigeMultipliers.clickValue = 1 + item.level; // 100% per level
                 console.log(`Click value increased by ${item.level * 100}%`);
                 break;
+
+            case "Increase Prestige Gain":
+                this.multipliers.prestigeMultipliers.prestigeGain = 1 + item.level * 0.25;
+                break;
         }
     }
 
@@ -812,8 +823,11 @@ class Server {
 
     // Get prestige shop data for UI (compatible with PrestigePopup)
     getPrestigeShopData() {
+        const preview = this.calculatePrestigePreview();
         return {
             balance: this.prestigeUpgradeShop.getBalance(),
+            ...preview,
+            prestige: this.prestige,
             upgrades: this.prestigeUpgradeShop.items.map(item => ({
                 name: item.name,
                 level: item.level,
@@ -821,6 +835,54 @@ class Server {
                 price: item.price,
                 canAfford: this.prestigeUpgradeShop.getBalance() >= item.price
             }))
+        };
+    }
+
+    calculatePrestigePreview() {
+        const totalPointsEarned = this.run.totalPointsEarned;
+        const totalCollisions = this.run.totalCollisions;
+        const basePrestigePoints = PRESTIGE_EQUATIONS.basePoints(totalPointsEarned);
+        const collisionMultiplier = PRESTIGE_EQUATIONS.collisionMultiplier(totalCollisions);
+        const prestigeUpgradeMultiplier = this.multipliers.prestigeMultipliers.prestigeGain || 1;
+        const estimatedAward = PRESTIGE_EQUATIONS.finalAward(
+            totalPointsEarned,
+            totalCollisions,
+            prestigeUpgradeMultiplier
+        );
+
+        return {
+            totalPointsEarned,
+            totalCollisions,
+            basePrestigePoints,
+            collisionMultiplier,
+            prestigeUpgradeMultiplier,
+            estimatedAward,
+            minimumRunPoints: PRESTIGE_EQUATIONS.minimumRunPoints,
+            canPrestige: totalPointsEarned >= PRESTIGE_EQUATIONS.minimumRunPoints && estimatedAward > 0
+        };
+    }
+
+    prestige() {
+        const preview = this.calculatePrestigePreview();
+        if (!preview.canPrestige) {
+            return {
+                success: false,
+                reason: `Earn at least ${PRESTIGE_EQUATIONS.minimumRunPoints} run points before prestiging.`,
+                ...preview
+            };
+        }
+
+        this.prestigeUpgradeShop.addBalance(preview.estimatedAward);
+        this.prestige.lifetimePoints += preview.estimatedAward;
+        this.prestige.lastAward = preview.estimatedAward;
+        this.prestige.totalPrestiges += 1;
+        this.resetRunState();
+        this.saveGameState();
+
+        return {
+            success: true,
+            awarded: preview.estimatedAward,
+            ...this.calculatePrestigePreview()
         };
     }
     
@@ -889,10 +951,16 @@ class Server {
                 clickCount: this.clickerObject ? this.clickerObject.clickCount : 0
             },
             prestige: {
-                totalPointsEarned: this.totalPointsEarned,
-                prestigePointsEarned: this.prestigePointsEarned
+                points: this.prestigeUpgradeShop.getBalance(),
+                lifetimePoints: this.prestige.lifetimePoints,
+                lastAward: this.prestige.lastAward,
+                totalPrestiges: this.prestige.totalPrestiges,
+                totalPointsEarned: this.run.totalPointsEarned,
+                prestigePointsEarned: this.prestige.lifetimePoints,
+                totalCollisions: this.run.totalCollisions,
+                totalWallHits: this.run.totalWallHits
             },
-            version: '0.0.5', // Increment version number for prestigeShop support
+            version: '0.0.6',
             seed: this.seed,
         };
         
@@ -909,7 +977,6 @@ class Server {
                 return false;
             }
             let success = loadVersions.load(this);
-            this.prestigeUpgradeShop.addBalance(100);
 
             this.handleResize();
             if (!success) {
@@ -931,8 +998,20 @@ class Server {
         }
     }
     
-    // Reset the game state
     resetGameState(seed=null) {
+        this.resetRunState(seed);
+        this.prestigeUpgradeShop.resetShop();
+        this.prestige = {
+            lifetimePoints: 0,
+            lastAward: null,
+            totalPrestiges: 0
+        };
+        this.prestigeUpgradeShop.addBalance(0);
+        this.saveGameState();
+    }
+
+    // Reset run progress while retaining permanent prestige upgrades and points.
+    resetRunState(seed=null) {
         // Stop existing loops
         this.stopGame();
         
@@ -948,14 +1027,13 @@ class Server {
         }
         this.baseUpgradeShop.resetShop();
         this.clickShop.resetShop();
-        this.prestigeUpgradeShop.resetShop();
-        this.prestigeUpgradeShop.addBalance(100000);
-
         this.multipliers = {
             prestigeMultipliers: {
                 clickValue: 1,
                 shapeValue: 1,
                 shapeSpeed: 1,
+                circleSize: 1,
+                prestigeGain: 1,
                 shapes: {
                     circle: {
                         speed: 1,
@@ -999,6 +1077,12 @@ class Server {
         this.circleBoard.initialize(this.seed);
         this.circleBoard.setSeed(this.seed);
         this.clickerObject.setSeed(this.seed);
+        this.run = {
+            totalPointsEarned: 0,
+            totalCollisions: 0,
+            totalWallHits: 0
+        };
+        this.applyAllPrestigeUpgrades();
         // Update displays
         this.updateBalanceDisplay();
         this.setupShopUI();
@@ -1013,16 +1097,10 @@ class Server {
         console.log('Game state reset successfully');
     }
     
-    // Method to add points and check for prestige point earning
+    // Add normal points to the current run.
     addPointsAndCheckPrestige(points) {
-        this.totalPointsEarned += points;
-        
-        // Give prestige points every 1000 total points earned
-        const prestigePointsToGive = Math.floor(this.totalPointsEarned / 1000) - this.prestigePointsEarned;
-        if (prestigePointsToGive > 0) {
-            this.prestigeUpgradeShop.addBalance(prestigePointsToGive);
-            this.prestigePointsEarned += prestigePointsToGive;
-        }
+        if (!Number.isFinite(points) || points <= 0) return;
+        this.run.totalPointsEarned += points;
     }
     
     startGame() {
@@ -1079,7 +1157,7 @@ class Server {
                     const speedMultipliers = {};
                                         let subIntervals = 8;
                     if( this.circleBoard.shapes.length > 450){
-                        subIntervals = subIntervals- Math.min(5, round(this.circleBoard.shapes.length - 500) / 35)
+                        subIntervals = subIntervals - Math.min(5, Math.round(this.circleBoard.shapes.length - 500) / 35)
 
                     }
                     for (const shape of this.circleBoard.shapes) {
@@ -1099,6 +1177,8 @@ class Server {
                         const stats = this.circleBoard.updatePhysics(speedMultipliers);
 
                         // Update balances based on shape collisions
+                        this.run.totalCollisions += stats.total.totalShapeCollisions;
+                        this.run.totalWallHits += stats.total.totalWallHits;
                         for (const [shapeType, shapeStats] of Object.entries(stats)) {
                             if(shapeType === 'total') continue;
                             const shapeName = shapeType.toLowerCase();
@@ -1110,15 +1190,19 @@ class Server {
                                                     this.multipliers.temporaryMultipliers.shapes[shapeName].value;
                             switch (shapeType) {
                                 case 'Circle':
+                                {
                                     const wallHitPoints = shapeStats.totalWallHits * totalValueMultiplier;
                                     this.baseUpgradeShop.addBalance(wallHitPoints);
                                     this.addPointsAndCheckPrestige(wallHitPoints);
                                     break;
+                                }
                                 case 'Square':
+                                {
                                     const collisionPoints = shapeStats.totalShapeCollisions * totalValueMultiplier;
                                     this.baseUpgradeShop.addBalance(collisionPoints);
                                     this.addPointsAndCheckPrestige(collisionPoints);
                                     break;
+                                }
                             }
                         }
                     }

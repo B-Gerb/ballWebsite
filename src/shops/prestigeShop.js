@@ -73,6 +73,16 @@ class prestigeShop extends AShop{
                 },
                 getValue: function() { return this.level;}
             },
+            {
+                name: "Increase Prestige Gain",
+                price: 100,
+                maxLevel: 10,
+                level: 0,
+                equation: function(price) {
+                    return price * (2 + this.level * 0.5);
+                },
+                getValue: function() { return 1 + this.level * 0.25;}
+            },
             
 
         ];
