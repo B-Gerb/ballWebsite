@@ -20,7 +20,7 @@ function popUps(contents, isClass = false, spot, backDrop = true) {
                 
         const message = document.createElement('p');
         message.textContent = contents.message;
-        message.style.fontSize = '16px';
+        message.style.fontSize = '1rem';
         message.style.margin = '0';
         message.style.padding = '10px';
         popUp.appendChild(message);
@@ -221,6 +221,7 @@ class Server {
             clickShopDisplay: document.getElementById('clickShopBalance'),
             // Container
             shopContainer: document.getElementById('shopContainer'),
+            prestigeAccess: document.getElementById('prestigeAccess'),
             // Menu buttons
             pauseButton: document.getElementById('pauseButton'),
             resetButton: document.getElementById('resetButton'),
@@ -280,88 +281,17 @@ class Server {
             product * this.getSafeMultiplier(value)
         ), 1);
     }
-    handleResize() { 
-        const windowWidth = window.innerWidth;
-        const windowHeight = window.innerHeight;
-        
-        // Let CSS handle all layout decisions - we just size the canvases
-        const container = document.querySelector('.container');
-        if (!container) return;
-        
-        // Calculate available space for the circle board
-        // Account for container padding, gaps, and shop space
-        const containerPadding = 40; // 20px padding on each side
-        const containerGap = 30; // gap between elements
-        const shopMinWidth = 400; // minimum shop width
-        
-        // Calculate how much space is actually available for canvas area
-        let availableWidth;
-        if (windowWidth > (shopMinWidth + 600 + containerGap + containerPadding)) {
-            // Wide screen: shop and canvas side by side
-            availableWidth = windowWidth - shopMinWidth - containerGap - containerPadding;
-        } else {
-            // Narrow screen: canvas gets full width (shop will wrap below)
-            availableWidth = windowWidth - containerPadding;
+    /**
+     * Layout is pure CSS; both canvases simulate/draw in fixed logical
+     * units. A resize (or a devicePixelRatio change from zooming / moving
+     * monitors) only refreshes the backing-store resolution.
+     */
+    handleResize() {
+        this.circleBoard.syncCanvasResolution();
+        if (this.clickerObject) {
+            this.clickerObject.syncCanvasResolution();
+            this.clickerObject.draw();
         }
-        
-        // Leave space for clicker canvas (roughly 300px + gap)
-        const clickerSpace = 320;
-        const boardAvailableWidth = availableWidth - clickerSpace;
-        
-        // Calculate board size
-        const availableHeight = windowHeight * 0.8; // Use 80% of viewport height
-        let boardSize = Math.min(boardAvailableWidth, availableHeight);
-        
-        // Ensure reasonable bounds
-        boardSize = Math.max(boardSize, 100); // Minimum size
-        boardSize = Math.min(boardSize, 1000); // Maximum size
-        
-        // Get current board size
-        const currentBoardSize = this.circleBoard.canvas.width || 500;
-
-        // Only update if size changed significantly
-        if (Math.abs(boardSize - currentBoardSize) > 10) {
-            this.circleBoard.updateCanvasSize(boardSize);
-        }
-        else{
-            return; // No significant change, skip further updates
-        }
-        
-        // Handle clicker canvas - size it proportionally to board
-        const clickerCanvas = this.elements.clickerCanvas;
-        if (clickerCanvas) {
-            let clickerWidth = Math.min(boardSize * 0.6, 300);
-            let clickerHeight = Math.min(boardSize * 0.3, 150);
-            
-    
-            
-            clickerWidth = Math.round(clickerWidth);
-            clickerHeight = Math.round(clickerHeight);
-            
-            // Only update if size changed
-            const currentClickerWidth = clickerCanvas.width || 0;
-            if (Math.abs(clickerWidth - currentClickerWidth) > 10) {
-                console.log(`Resizing clicker from ${currentClickerWidth}x${clickerCanvas.height} to ${clickerWidth}x${clickerHeight}`);
-                
-                clickerCanvas.style.width = `${clickerWidth}px`;
-                clickerCanvas.style.height = `${clickerHeight}px`;
-                clickerCanvas.width = clickerWidth;
-                clickerCanvas.height = clickerHeight;
-                
-                // Update the clicker object if it exists
-                if (this.clickerObject) {
-                    this.clickerObject.updateSize?.(clickerWidth, clickerHeight);
-                }
-            }
-        }
-        
-        // Force a render after changes
-        setTimeout(() => {
-            this.circleBoard.render();
-            if (this.clickerObject) {
-                this.clickerObject.draw();
-            }
-        }, 50);
     }
 
     // Setup event listeners for pause, reset and save
@@ -555,25 +485,10 @@ class Server {
                 <button type="button" class="shop-tab is-active" role="tab" aria-selected="true">
                     Balance Shop
                 </button>
-                <button
-                    type="button"
-                    class="shop-tab prestige-focus-button is-locked"
-                    role="tab"
-                    aria-selected="false"
-                    aria-label="Prestige locked. Earn 1 prestige point to unlock"
-                    title="Earn 1 prestige point to unlock Prestige"
-                >
-                    <span class="prestige-focus-icon" aria-hidden="true">🔒</span>
-                    <span class="prestige-focus-label">Prestige</span>
-                </button>
             </div>
         `;
-        balanceShopSection.querySelector('.prestige-focus-button').addEventListener('click', (event) => {
-            if (event.currentTarget.disabled) return;
-            window.dispatchEvent(new CustomEvent('open-prestige-focus'));
-        });
-        this.updatePrestigeFocusButton(balanceShopSection);
         shopContainer.appendChild(balanceShopSection);
+        this.setupPrestigeAccess();
         
         // Add shop items organized by category
         for (const [shopName, shop] of Object.entries(this.baseUpgradeShop.items)) {
@@ -668,12 +583,38 @@ class Server {
         shopContainer.appendChild(clickShopSection);
     }
 
+    /** Prestige entry point that sits under the clicker (layout via CSS). */
+    setupPrestigeAccess() {
+        const container = this.elements.prestigeAccess;
+        if (!container) return;
+        container.innerHTML = `
+            <button
+                type="button"
+                class="prestige-focus-button prestige-access-button is-locked"
+                aria-label="Prestige locked. Earn 1 prestige point to unlock"
+                title="Earn 1 prestige point to unlock Prestige"
+            >
+                <span class="prestige-focus-icon" aria-hidden="true">🔒</span>
+                <span class="prestige-focus-label">Prestige</span>
+            </button>
+        `;
+        container.querySelector('.prestige-focus-button').addEventListener('click', (event) => {
+            if (event.currentTarget.disabled) return;
+            window.dispatchEvent(new CustomEvent('open-prestige-focus'));
+        });
+        this.updatePrestigeFocusButton(container);
+    }
+
     updatePrestigeFocusButton(root = document) {
-        const button = root.querySelector?.('.prestige-focus-button');
-        if (!button) return;
+        const buttons = root.querySelectorAll?.('.prestige-focus-button') ?? [];
+        if (!buttons.length) return;
 
         const unlocked = this.prestigeStats.totalPrestiges > 0
             || this.calculatePrestigePreview().estimatedAward >= 1;
+        buttons.forEach((button) => this.renderPrestigeFocusButton(button, unlocked));
+    }
+
+    renderPrestigeFocusButton(button, unlocked) {
         button.classList.toggle('is-locked', !unlocked);
         button.classList.toggle('is-unlocked', unlocked);
         button.disabled = !unlocked;
@@ -787,11 +728,8 @@ class Server {
         }
 
         
-        // Update scaled properties based on current scale factor
-        this.circleBoard.calculateScaleFactor();
-        
-        // Reinitialize the CircleBoard with new values
-        this.circleBoard.initContainer();
+        // Re-derive scale factor + container and move shapes into it.
+        this.circleBoard.syncCanvasResolution();
     }
     buyItemCShop(itemName, amount = 1) {
         const item = this.clickShop.getItem(itemName);
@@ -875,11 +813,8 @@ class Server {
 
         }
         
-        // Update scaled properties based on current scale factor
-        this.circleBoard.calculateScaleFactor();
-        
-        // Reinitialize the CircleBoard with new values
-        this.circleBoard.initContainer();
+        // Re-derive scale factor + container and move shapes into it.
+        this.circleBoard.syncCanvasResolution();
     }
     
     // Prestige shop methods using prestigeShop class

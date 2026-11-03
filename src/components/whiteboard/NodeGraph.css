@@ -1,0 +1,46 @@
+/* ── NodeGraph: layout + edges on a Whiteboard ─────────────────────── */
+
+.ng-edges {
+  position: absolute;
+  top: 0;
+  left: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.ng-edge {
+  fill: none;
+  stroke: var(--branch, #94a3b8);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* The node button is only a positioned, focusable hit area; the card
+   inside it (from renderNode) owns the visuals. */
+.ng-node {
+  position: absolute;
+  display: block;
+  margin: 0;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  text-align: inherit;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+.ng-node:focus:not(:focus-visible) {
+  outline: none;
+}
+
+.ng-node:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 3px;
+  border-radius: 18px;
+}
+
+.ng-node.is-selected {
+  z-index: 2;
+}

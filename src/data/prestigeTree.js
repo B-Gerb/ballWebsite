@@ -1,33 +1,32 @@
 /**
- * Prestige upgrade tree definition.
+ * Prestige upgrade tree definition: data only.
  *
- * This file is the single source of truth for the prestige shop layout.
- * `PrestigePopup` reads it and derives everything else (node positions,
- * connecting lines, lock state, tooltips), so adding content only means
- * editing the data below.
+ * `PrestigePopup` hands these nodes to the generic `NodeGraph`, which lays
+ * them out automatically (rows from `requires`, order chosen to reduce line
+ * crossings) and draws the connecting lines. You never choose a position.
  *
  * ── Adding an upgrade ────────────────────────────────────────────────
  * 1. Add the upgrade to `src/shops/prestigeShop.js` (name / price / maxLevel).
- * 2. Add a node here with the SAME `item` name, then give it a `col`/`row`
- *    and list what it needs in `requires`. Locked nodes stay hidden in the
- *    shop until every requirement is purchased.
+ * 2. Add a node here with the SAME `item` name and list what it needs in
+ *    `requires`. Locked nodes stay hidden until every requirement is met,
+ *    and the tree re-lays itself out as nodes unlock.
  * 3. Handle its effect in `Server.applyPrestigeUpgradeEffect`.
  *
  * ── Adding a whole new path ──────────────────────────────────────────
- * Add a key to `BRANCHES` (it only controls the colour/label of the lane),
- * then add nodes with that `branch` in a free `col`. Lines between nodes
- * are generated from `requires`, so you never hand-maintain a list of edges.
+ * Add a key to `BRANCHES` (it only controls the colour/label), then add
+ * nodes with that `branch`. Lines are generated from `requires`, so you
+ * never hand-maintain a list of edges.
  *
  * Node fields
  *   id          unique string used by `requires`
  *   item        name of the matching entry in prestigeShop (defaults to id)
- *   label       text shown on the node
+ *   label       text shown on the node (clamped to 2 lines; full text on hover)
  *   icon        single emoji/character shown on the node
- *   branch      key of BRANCHES — controls the lane colour
- *   col / row   grid coordinates. col = horizontal lane, row = depth.
- *               They may be fractional (e.g. col: 1.5) to fan a path out.
+ *   branch      key of BRANCHES — controls the colour
  *   requires    [] | ['other-id'] | [{ id: 'other-id', level: 3 }]
  *               A bare string means "at least level 1".
+ *   pin         optional { col, row } to force a node into a fixed slot.
+ *               Only use it when the automatic layout really isn't right.
  *   description one line shown in the detail panel
  *   effectKey   key used by the matching shop item to format its effect
  */
@@ -47,8 +46,6 @@ export const PRESTIGE_NODES = [
     label: 'Unlock Triangle',
     icon: '🔺',
     branch: 'core',
-    col: 0,
-    row: 0,
     requires: [],
     description: 'Unlocks the triangle route and the next generation of prestige upgrades.',
     effectKey: 'unlockTriangle',
@@ -59,8 +56,6 @@ export const PRESTIGE_NODES = [
     label: 'Unlock Square',
     icon: '⬛',
     branch: 'core',
-    col: 0,
-    row: 1,
     requires: ['unlock-triangle'],
     description: 'Unlocks square shapes in the shop.',
     effectKey: 'unlockSquare',
@@ -71,8 +66,6 @@ export const PRESTIGE_NODES = [
     label: 'Circle Wall Value',
     icon: '⭕',
     branch: 'economy',
-    col: 1,
-    row: 1,
     requires: ['unlock-triangle'],
     description: 'Increases the value earned when circles hit the wall.',
     effectKey: 'circleWallValue',
@@ -83,8 +76,6 @@ export const PRESTIGE_NODES = [
     label: 'Triangle Value',
     icon: '🔺',
     branch: 'motion',
-    col: 0,
-    row: 2,
     requires: ['unlock-square'],
     description: 'Improves the value of triangle progress and unlocks triangle upgrades.',
     effectKey: 'triangleValue',
@@ -95,8 +86,6 @@ export const PRESTIGE_NODES = [
     label: 'Square Value',
     icon: '⬛',
     branch: 'growth',
-    col: 1,
-    row: 2,
     requires: ['unlock-square'],
     description: 'Improves the value of square collisions and unlocks square upgrades.',
     effectKey: 'squareValue',
@@ -107,8 +96,6 @@ export const PRESTIGE_NODES = [
     label: 'Triangle Size',
     icon: '📐',
     branch: 'motion',
-    col: -1,
-    row: 3,
     requires: ['triangle-value'],
     description: 'Increases the size contribution of triangle progression.',
     effectKey: 'triangleSize',
@@ -119,8 +106,6 @@ export const PRESTIGE_NODES = [
     label: 'Triangle Speed',
     icon: '💨',
     branch: 'motion',
-    col: 0,
-    row: 3,
     requires: ['triangle-value'],
     description: 'Increases triangle speed.',
     effectKey: 'triangleSpeed',
@@ -131,8 +116,6 @@ export const PRESTIGE_NODES = [
     label: 'Triangle Collision Value',
     icon: '💎',
     branch: 'motion',
-    col: 1,
-    row: 3,
     requires: ['triangle-value'],
     description: 'Increases the value of triangle collisions.',
     effectKey: 'triangleCollisionValue',
@@ -143,8 +126,6 @@ export const PRESTIGE_NODES = [
     label: 'Square Size',
     icon: '📐',
     branch: 'growth',
-    col: 2,
-    row: 3,
     requires: ['square-value'],
     description: 'Increases the size contribution of square progression.',
     effectKey: 'squareSize',
@@ -155,8 +136,6 @@ export const PRESTIGE_NODES = [
     label: 'Square Speed',
     icon: '💨',
     branch: 'growth',
-    col: 3,
-    row: 3,
     requires: ['square-value'],
     description: 'Increases square speed.',
     effectKey: 'squareSpeed',
@@ -167,8 +146,6 @@ export const PRESTIGE_NODES = [
     label: 'Square Collision Value',
     icon: '💎',
     branch: 'growth',
-    col: 4,
-    row: 3,
     requires: ['square-value'],
     description: 'Increases the value of square collisions.',
     effectKey: 'squareCollisionValue',
@@ -179,8 +156,6 @@ export const PRESTIGE_NODES = [
     label: 'Click Value',
     icon: '👆',
     branch: 'click',
-    col: 2,
-    row: 2,
     requires: ['circle-wall-value'],
     description: 'Increases points earned from clicks.',
     effectKey: 'clickValue',
@@ -191,8 +166,6 @@ export const PRESTIGE_NODES = [
     label: 'Click Upgrade Effectiveness',
     icon: '🖱️',
     branch: 'click',
-    col: 5,
-    row: 3,
     requires: ['click-value'],
     description: 'Makes every click-shop upgrade more effective.',
     effectKey: 'clickUpgradeEffectiveness',
@@ -203,8 +176,6 @@ export const PRESTIGE_NODES = [
     label: 'Circle Cost Scaling',
     icon: '📉',
     branch: 'economy',
-    col: 3,
-    row: 2,
     requires: ['circle-wall-value'],
     description: 'Reduces how quickly circle upgrade costs grow.',
     effectKey: 'circleCostScaling',
@@ -215,8 +186,6 @@ export const PRESTIGE_NODES = [
     label: 'Square Cost Scaling',
     icon: '📉',
     branch: 'economy',
-    col: 6,
-    row: 3,
     requires: ['circle-cost-scaling'],
     description: 'Reduces how quickly square upgrade costs grow.',
     effectKey: 'squareCostScaling',
@@ -227,8 +196,6 @@ export const PRESTIGE_NODES = [
     label: 'Triangle Cost Scaling',
     icon: '📉',
     branch: 'economy',
-    col: 3,
-    row: 4,
     requires: ['square-cost-scaling'],
     description: 'Reduces how quickly triangle upgrade costs grow.',
     effectKey: 'triangleCostScaling',
@@ -239,8 +206,6 @@ export const PRESTIGE_NODES = [
     label: 'Global Currency',
     icon: '💰',
     branch: 'economy',
-    col: 4,
-    row: 2,
     requires: ['circle-wall-value'],
     description: 'Multiplies all normal currency earned.',
     effectKey: 'currencyMultiplier',
@@ -251,8 +216,6 @@ export const PRESTIGE_NODES = [
     label: 'Global Speed',
     icon: '⚡',
     branch: 'motion',
-    col: 7,
-    row: 3,
     requires: ['currency-multiplier'],
     description: 'Increases speed for every shape.',
     effectKey: 'globalSpeed',
@@ -263,8 +226,6 @@ export const PRESTIGE_NODES = [
     label: 'Global Size',
     icon: '🔵',
     branch: 'growth',
-    col: 8,
-    row: 3,
     requires: ['currency-multiplier'],
     description: 'Increases size for every shape and its value contribution.',
     effectKey: 'globalSize',
@@ -275,8 +236,6 @@ export const PRESTIGE_NODES = [
     label: 'Prestige Value',
     icon: '✨',
     branch: 'core',
-    col: 9,
-    row: 3,
     requires: ['currency-multiplier'],
     description: 'Increases future prestige awards.',
     effectKey: 'prestigeGain',
@@ -287,8 +246,6 @@ export const PRESTIGE_NODES = [
     label: 'Speed Collision Value',
     icon: '🏎️',
     branch: 'motion',
-    col: 7,
-    row: 4,
     requires: ['global-speed'],
     description: 'Adds collision value based on shape speed.',
     effectKey: 'speedCollisionValue',
@@ -299,8 +256,6 @@ export const PRESTIGE_NODES = [
     label: 'Size Collision Value',
     icon: '📏',
     branch: 'growth',
-    col: 8,
-    row: 4,
     requires: ['global-size'],
     description: 'Adds collision value based on shape size.',
     effectKey: 'sizeCollisionValue',
@@ -311,114 +266,8 @@ export const PRESTIGE_NODES = [
     label: 'Mass Collision Value',
     icon: '⚖️',
     branch: 'core',
-    col: 7,
-    row: 5,
     requires: ['speed-collision-value', 'size-collision-value'],
     description: 'Adds collision value based on mass (speed × size).',
     effectKey: 'massCollisionValue',
   },
 ];
-
-/*
- * Example — a new two-node path branching off "Bigger Arena" into a free
- * lane (col 4). Copy, rename, add the matching prestigeShop entries:
- *
- *   {
- *     id: 'auto-spawn',
- *     item: 'Auto Spawn',
- *     label: 'Auto Spawn',
- *     icon: '🌀',
- *     branch: 'growth',
- *     col: 4, row: 1,
- *     requires: [{ id: 'increase-circle-size', level: 3 }],
- *     description: 'Spawns a shape every few seconds on its own.',
- *     effect: (level) => `${level} shape/s`,
- *   },
- *   {
- *     id: 'auto-spawn-speed',
- *     item: 'Auto Spawn Speed',
- *     label: 'Spawn Rate',
- *     icon: '⏱️',
- *     branch: 'growth',
- *     col: 4, row: 2,
- *     requires: ['auto-spawn'],
- *     description: 'Shortens the auto spawn interval.',
- *   },
- */
-
-/** Pixel geometry of the tree canvas. Zoom/pan scales this at render time. */
-export const LAYOUT = {
-  nodeSize: 108,
-  colGap: 200,
-  rowGap: 172,
-  padding: 96,
-};
-
-const normalizeRequirement = (req) =>
-  typeof req === 'string' ? { id: req, level: 1 } : { id: req.id, level: req.level ?? 1 };
-
-/**
- * Turns the declarative node list into positioned nodes plus the edges
- * implied by `requires`, and reports the canvas size needed to hold them.
- */
-export function buildTree(nodes = PRESTIGE_NODES, layout = LAYOUT) {
-  const { colGap, rowGap, padding } = layout;
-
-  const byId = new Map();
-  const positioned = nodes.map((node) => {
-    const placed = {
-      ...node,
-      item: node.item ?? node.label ?? node.id,
-      requires: (node.requires ?? []).map(normalizeRequirement),
-      x: padding + node.col * colGap,
-      y: padding + node.row * rowGap,
-    };
-    if (import.meta.env?.DEV && byId.has(placed.id)) {
-      console.warn(`[prestigeTree] duplicate node id "${placed.id}"`);
-    }
-    byId.set(placed.id, placed);
-    return placed;
-  });
-
-  const edges = [];
-  positioned.forEach((node) => {
-    node.requires.forEach((req) => {
-      const from = byId.get(req.id);
-      if (!from) {
-        if (import.meta.env?.DEV) {
-          console.warn(`[prestigeTree] "${node.id}" requires unknown node "${req.id}"`);
-        }
-        return;
-      }
-      edges.push({ id: `${req.id}->${node.id}`, from, to: node, level: req.level });
-    });
-  });
-
-  const width = Math.max(...positioned.map((n) => n.x)) + padding;
-  const height = Math.max(...positioned.map((n) => n.y)) + padding;
-
-  return { nodes: positioned, edges, byId, width, height };
-}
-
-/**
- * Rounded elbow between two node centres: straight when the nodes share a
- * lane, otherwise down → across → down, which reads much better than a
- * diagonal once several paths overlap.
- */
-export function edgePath(from, to, radius = 26) {
-  const dx = to.x - from.x;
-  if (Math.abs(dx) < 1) return `M ${from.x} ${from.y} L ${to.x} ${to.y}`;
-
-  const midY = (from.y + to.y) / 2;
-  const dir = Math.sign(dx);
-  const r = Math.min(radius, Math.abs(dx) / 2, Math.abs(to.y - from.y) / 2);
-
-  return [
-    `M ${from.x} ${from.y}`,
-    `L ${from.x} ${midY - r}`,
-    `Q ${from.x} ${midY} ${from.x + dir * r} ${midY}`,
-    `L ${to.x - dir * r} ${midY}`,
-    `Q ${to.x} ${midY} ${to.x} ${midY + r}`,
-    `L ${to.x} ${to.y}`,
-  ].join(' ');
-}

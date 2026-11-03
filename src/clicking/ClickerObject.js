@@ -1,9 +1,17 @@
 import seedrandom from 'seedrandom';
+
+/** Fixed logical drawing size; CSS scales the element, DPR only adds sharpness. */
+export const CLICKER_LOGICAL_WIDTH = 300;
+export const CLICKER_LOGICAL_HEIGHT = 180;
+
 class ClickerObject {
     constructor(canvasElement) {
         // Use the provided canvas element directly
         this.canvas = canvasElement;
         this.ctx = this.canvas.getContext('2d');
+        this.width = CLICKER_LOGICAL_WIDTH;
+        this.height = CLICKER_LOGICAL_HEIGHT;
+        this.syncCanvasResolution();
         this.seed = seedrandom();;
         
         // Properties for the clickable object
@@ -35,10 +43,29 @@ class ClickerObject {
         this.canvas.addEventListener('mouseup', this.handleMouseUp);
     }
 
+    /** Match the backing store to devicePixelRatio; logical size never changes. */
+    syncCanvasResolution() {
+        const dpr = Math.min(Math.max(globalThis.devicePixelRatio || 1, 1), 3);
+        const backingWidth = Math.round(this.width * dpr);
+        const backingHeight = Math.round(this.height * dpr);
+        if (this.canvas.width !== backingWidth || this.canvas.height !== backingHeight) {
+            this.canvas.width = backingWidth;
+            this.canvas.height = backingHeight;
+        }
+        this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+
+    /** Convert a pointer position to logical canvas coordinates. */
+    toLogical(clientX, clientY) {
+        const rect = this.canvas.getBoundingClientRect();
+        return {
+            x: (clientX - rect.left) * (this.width / (rect.width || this.width)),
+            y: (clientY - rect.top) * (this.height / (rect.height || this.height)),
+        };
+    }
+
     handleMouseUp(e) {
-            const rect = this.canvas.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
+            const { x, y } = this.toLogical(e.clientX, e.clientY);
             if (this.isPointInClickArea(x, y)) {
 
                 this.handleClick();
@@ -51,9 +78,9 @@ class ClickerObject {
     
     // Check if a point is inside the clickable area
     isPointInClickArea(x, y) {
-        const centerX = this.canvas.width / 2;
-        const centerY = this.canvas.height / 2;
-        const radius = Math.min(this.canvas.width, this.canvas.height) * 0.3;
+        const centerX = this.width / 2;
+        const centerY = this.height / 2;
+        const radius = Math.min(this.width, this.height) * 0.3;
         
         const distance = Math.sqrt((x - centerX) ** 2 + (y - centerY) ** 2);
         return distance <= radius;
@@ -82,12 +109,12 @@ class ClickerObject {
         if (!this.ctx) return;
         
         // Clear the canvas
-        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        this.ctx.clearRect(0, 0, this.width, this.height);
         
         // Calculate center and radius
-        const centerX = this.canvas.width / 2;
-        const centerY = this.canvas.height / 2;
-        let radius = Math.min(this.canvas.width, this.canvas.height) * 0.3;
+        const centerX = this.width / 2;
+        const centerY = this.height / 2;
+        let radius = Math.min(this.width, this.height) * 0.3;
         
         // Handle click animation
         if (this.isAnimating) {

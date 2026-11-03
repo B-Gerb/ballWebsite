@@ -6,7 +6,8 @@ import {
     collisionMultiplier,
     prestigeAward,
 } from '../src/prestigeEquations.js';
-import { buildTree, PRESTIGE_NODES } from '../src/data/prestigeTree.js';
+import { BRANCHES, PRESTIGE_NODES } from '../src/data/prestigeTree.js';
+import { layoutGraph } from '../src/components/whiteboard/graphLayout.js';
 
 test('prestige equations are deterministic and safe at boundaries', () => {
     assert.equal(basePrestigePoints(0), 0);
@@ -26,25 +27,15 @@ test('prestige equations are deterministic and safe at boundaries', () => {
 });
 
 test('prestige tree exposes the requested dependency branches', () => {
-    const tree = buildTree();
-    const triangle = tree.byId.get('unlock-triangle');
-    const square = tree.byId.get('unlock-square');
-    const wallValue = tree.byId.get('circle-wall-value');
-    const massValue = tree.byId.get('mass-collision-value');
+    const tree = layoutGraph(PRESTIGE_NODES, { warn: () => {} });
+    const ids = new Set(tree.nodes.map((node) => node.id));
 
-    assert.ok(triangle);
-    assert.ok(square);
-    assert.ok(wallValue);
-    assert.ok(massValue);
-    assert.ok(tree.edges.some((edge) => (
-        edge.from.id === 'unlock-triangle' && edge.to.id === 'unlock-square'
-    )));
-    assert.ok(tree.edges.some((edge) => (
-        edge.from.id === 'speed-collision-value' && edge.to.id === 'mass-collision-value'
-    )));
-    assert.ok(tree.edges.some((edge) => (
-        edge.from.id === 'size-collision-value' && edge.to.id === 'mass-collision-value'
-    )));
+    ['unlock-triangle', 'unlock-square', 'circle-wall-value', 'mass-collision-value']
+        .forEach((id) => assert.ok(ids.has(id), id));
+    const edgeIds = new Set(tree.edges.map((edge) => edge.id));
+    assert.ok(edgeIds.has('unlock-triangle->unlock-square'));
+    assert.ok(edgeIds.has('speed-collision-value->mass-collision-value'));
+    assert.ok(edgeIds.has('size-collision-value->mass-collision-value'));
 });
 
 test('prestige tree node ids and dependencies are internally consistent', () => {
@@ -58,5 +49,8 @@ test('prestige tree node ids and dependencies are internally consistent', () => 
                 : requirement.id;
             assert.ok(ids.has(dependencyId), `${node.id} has an unknown dependency`);
         });
+        assert.ok(BRANCHES[node.branch], `${node.id} has an unknown branch`);
+        assert.equal(node.col, undefined, `${node.id} still has a hand-set col`);
+        assert.equal(node.row, undefined, `${node.id} still has a hand-set row`);
     });
 });

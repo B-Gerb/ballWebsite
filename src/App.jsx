@@ -98,35 +98,39 @@ function App() {
   };
 
   return (
-    <div>
-      <h1>Bouncing Balls Inside Circle</h1>
+    <div className="app">
+      <h1 className="app-title">Bouncing Balls Inside Circle</h1>
 
-      <div className="shop-balance-container">
-        <label htmlFor="shopBalance"> Balance: <span id="shopBalance">0</span></label>
-        <label htmlFor="clickShopBalance"> Click Shop Balance: <span id="clickShopBalance"> 0 </span></label>
-        <label htmlFor="fpsCounter"> FPS: <span id="fpsCounter">0</span></label>
-      </div>
-      <div className="stats">
-        <h3>Stats</h3>
-        <div className="stat">
-          <label htmlFor="offWallB"> Collision off wall per/sec: <span id="offWallB">0</span></label>
-          <label htmlFor="offBallB"> Collision off other Balls per/sec: <span id="offBallB">0</span></label>
+      <header className="app-topbar">
+        <div className="shop-balance-container">
+          <label htmlFor="shopBalance"> Balance: <span id="shopBalance">0</span></label>
+          <label htmlFor="clickShopBalance"> Click Shop Balance: <span id="clickShopBalance"> 0 </span></label>
+          <label htmlFor="fpsCounter"> FPS: <span id="fpsCounter">0</span></label>
         </div>
-      </div>
-      <div className="container">
-        <div className="canvas-container">
+        <div className="stats">
+          <h3>Stats</h3>
+          <div className="stat">
+            <label htmlFor="offWallB"> Collision off wall per/sec: <span id="offWallB">0</span></label>
+            <label htmlFor="offBallB"> Collision off other Balls per/sec: <span id="offBallB">0</span></label>
+          </div>
+        </div>
+      </header>
+
+      <main className="layout">
+        <section className="canvas-container" aria-label="Board">
           <canvas ref={canvasRef} id="bouncingBallsCanvas"></canvas>
           <canvas ref={clickerCanvasRef} id="clickerCanvas"></canvas>
+        </section>
+        {/* Filled by Server.setupPrestigeAccess */}
+        <aside id="prestigeAccess" className="prestige-access" aria-label="Prestige"></aside>
+        <section id="shopContainer" className="shop-container" aria-label="Shop"></section>
+        <div className="controls">
+          <button id="pauseButton">Pause</button>
+          <button id="saveButton">Save</button>
+          <button id="resetButton">Reset</button>
         </div>
-        <div id="shopContainer" className="shop-container"></div>
-        
-      </div>
-      <div className="controls">
-        <button id="pauseButton">Pause</button>
-        <button id="saveButton">Save</button>
-        <button id="resetButton">Reset</button>
-      </div>
-      
+      </main>
+
       {/* Prestige Popup */}
       {serverRef.current && (
         <PrestigePopup 

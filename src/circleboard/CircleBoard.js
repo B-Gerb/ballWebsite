@@ -3,10 +3,20 @@ import Circle from './circle.js';
 import Square from './square.js';
 import Triangle from './triangle.js';
 import CollisionResponse from './CollisionResponse.js';
+
+/**
+ * The board always simulates in a fixed logical coordinate space of
+ * LOGICAL_SIZE x LOGICAL_SIZE units. CSS decides how big it looks; the
+ * backing store is only multiplied by devicePixelRatio for sharpness.
+ * Resizing the window therefore never changes physics, speeds or saves.
+ */
+export const LOGICAL_SIZE = 800;
+
 class CircleBoard {
     constructor(canvasElement) {
         this.canvas = canvasElement;
         this.ctx = this.canvas.getContext('2d');
+        this.logicalSize = LOGICAL_SIZE;
         
         this.baseContainerThickness = 5;
 
@@ -104,8 +114,7 @@ class CircleBoard {
         // Store the previous scale factor
         this.lastScaleFactor = this.scaleFactor;
         
-        const smallerDimension = Math.min(this.canvas.width, this.canvas.height);
-        this.scaleFactor = smallerDimension / this.baseReferenceSize;
+        this.scaleFactor = this.logicalSize / this.baseReferenceSize;
         
         for( const shape of Object.keys(this.shapeInfo)){
             for(const prop of Object.keys(this.shapeInfo[shape])){
@@ -119,12 +128,10 @@ class CircleBoard {
     // Initialize container
     initContainer() {
         const padding = 20 * this.scaleFactor;
-        const smallerDimension = Math.min(this.canvas.width, this.canvas.height);
-        
         this.container = {
-            x: this.canvas.width / 2,
-            y: this.canvas.height / 2,
-            radius: (smallerDimension / 2) - padding,
+            x: this.logicalSize / 2,
+            y: this.logicalSize / 2,
+            radius: (this.logicalSize / 2) - padding,
             color: '#3498db',
             borderColor: '#2c3e50',
             thickness: this.baseContainerThickness * this.scaleFactor
@@ -468,71 +475,57 @@ class CircleBoard {
      * Render the current state without updating physics
      */
     render() {
-        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        this.ctx.clearRect(0, 0, this.logicalSize, this.logicalSize);
         this.drawContainer();
         this.shapes.forEach(shape => shape.draw(this.ctx));
         
 
     }
-    updateCanvasSize(size) {
-        const shapeStates = this.shapes.map(shape => {    
-            const info = shape.getInformation();
-            const dx = info.center.x - this.container.x;
-            const dy = info.center.y - this.container.y;
-            const distance = Math.sqrt(dx * dx + dy * dy);
-            return {
-                shape: shape,
-                info: info,
-                dirX: dx / Math.max(distance, 0.0001), // Avoid division by zero
-                dirY: dy / Math.max(distance, 0.0001),
-                relDist: distance / this.container.radius, // Store distance as percentage of container radius
-                velocity: { ...shape.velocity } // Store original velocity
-            };
-        });
-        
-        const oldContainerRadius = this.container ? this.container.radius : size / 2;
-        
-        this.canvas.width = size;
-        this.canvas.height = size;
-        
-        this.calculateScaleFactor();
-        
-        this.initContainer();
-        
-        const sizeRatio = this.container.radius / oldContainerRadius;
-    
-        shapeStates.forEach(state => {
-            const shape = state.shape;
-            
-            // Calculate new position based on relative distance to container center
-            const newDist = state.relDist * this.container.radius;
-            const newX = this.container.x + (state.dirX * newDist);
-            const newY = this.container.y + (state.dirY * newDist);
-            
-            // Update shape position
-            shape.center.x = newX;
-            shape.center.y = newY;
-            
-            // Scale velocity by size ratio while maintaining speed
-            shape.velocity.x *= sizeRatio;
-            shape.velocity.y *= sizeRatio;
+    /**
+     * Match the canvas backing store to devicePixelRatio, recompute the
+     * scale factor and container, and move existing shapes into the new
+     * container if it changed (a save made at an older canvas size, or a
+     * changed baseReferenceSize). Safe to call on every window resize: when
+     * only the DPR changes, the simulation is untouched.
+     */
+    syncCanvasResolution() {
+        const dpr = Math.min(Math.max(globalThis.devicePixelRatio || 1, 1), 3);
+        const backing = Math.round(this.logicalSize * dpr);
+        if (this.canvas.width !== backing || this.canvas.height !== backing) {
+            this.canvas.width = backing;
+            this.canvas.height = backing;
+        }
+        this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-            // Scale radius if it's a Circle
-            if (shape instanceof Circle) {
-                shape.radius = shape.baseRadius * this.scaleFactor;
-            }
-            // Scale side if it's a Square
-            else if (shape instanceof Square) {
-                shape.side = shape.baseSide * this.scaleFactor;
-            }
-            else if (shape instanceof Triangle) {
-                shape.side = shape.baseSide * this.scaleFactor;
-                shape.mass = (Math.sqrt(3) / 4) * shape.side * shape.side;
-            }
-        });
-        
+        const old = this.container;
+        this.calculateScaleFactor();
+        this.initContainer();
+        const next = this.container;
+
+        const changed = old.radius !== next.radius || old.x !== next.x || old.y !== next.y;
+        if (changed && old.radius > 0) {
+            const sizeRatio = next.radius / old.radius;
+            this.shapes.forEach(shape => {
+                const dx = shape.center.x - old.x;
+                const dy = shape.center.y - old.y;
+                // Keep each shape at the same relative spot in the container.
+                shape.center.x = next.x + dx * sizeRatio;
+                shape.center.y = next.y + dy * sizeRatio;
+                shape.velocity.x *= sizeRatio;
+                shape.velocity.y *= sizeRatio;
+
+                if (shape instanceof Circle) {
+                    shape.radius = shape.baseRadius * this.scaleFactor;
+                } else if (shape instanceof Square) {
+                    shape.side = shape.baseSide * this.scaleFactor;
+                } else if (shape instanceof Triangle) {
+                    shape.side = shape.baseSide * this.scaleFactor;
+                    shape.mass = (Math.sqrt(3) / 4) * shape.side * shape.side;
+                }
+            });
+        }
+
         this.render();
-        
         return this.scaleFactor;
     }
 
@@ -583,23 +576,8 @@ class CircleBoard {
     
     // Initialize the simulation
     initialize() {
-        this.canvas.width = this.canvas.parentElement.clientWidth;
-        this.canvas.height = this.canvas.parentElement.clientHeight;
-        
-        this.baseReferenceSize = 750; // Fixed reference size
-        
-        this.calculateScaleFactor();
-        this.initContainer();
-        
-        // Add proper bounds checking when creating initial balls
-        if (this.container.radius <= this.maxBallSize) {
-            console.warn("Container too small for balls, adjusting sizes");
-            this.minBallSize = Math.min(this.minBallSize, this.container.radius * 0.1);
-            this.maxBallSize = Math.min(this.maxBallSize, this.container.radius * 0.2);
-        }        
+        this.syncCanvasResolution();
         this.resetCollisionCounters();
-
-        
     }
 }
 
