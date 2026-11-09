@@ -8,7 +8,7 @@ import { formatNumber } from '../components/formatNumber.js';
  *   ┌──────┬──────────────────────────────┬─────┐
  *   │ icon │ Name                         │  12 │  ← level, big and faint
  *   │      │ what it does                 │     │
- *   │      │ 🪙 1.23K  (green / red)       │     │
+ *   │      │ 🪙 1.23K for 10 (green / red) │     │
  *   └──────┴──────────────────────────────┴─────┘
  */
 
@@ -27,7 +27,7 @@ export function createStoreSection(title, accent) {
   return section;
 }
 
-export function createStoreRow({ item, className, cost, canAfford, currencyIcon, onBuy }) {
+export function createStoreRow({ item, className, amount = 1, cost, canAfford, currencyIcon, onBuy }) {
   const { icon, description } = catalogEntry(item.name);
   const row = el('button', `store-row ${className}`);
   row.type = 'button';
@@ -41,23 +41,25 @@ export function createStoreRow({ item, className, cost, canAfford, currencyIcon,
   const price = el('span', 'store-row-price');
   price.appendChild(el('span', 'store-row-coin', currencyIcon)).setAttribute('aria-hidden', 'true');
   price.appendChild(el('span', 'store-row-cost'));
+  price.appendChild(el('span', 'store-row-amount'));
   body.appendChild(price);
   row.appendChild(body);
 
   row.appendChild(el('span', 'store-row-level'));
   row.addEventListener('click', onBuy);
 
-  refreshStoreRow(row, { item, cost, canAfford });
+  refreshStoreRow(row, { item, amount, cost, canAfford });
   return row;
 }
 
-/** Cheap enough to call every UI tick. */
-export function refreshStoreRow(row, { item, cost, canAfford }) {
+/** `cost` is the total for `amount` levels. Cheap enough to call every UI tick. */
+export function refreshStoreRow(row, { item, amount = 1, cost, canAfford }) {
   row.classList.toggle('cannot-afford', !canAfford);
   row.querySelector('.store-row-cost').textContent = formatNumber(cost);
+  row.querySelector('.store-row-amount').textContent = amount > 1 ? `for ${amount}` : '';
   row.querySelector('.store-row-level').textContent = item.level;
   row.setAttribute(
     'aria-label',
-    `${item.name}, level ${item.level}, costs ${formatNumber(cost)}${canAfford ? '' : ', cannot afford'}`,
+    `Buy ${amount} ${item.name}, level ${item.level}, costs ${formatNumber(cost)}${canAfford ? '' : ', cannot afford'}`,
   );
 }

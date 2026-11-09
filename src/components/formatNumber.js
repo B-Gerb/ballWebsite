@@ -1,6 +1,7 @@
 /** Short display form: 12.34K, 5.00M, ... (two decimals below 10K). */
 export const formatNumber = (value) => {
   if (value === undefined || value === null || Number.isNaN(value)) return '—';
+  if (!Number.isFinite(value)) return value > 0 ? '∞' : '-∞';
   const abs = Math.abs(value);
   if (abs >= 1e15) return value.toExponential(2);
   if (abs >= 1e12) return `${(value / 1e12).toFixed(2)}T`;

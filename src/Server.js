@@ -7,7 +7,7 @@ import clickShop from './shops/clickShop';
 import prestigeShop from './shops/prestigeShop';
 import SkillShop, { SKILLS_UNLOCK_COST } from './shops/skillShop';
 import { SKILL_NODES } from './data/skillTree';
-import { STORE_SECTIONS } from './data/shopCatalog';
+import { STORE_BUY_AMOUNTS, STORE_SECTIONS } from './data/shopCatalog';
 import { createStoreRow, createStoreSection, refreshStoreRow } from './shops/storeView';
 import { formatNumber } from './components/formatNumber';
 import ClickerObject from './clicking/ClickerObject';
@@ -240,6 +240,8 @@ class Server {
         // Remove createGameContainer logic for clickerCanvas
         this.clickerObject = null;
         this.clickerValue = 1;
+        // Store buy amount (×1 / ×10 / ×100); not saved.
+        this.storeBuyAmount = 1;
 
         // Animation and physics timing
         this.animationFrameId = null;
@@ -432,10 +434,21 @@ class Server {
         this.updatePrestigeFocusButton();
 
     }
-    /** Live cost + affordability for one store row of either shop. */
+    /** Live cost + affordability for one store row, at the chosen buy amount. */
     storeRowState(item, shop) {
-        const cost = shop.itemCost(item, 1)[0];
-        return { item, cost, canAfford: shop.balance >= cost };
+        const amount = this.storeBuyAmount;
+        const cost = shop.itemCost(item, amount)[0];
+        return { item, amount, cost, canAfford: shop.balance >= cost };
+    }
+
+    setStoreBuyAmount(amount) {
+        this.storeBuyAmount = amount;
+        this.elements.shopContainer?.querySelectorAll('.store-amount').forEach((button) => {
+            const active = Number(button.dataset.amount) === amount;
+            button.classList.toggle('is-active', active);
+            button.setAttribute('aria-pressed', String(active));
+        });
+        this.updateButtonAppearance();
     }
 
     refreshStoreRows(selector, lookup, shop) {
@@ -490,6 +503,12 @@ class Server {
         shopContainer.innerHTML = `
             <header class="store-header">
                 <h2 class="store-title">Store</h2>
+                <div class="store-amounts" role="group" aria-label="Buy amount">
+                    <span class="store-amounts-label">Buy</span>
+                    ${STORE_BUY_AMOUNTS.map((amount) => `
+                        <button type="button" class="store-amount" data-amount="${amount}">×${amount}</button>
+                    `).join('')}
+                </div>
                 <div class="store-balances">
                     <span class="store-balance"><span aria-hidden="true">🪙</span>
                         <strong data-store-balance="balance">0</strong><small>balance</small></span>
@@ -498,6 +517,9 @@ class Server {
                 </div>
             </header>
         `;
+        shopContainer.querySelectorAll('.store-amount').forEach((button) => {
+            button.addEventListener('click', () => this.setStoreBuyAmount(Number(button.dataset.amount)));
+        });
         this.setupPrestigeAccess();
 
         const addSection = (key, items, rowClass, shop, buy) => {
@@ -511,7 +533,7 @@ class Server {
                     currencyIcon,
                     ...this.storeRowState(item, shop),
                     onBuy: () => {
-                        buy(item.name);
+                        buy(item.name, this.storeBuyAmount);
                         this.updateButtonAppearance();
                     },
                 });
@@ -522,11 +544,11 @@ class Server {
 
         for (const [key, items] of Object.entries(this.baseUpgradeShop.items)) {
             addSection(key, items, 'baseUpgrade-shop-item-button', this.baseUpgradeShop,
-                (name) => this.buyItemBShop(name));
+                (name, amount) => this.buyItemBShop(name, amount));
         }
         addSection('clickShop', this.clickShop.items, 'click-shop-item-button', this.clickShop,
-            (name) => this.buyItemCShop(name));
-        this.updateStoreBalances();
+            (name, amount) => this.buyItemCShop(name, amount));
+        this.setStoreBuyAmount(this.storeBuyAmount);
     }
 
     /** Prestige entry point that sits under the clicker (layout via CSS). */
@@ -688,7 +710,7 @@ class Server {
         const success = this.clickShop.buyItem(item, amount);
         
         if (success) {
-            this.applyItemEffectCShop(item);
+            this.applyItemEffectCShop(item, amount);
             this.updateBalanceDisplay();
             this.saveGameState();
         }
@@ -696,7 +718,8 @@ class Server {
         return success;
     }
 
-    applyItemEffectCShop(item) {
+    // `amount` bulk-bought temporary boosts stack their duration (10 s each).
+    applyItemEffectCShop(item, amount = 1) {
         switch (item.name) {
             case "Increase Click Value":
                 this.clickerValue = item.getValue();
@@ -706,14 +729,14 @@ class Server {
                 if('tclickValue' in this.temporaryMultipliersActiveFrames){
                     this.multipliers.temporaryMultipliers.clickValue /= this.temporaryMultipliersActiveFrames.tclickValue.multiplier;
                     this.multipliers.temporaryMultipliers.clickValue *= item.getValue();
-                    this.temporaryMultipliersActiveFrames.tclickValue.frames += 600; // 10 seconds
+                    this.temporaryMultipliersActiveFrames.tclickValue.frames += 600 * amount; // 10 seconds each
                     this.temporaryMultipliersActiveFrames.tclickValue.multiplier = item.getValue();
                 }
                 else{
                     this.multipliers.temporaryMultipliers.clickValue *= item.getValue();
                     this.temporaryMultipliersActiveFrames.tclickValue = {
                         multiplier: item.getValue(),
-                        frames: 600, // 10 seconds
+                        frames: 600 * amount, // 10 seconds each
                         name: "tclickValue"
                     };
                 }
@@ -724,7 +747,7 @@ class Server {
                 if('tcircleValue' in this.temporaryMultipliersActiveFrames){
                     this.multipliers.temporaryMultipliers.shapeValue /= this.temporaryMultipliersActiveFrames.tcircleValue.multiplier;
                     this.multipliers.temporaryMultipliers.shapeValue *= item.getValue();
-                    this.temporaryMultipliersActiveFrames.tcircleValue.frames += 600; // 10 seconds
+                    this.temporaryMultipliersActiveFrames.tcircleValue.frames += 600 * amount; // 10 seconds each
                     this.temporaryMultipliersActiveFrames.tcircleValue.multiplier = item.getValue();
                 }
 
@@ -733,7 +756,7 @@ class Server {
 
                     this.temporaryMultipliersActiveFrames.tcircleValue = {
                         multiplier: item.getValue(),
-                        frames: 600, // 10 seconds
+                        frames: 600 * amount, // 10 seconds each
                         name: "tcircleValue"
                     };
                 }
@@ -743,7 +766,7 @@ class Server {
                 if('tcircleSpeed' in this.temporaryMultipliersActiveFrames){
                     this.multipliers.temporaryMultipliers.shapeSpeed /= this.temporaryMultipliersActiveFrames.tcircleSpeed.multiplier;
                     this.multipliers.temporaryMultipliers.shapeSpeed *= item.getValue();
-                    this.temporaryMultipliersActiveFrames.tcircleSpeed.frames += 600; // 10 seconds
+                    this.temporaryMultipliersActiveFrames.tcircleSpeed.frames += 600 * amount; // 10 seconds each
                     this.temporaryMultipliersActiveFrames.tcircleSpeed.multiplier = item.getValue();
                 }
                 else{
@@ -751,7 +774,7 @@ class Server {
 
                     this.temporaryMultipliersActiveFrames.tcircleSpeed = {
                         multiplier: item.getValue(),
-                        frames: 600, // 10 seconds
+                        frames: 600 * amount, // 10 seconds each
                         name: "tcircleSpeed"
                     };
                 }

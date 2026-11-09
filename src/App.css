@@ -257,6 +257,59 @@ canvas {
     border: 0;
 }
 
+.store-amounts {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 3px;
+    background: rgba(0, 0, 0, 0.35);
+    border: 1px solid #1c1108;
+    border-radius: 8px;
+}
+
+.store-amounts-label {
+    padding: 0 6px 0 4px;
+    color: #d6bf94;
+    font-size: 0.75rem;
+    font-weight: bold;
+    text-transform: uppercase;
+}
+
+.store-amount {
+    min-width: 46px;
+    padding: 4px 8px;
+    font: inherit;
+    font-size: 0.9rem;
+    font-weight: bold;
+    color: #e3cfa6;
+    background: transparent;
+    border: 0;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+.store-amount:hover {
+    color: #fff;
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.store-amount.is-active {
+    color: #2a190c;
+    background: #ffe9b8;
+    box-shadow: 0 1px 0 #000;
+}
+
+.store-amount:focus-visible {
+    outline: 2px solid #ffe9b8;
+    outline-offset: 1px;
+}
+
+.store-row-amount {
+    color: #d6bf94;
+    font-size: 0.75rem;
+    font-weight: normal;
+}
+
 .store-balances {
     display: flex;
     flex-wrap: wrap;

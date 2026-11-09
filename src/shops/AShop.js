@@ -29,8 +29,12 @@ class AShop {
         const costScalingMultiplier = item.costScalingMultiplier ?? 1;
         for (let i = 0; i < amount; ++i) {
             cost += currentPrice * costScalingMultiplier;
-            const priceEquation = item.priceEquation ?? ((price) => item.equation(price));
-            currentPrice = priceEquation(currentPrice, item.level + i);
+            // Legacy `equation`s read `this.level`, so each step of a bulk
+            // buy sees the level the item would have at that point.
+            const level = item.level + i;
+            const priceEquation = item.priceEquation
+                ?? ((price) => item.equation.call({ ...item, level }, price));
+            currentPrice = priceEquation(currentPrice, level);
         }
         return [cost, currentPrice];
     }
