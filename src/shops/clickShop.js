@@ -1,5 +1,6 @@
 import AShop from './AShop.js';
 
+// Price curves: a flat percentage per level (×1.2–×1.3), no tier jumps.
 class clickShop extends AShop {
     constructor(){
         super();
@@ -9,7 +10,7 @@ class clickShop extends AShop {
                 price: 10,
                 level: 1,
                 equation: function(price) {
-                    return price + (Math.floor(this.level/10)+1)*price*.5;
+                    return price * 1.3;
                 },
                 getValue: function() { return this.level; }
             },
@@ -18,7 +19,7 @@ class clickShop extends AShop {
                 price: 20,
                 level: 1,
                 equation: function(price) {
-                    return price + (Math.floor(this.level/10)+1)*price*0.2;
+                    return price * 1.2;
                 },
                 getValue: function() { 
                     if (this.level < 10){
@@ -52,7 +53,7 @@ class clickShop extends AShop {
                 price: 50,
                 level: 1,
                 equation: function(price) {
-                    return price + (Math.floor(this.level/10)+1)*price*0.3;
+                    return price * 1.25;
                 },
                 getValue: function() { 
                     /* rest of the getValue function remains the same */
@@ -87,7 +88,7 @@ class clickShop extends AShop {
                 price: 50,
                 level: 1,
                 equation: function(price) {
-                    return price + (Math.floor(this.level/10)+1)*price*0.3;
+                    return price * 1.25;
                 },
                 getValue: function() { 
                     /* rest of the getValue function remains the same */

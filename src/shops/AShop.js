@@ -23,21 +23,55 @@ class AShop {
         }
         return this.balance;
     }
+    /** Price after buying one more level while the item is at `level`. */
+    nextPrice(item, price, level) {
+        if (item.priceEquation) return item.priceEquation(price, level);
+        // Legacy `equation`s read `this.level`, so give them the level the
+        // item would have at that step of a bulk buy.
+        return item.equation.call({ ...item, level }, price);
+    }
     itemCost(item, amount) {
         let cost = 0;
         let currentPrice = item.price;
         const costScalingMultiplier = item.costScalingMultiplier ?? 1;
         for (let i = 0; i < amount; ++i) {
             cost += currentPrice * costScalingMultiplier;
-            // Legacy `equation`s read `this.level`, so each step of a bulk
-            // buy sees the level the item would have at that point.
-            const level = item.level + i;
-            const priceEquation = item.priceEquation
-                ?? ((price) => item.equation.call({ ...item, level }, price));
-            currentPrice = priceEquation(currentPrice, level);
+            currentPrice = this.nextPrice(item, currentPrice, item.level + i);
         }
         return [cost, currentPrice];
     }
+    /**
+     * Most levels the balance covers in one go (respecting maxLevel), and
+     * what they cost together. `limit` keeps a huge balance from looping forever.
+     */
+    maxAffordable(item, limit = 10000) {
+        const room = item.maxLevel != null ? Math.max(0, item.maxLevel - item.level) : Infinity;
+        const cap = Math.min(room, limit);
+        const scaling = item.costScalingMultiplier ?? 1;
+        let count = 0;
+        let cost = 0;
+        let price = item.price;
+        while (count < cap) {
+            const next = price * scaling;
+            if (!Number.isFinite(next) || cost + next > this.balance) break;
+            cost += next;
+            price = this.nextPrice(item, price, item.level + count);
+            count++;
+        }
+        return { count, cost };
+    }
+
+    /**
+     * Set a freshly-built item to `level`, deriving its price from the
+     * current price curve (so a save made under older, steeper curves
+     * gets today's prices).
+     */
+    restoreLevel(item, level) {
+        const steps = level - item.level;
+        if (steps > 0) item.price = this.itemCost(item, steps)[1];
+        item.level = level;
+    }
+
     buyItem(item, amount = 1) {
         if (!Number.isInteger(amount) || amount < 1 ||
             (item.maxLevel != null && item.level + amount > item.maxLevel)) {

@@ -1,5 +1,10 @@
 import AShop from './AShop.js';
 
+/*
+ * Price curves: each level costs a steady percentage more (×1.35 size,
+ * ×1.45 speed, ×1.5 arena) plus a small flat amount, so prices climb
+ * smoothly instead of exploding. Add-shape items stay at ×1.1 + 1.
+ */
 class baseUpgradeShop extends AShop {
     constructor() {
         super();
@@ -16,35 +21,36 @@ class baseUpgradeShop extends AShop {
                     name: "Increase Ball Size Range Min", 
                     price: 20, 
                     level: 1, 
-                    equation: price => (price + 10) ** 1.2,
+                    equation: price => price * 1.35 + 5,
                     getValue: function() { return this.level + 4; }
                 },
                 { 
                     name: "Increase Ball Size Range Max", 
                     price: 20, 
                     level: 1, 
-                    equation: price => (price + 10) ** 1.2,
+                    equation: price => price * 1.35 + 5,
                     getValue: function() { return this.level + 14; }
                 },
                 { 
                     name: "Increase Ball Speed Min", 
                     price: 30, 
                     level: 1, 
-                    equation: price => (price + 10) ** 1.4,
+                    equation: price => price * 1.45 + 5,
                     getValue: function() { return this.level + 4; }
                 },
                 { 
                     name: "Increase Ball Speed Max", 
                     price: 30, 
                     level: 1, 
-                    equation: price => (price + 10) ** 1.4,
+                    equation: price => price * 1.45 + 5,
                     getValue: function() { return this.level + 14; }
                 },
                 { 
                     name: "Decrease Large Circle Size", 
                     price: 50, 
                     level: 1, 
-                    equation: price => (price + 10) ** 1.2,
+                    maxLevel: 100, // 750 - 5 * level must stay well above 0
+                    equation: price => price * 1.5 + 10,
                     getValue: function() { return 750 - (this.level * 5); }
                 }
             ]
@@ -87,28 +93,28 @@ class baseUpgradeShop extends AShop {
                 name: "Increase Square Size Range Min", 
                 price: 20, 
                 level: 1, 
-                equation: price => (price + 10) ** 1.2,
+                equation: price => price * 1.35 + 5,
                 getValue: function() { return this.level + 4; }
             },
             { 
                 name: "Increase Square Size Range Max", 
                 price: 20, 
                 level: 1, 
-                equation: price => (price + 10) ** 1.2,
+                equation: price => price * 1.35 + 5,
                 getValue: function() { return this.level + 14; }
             },
             { 
                 name: "Increase Square Speed Min", 
                 price: 30, 
                 level: 1, 
-                equation: price => (price + 10) ** 1.4,
+                equation: price => price * 1.45 + 5,
                 getValue: function() { return this.level + 4; }
             },
             { 
                 name: "Increase Square Speed Max", 
                 price: 30, 
                 level: 1, 
-                equation: price => (price + 10) ** 1.4,
+                equation: price => price * 1.45 + 5,
                 getValue: function() { return this.level + 14; }
             }
         ];
@@ -118,10 +124,10 @@ class baseUpgradeShop extends AShop {
         if (this.items.triangleShop) return;
         this.items.triangleShop = [
             { name: "Add Triangle", price: 1, level: 1, equation: price => price * 1.1 + 1, getValue() { return this.level + 1; } },
-            { name: "Increase Triangle Size Range Min", price: 20, level: 1, equation: price => (price + 10) ** 1.2, getValue() { return this.level + 4; } },
-            { name: "Increase Triangle Size Range Max", price: 20, level: 1, equation: price => (price + 10) ** 1.2, getValue() { return this.level + 14; } },
-            { name: "Increase Triangle Speed Min", price: 30, level: 1, equation: price => (price + 10) ** 1.4, getValue() { return this.level + 4; } },
-            { name: "Increase Triangle Speed Max", price: 30, level: 1, equation: price => (price + 10) ** 1.4, getValue() { return this.level + 14; } },
+            { name: "Increase Triangle Size Range Min", price: 20, level: 1, equation: price => price * 1.35 + 5, getValue() { return this.level + 4; } },
+            { name: "Increase Triangle Size Range Max", price: 20, level: 1, equation: price => price * 1.35 + 5, getValue() { return this.level + 14; } },
+            { name: "Increase Triangle Speed Min", price: 30, level: 1, equation: price => price * 1.45 + 5, getValue() { return this.level + 4; } },
+            { name: "Increase Triangle Speed Max", price: 30, level: 1, equation: price => price * 1.45 + 5, getValue() { return this.level + 14; } },
         ];
     }
 

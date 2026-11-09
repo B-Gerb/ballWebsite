@@ -450,6 +450,24 @@ canvas {
     color: #ff6b6b;
 }
 
+.store-row.is-maxed {
+    cursor: default;
+    border-left-color: #ffd54a;
+}
+
+.store-row.is-maxed:hover {
+    transform: none;
+    filter: none;
+}
+
+.store-row.is-maxed .store-row-price {
+    color: #ffd54a;
+}
+
+.store-row.is-maxed .store-row-coin {
+    display: none;
+}
+
 @media (prefers-reduced-motion: reduce) {
     .store-row {
         transition: none;

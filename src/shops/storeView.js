@@ -27,7 +27,7 @@ export function createStoreSection(title, accent) {
   return section;
 }
 
-export function createStoreRow({ item, className, amount = 1, cost, canAfford, currencyIcon, onBuy }) {
+export function createStoreRow({ item, className, amount = 1, cost, canAfford, maxed, currencyIcon, onBuy }) {
   const { icon, description } = catalogEntry(item.name);
   const row = el('button', `store-row ${className}`);
   row.type = 'button';
@@ -48,18 +48,21 @@ export function createStoreRow({ item, className, amount = 1, cost, canAfford, c
   row.appendChild(el('span', 'store-row-level'));
   row.addEventListener('click', onBuy);
 
-  refreshStoreRow(row, { item, amount, cost, canAfford });
+  refreshStoreRow(row, { item, amount, cost, canAfford, maxed });
   return row;
 }
 
 /** `cost` is the total for `amount` levels. Cheap enough to call every UI tick. */
-export function refreshStoreRow(row, { item, amount = 1, cost, canAfford }) {
-  row.classList.toggle('cannot-afford', !canAfford);
-  row.querySelector('.store-row-cost').textContent = formatNumber(cost);
-  row.querySelector('.store-row-amount').textContent = amount > 1 ? `for ${amount}` : '';
+export function refreshStoreRow(row, { item, amount = 1, cost, canAfford, maxed = false }) {
+  row.classList.toggle('cannot-afford', !canAfford && !maxed);
+  row.classList.toggle('is-maxed', maxed);
+  row.querySelector('.store-row-cost').textContent = maxed ? 'MAX' : formatNumber(cost);
+  row.querySelector('.store-row-amount').textContent = !maxed && amount > 1 ? `for ${amount}` : '';
   row.querySelector('.store-row-level').textContent = item.level;
   row.setAttribute(
     'aria-label',
-    `Buy ${amount} ${item.name}, level ${item.level}, costs ${formatNumber(cost)}${canAfford ? '' : ', cannot afford'}`,
+    maxed
+      ? `${item.name}, level ${item.level}, maxed out`
+      : `Buy ${amount} ${item.name}, level ${item.level}, costs ${formatNumber(cost)}${canAfford ? '' : ', cannot afford'}`,
   );
 }

@@ -13,8 +13,8 @@ export const STORE_SECTIONS = {
   clickShop: { title: 'Clicker', currency: 'click', accent: '#fbbf24' },
 };
 
-/** Buy-amount toggle in the store header (like Cookie Clicker's 1 / 10 / 100). */
-export const STORE_BUY_AMOUNTS = [1, 10, 100];
+/** Buy-amount toggle in the store header (Cookie Clicker's 1 / 10 / 100, plus max). */
+export const STORE_BUY_AMOUNTS = [1, 10, 100, 'max'];
 
 export const SHOP_CATALOG = {
   'Add Ball': { icon: '⚪', description: 'Adds another circle to the board.' },

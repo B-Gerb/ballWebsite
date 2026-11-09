@@ -245,6 +245,12 @@ function createShape(savedShape, id) {
     return shape;
 }
 
+/** Saved level, sanitized and kept within the item's max level. */
+function savedLevel(item, savedItem) {
+    const level = nonNegativeInteger(savedItem.level);
+    return Number.isFinite(item.maxLevel) ? Math.min(item.maxLevel, level) : level;
+}
+
 /**
  * Load base upgrade shop state
  * @param {Object} server - Game server instance
@@ -277,8 +283,8 @@ function loadLegacyShopItems(server, items) {
         for (const category in server.baseUpgradeShop.items) {
             const item = server.baseUpgradeShop.items[category].find(i => i.name === savedItem.name);
             if (item) {
-                item.price = nonNegativeFinite(savedItem.price, item.price);
-                item.level = nonNegativeInteger(savedItem.level);
+                // Prices come from the level and today's price curve, not the save.
+                server.baseUpgradeShop.restoreLevel(item, savedLevel(item, savedItem));
                 break;
             }
         }
@@ -304,8 +310,8 @@ function loadCategorizedShopItems(server, items) {
             items[category].forEach(savedItem => {
                 const item = server.baseUpgradeShop.items[category].find(i => i.name === savedItem.name);
                 if (item) {
-                    item.price = nonNegativeFinite(savedItem.price, item.price);
-                    item.level = nonNegativeInteger(savedItem.level);
+                    // Prices come from the level and today's price curve, not the save.
+                    server.baseUpgradeShop.restoreLevel(item, savedLevel(item, savedItem));
                 }
             });
         }
@@ -327,8 +333,8 @@ function loadclickShop(server, gameState) {
         clickShop.items.forEach(savedItem => {
             const item = server.clickShop.getItem(savedItem.name);
             if (item) {
-                item.price = nonNegativeFinite(savedItem.price, item.price);
-                item.level = nonNegativeInteger(savedItem.level);
+                // Prices come from the level and today's price curve, not the save.
+                server.clickShop.restoreLevel(item, savedLevel(item, savedItem));
                 
                 // Special handling for click value
                 if (savedItem.name === "Increase Click Value") {
@@ -577,8 +583,8 @@ function loadPreVersion(server, gameState) {
             gameState.shop.items.forEach(savedItem => {
                 const item = server.baseUpgradeShop.getItem(savedItem.name)[0];
                 if (item) {
-                    item.price = nonNegativeFinite(savedItem.price, item.price);
-                    item.level = nonNegativeInteger(savedItem.level);
+                    // Prices come from the level and today's price curve, not the save.
+                    server.baseUpgradeShop.restoreLevel(item, savedLevel(item, savedItem));
                 }
             });
         }

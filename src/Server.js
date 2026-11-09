@@ -240,7 +240,7 @@ class Server {
         // Remove createGameContainer logic for clickerCanvas
         this.clickerObject = null;
         this.clickerValue = 1;
-        // Store buy amount (×1 / ×10 / ×100); not saved.
+        // Store buy amount (1 / 10 / 100 / 'max'); not saved.
         this.storeBuyAmount = 1;
 
         // Animation and physics timing
@@ -434,9 +434,21 @@ class Server {
         this.updatePrestigeFocusButton();
 
     }
-    /** Live cost + affordability for one store row, at the chosen buy amount. */
+    /**
+     * Live cost + affordability for one store row, at the chosen buy amount
+     * (1, 10, 100 or 'max'). Never asks for more levels than an item has left.
+     */
     storeRowState(item, shop) {
-        const amount = this.storeBuyAmount;
+        const room = item.maxLevel != null ? item.maxLevel - item.level : Infinity;
+        if (room <= 0) return { item, amount: 0, cost: 0, canAfford: false, maxed: true };
+
+        if (this.storeBuyAmount === 'max') {
+            const { count, cost } = shop.maxAffordable(item);
+            // Nothing affordable: show what one more level would cost.
+            if (count === 0) return { item, amount: 1, cost: shop.itemCost(item, 1)[0], canAfford: false };
+            return { item, amount: count, cost, canAfford: true };
+        }
+        const amount = Math.min(this.storeBuyAmount, room);
         const cost = shop.itemCost(item, amount)[0];
         return { item, amount, cost, canAfford: shop.balance >= cost };
     }
@@ -444,7 +456,7 @@ class Server {
     setStoreBuyAmount(amount) {
         this.storeBuyAmount = amount;
         this.elements.shopContainer?.querySelectorAll('.store-amount').forEach((button) => {
-            const active = Number(button.dataset.amount) === amount;
+            const active = String(amount) === button.dataset.amount;
             button.classList.toggle('is-active', active);
             button.setAttribute('aria-pressed', String(active));
         });
@@ -506,7 +518,9 @@ class Server {
                 <div class="store-amounts" role="group" aria-label="Buy amount">
                     <span class="store-amounts-label">Buy</span>
                     ${STORE_BUY_AMOUNTS.map((amount) => `
-                        <button type="button" class="store-amount" data-amount="${amount}">×${amount}</button>
+                        <button type="button" class="store-amount" data-amount="${amount}">
+                            ${amount === 'max' ? 'Max' : `×${amount}`}
+                        </button>
                     `).join('')}
                 </div>
                 <div class="store-balances">
@@ -518,7 +532,8 @@ class Server {
             </header>
         `;
         shopContainer.querySelectorAll('.store-amount').forEach((button) => {
-            button.addEventListener('click', () => this.setStoreBuyAmount(Number(button.dataset.amount)));
+            const { amount } = button.dataset;
+            button.addEventListener('click', () => this.setStoreBuyAmount(amount === 'max' ? 'max' : Number(amount)));
         });
         this.setupPrestigeAccess();
 
@@ -533,7 +548,10 @@ class Server {
                     currencyIcon,
                     ...this.storeRowState(item, shop),
                     onBuy: () => {
-                        buy(item.name, this.storeBuyAmount);
+                        // Re-read at click time: under 'max' the count depends on the balance now.
+                        const { amount, canAfford } = this.storeRowState(item, shop);
+                        if (!canAfford) return;
+                        buy(item.name, amount);
                         this.updateButtonAppearance();
                     },
                 });
