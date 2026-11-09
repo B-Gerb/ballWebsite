@@ -1,15 +1,17 @@
 /**
  * Prestige upgrade tree definition: data only.
  *
- * `PrestigePopup` hands these nodes to the generic `NodeGraph`, which lays
- * them out automatically (rows from `requires`, order chosen to reduce line
- * crossings) and draws the connecting lines. You never choose a position.
+ * `PrestigePopup` hands these nodes to the generic `NodeGraph` with the
+ * radial layout: the root sits in the middle and each branch grows outward
+ * in its own direction. A node hangs off its FIRST requirement; any extra
+ * requirements still get a line. Siblings appear in the order listed here.
+ * You never choose a position.
  *
  * ── Adding an upgrade ────────────────────────────────────────────────
  * 1. Add the upgrade to `src/shops/prestigeShop.js` (name / price / maxLevel).
  * 2. Add a node here with the SAME `item` name and list what it needs in
  *    `requires`. Locked nodes stay hidden until every requirement is met,
- *    and the tree re-lays itself out as nodes unlock.
+ *    but their slot is reserved, so unlocking never moves other nodes.
  * 3. Handle its effect in `Server.applyPrestigeUpgradeEffect`.
  *
  * ── Adding a whole new path ──────────────────────────────────────────
@@ -25,8 +27,6 @@
  *   branch      key of BRANCHES — controls the colour
  *   requires    [] | ['other-id'] | [{ id: 'other-id', level: 3 }]
  *               A bare string means "at least level 1".
- *   pin         optional { col, row } to force a node into a fixed slot.
- *               Only use it when the automatic layout really isn't right.
  *   description one line shown in the detail panel
  *   effectKey   key used by the matching shop item to format its effect
  */

@@ -9,6 +9,8 @@ class Square {
         this.mass = Math.PI * side * side;
         this.velocity = { x: dx, y: dy };
         this.baseSide = side;
+        // Points per hit; fused shapes carry the value of everything inside them.
+        this.value = 1;
     }
     getName(){
         return "Square";
@@ -82,6 +84,7 @@ class Square {
             mass: this.mass,
             velocity: this.velocity,
             color: this.color,
+            value: this.value,
         };
     }
     static create(x, y, side, rotation, color, dx, dy, baseSide = side) {

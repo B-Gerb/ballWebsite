@@ -1,6 +1,7 @@
 import { useEffect, useMemo } from 'react';
 import Whiteboard from './Whiteboard.jsx';
 import { layoutGraph } from './graphLayout.js';
+import { layoutRadial } from './radialLayout.js';
 import './NodeGraph.css';
 
 /** Last layout per board (session only), so reopening keeps node order stable. */
@@ -17,12 +18,17 @@ const FIT_PADDING = 48;
  * The layout only depends on which nodes are visible, so frequent parent
  * re-renders (e.g. a balance ticking) re-render the cards but never
  * re-run the layout.
+ *
+ * `layout="layered"` (default) stacks rows top-down from `requires`;
+ * `layout="radial"` puts the root in the middle and sends each branch out
+ * in its own direction, with every node keeping a fixed slot.
  */
 function NodeGraph({
   nodes,
   isVisible = () => true,
   nodeSize = DEFAULT_SIZE,
   gap = 24,
+  layout: layoutKind = 'layered',
   renderNode,
   nodeLabel,
   edgeClassName,
@@ -44,13 +50,16 @@ function NodeGraph({
 
   const layout = useMemo(() => {
     const visible = new Set(visibleKey ? visibleKey.split('|') : []);
+    if (layoutKind === 'radial') {
+      return layoutRadial(nodes, { isVisible: (n) => visible.has(n.id), nodeSize: { width, height }, gap });
+    }
     return layoutGraph(nodes, {
       isVisible: (n) => visible.has(n.id),
       nodeSize: { width, height },
       gap,
       previous: previousLayouts.get(cameraKey),
     });
-  }, [nodes, visibleKey, width, height, gap, cameraKey]);
+  }, [nodes, visibleKey, width, height, gap, cameraKey, layoutKind]);
 
   useEffect(() => {
     previousLayouts.set(cameraKey, layout);
@@ -77,8 +86,9 @@ function NodeGraph({
 
   const edgeLayer = useMemo(() => {
     const looks = JSON.parse(edgeLooksKey);
-    const svgWidth = Math.max(1, layout.bounds.maxX);
-    const svgHeight = Math.max(1, layout.bounds.maxY);
+    // Radial boards report the whole board as `extent`; bounds only hug what's visible.
+    const svgWidth = Math.max(1, (layout.extent ?? layout.bounds).maxX);
+    const svgHeight = Math.max(1, (layout.extent ?? layout.bounds).maxY);
     return (
       <svg
         className="ng-edges"

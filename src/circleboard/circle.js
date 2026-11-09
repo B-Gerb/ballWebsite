@@ -8,6 +8,8 @@ class Circle {
         this.mass = Math.PI * radius * radius;
         this.velocity = { x: dx, y: dy };
 
+        // Points per hit; fused shapes carry the value of everything inside them.
+        this.value = 1;
     }
     getName(){
         return "Circle";
@@ -45,6 +47,7 @@ class Circle {
             mass: this.mass,
             velocity: this.velocity,
             color: this.color,
+            value: this.value,
             baseRadius: this.baseRadius
         };
     }

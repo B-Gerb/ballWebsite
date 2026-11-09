@@ -78,6 +78,18 @@ function App() {
     return false;
   };
 
+  // Skills: every action refreshes the popup data when it succeeds.
+  const runSkillAction = (action) => {
+    const server = serverRef.current;
+    if (!server) return false;
+    const success = action(server);
+    if (success) setPrestigeData(server.getPrestigeShopData());
+    return success;
+  };
+  const handleUnlockSkills = () => runSkillAction((server) => server.unlockSkills());
+  const handleBuySkillPoint = () => runSkillAction((server) => server.buySkillPoint());
+  const handleBuySkill = (skillId) => runSkillAction((server) => server.buySkill(skillId));
+
   const handlePrestige = () => {
     const server = serverRef.current;
     if (!server) return false;
@@ -141,6 +153,9 @@ function App() {
           prestigeShop={prestigeData}
           onPurchase={handlePrestigePurchase}
           onPrestige={handlePrestige}
+          onUnlockSkills={handleUnlockSkills}
+          onBuySkillPoint={handleBuySkillPoint}
+          onBuySkill={handleBuySkill}
         />
       )}
     </div>

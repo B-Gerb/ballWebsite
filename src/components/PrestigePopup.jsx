@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BRANCHES, PRESTIGE_NODES } from '../data/prestigeTree';
 import { describePrestigeEffect } from '../prestigeEquations';
 import NodeGraph from './whiteboard/NodeGraph.jsx';
+import SkillsBoard from './SkillsBoard.jsx';
+import { formatNumber } from './formatNumber.js';
 import { normalizeRequirement } from './whiteboard/graphLayout.js';
 import './PrestigePopup.css';
 
@@ -9,16 +11,6 @@ import './PrestigePopup.css';
 const NODE_SIZE = { width: 128, height: 112 };
 const NODE_GAP = 24;
 const SHEET_SWIPE_CLOSE = 60;
-
-const formatNumber = (value) => {
-  if (value === undefined || value === null || Number.isNaN(value)) return '—';
-  const abs = Math.abs(value);
-  if (abs >= 1e12) return `${(value / 1e12).toFixed(2)}T`;
-  if (abs >= 1e9) return `${(value / 1e9).toFixed(2)}B`;
-  if (abs >= 1e6) return `${(value / 1e6).toFixed(2)}M`;
-  if (abs >= 1e4) return `${(value / 1e3).toFixed(2)}K`;
-  return value.toFixed(2);
-};
 
 const branchOf = (node) => BRANCHES[node.branch] ?? { label: 'Upgrade', color: '#94a3b8' };
 
@@ -213,8 +205,12 @@ const PrestigePopup = ({
   prestigeShop,
   onPurchase,
   onPrestige,
+  onUnlockSkills,
+  onBuySkillPoint,
+  onBuySkill,
 }) => {
   const [selectedId, setSelectedId] = useState(null);
+  const [tab, setTab] = useState('upgrades');
   const [isConfirmingPrestige, setIsConfirmingPrestige] = useState(false);
   const [showStats, setShowStats] = useState(false);
 
@@ -418,7 +414,36 @@ const PrestigePopup = ({
           </section>
         )}
 
-        {mode === 'buffs' ? (
+        {mode !== 'buffs' && (
+          <nav className="pt-tabs" aria-label="Prestige sections">
+            <button
+              type="button"
+              className={`pt-tab ${tab === 'upgrades' ? 'is-active' : ''}`}
+              aria-pressed={tab === 'upgrades'}
+              onClick={() => setTab('upgrades')}
+            >
+              ✨ Upgrades
+            </button>
+            <button
+              type="button"
+              className={`pt-tab ${tab === 'skills' ? 'is-active' : ''}`}
+              aria-pressed={tab === 'skills'}
+              onClick={() => { setTab('skills'); setSelectedId(null); }}
+            >
+              {prestigeShop?.skills?.unlocked ? '🧬' : '🔒'} Skills
+            </button>
+          </nav>
+        )}
+
+        {mode !== 'buffs' && tab === 'skills' ? (
+          <SkillsBoard
+            skills={prestigeShop?.skills}
+            prestigeBalance={balance}
+            onUnlock={onUnlockSkills}
+            onBuySkillPoint={onBuySkillPoint}
+            onBuySkill={onBuySkill}
+          />
+        ) : mode === 'buffs' ? (
           <section className="pt-buffs-panel" aria-label="Active prestige buffs">
             <div className="pt-buffs-heading">
               <div>
@@ -449,6 +474,7 @@ const PrestigePopup = ({
               isVisible={isVisible}
               nodeSize={NODE_SIZE}
               gap={NODE_GAP}
+              layout="radial"
               renderNode={renderNode}
               nodeLabel={nodeLabel}
               edgeClassName={edgeClassName}

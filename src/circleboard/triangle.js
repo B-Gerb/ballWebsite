@@ -7,6 +7,8 @@ class Triangle {
         this.mass = (Math.sqrt(3) / 4) * side * side;
         this.velocity = { x: dx, y: dy };
         this.baseSide = side;
+        // Points per hit; fused shapes carry the value of everything inside them.
+        this.value = 1;
     }
 
     getName() {
@@ -66,6 +68,7 @@ class Triangle {
             mass: this.mass,
             velocity: this.velocity,
             color: this.color,
+            value: this.value,
         };
     }
 

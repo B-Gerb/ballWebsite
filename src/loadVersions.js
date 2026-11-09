@@ -178,6 +178,8 @@ function loadShapes(server, circleBoard) {
         // No saved shapes, initialize with default
         server.circleBoard.addNewBalls(1);
     }
+    // New shapes (and fused ones) must not reuse a loaded id.
+    server.circleBoard.counter = Math.max(server.circleBoard.counter, counter);
 }
 
 /**
@@ -235,6 +237,9 @@ function createShape(savedShape, id) {
     
     if (shape) {
         shape.id = id;
+        if (Number.isFinite(savedShape.value) && savedShape.value >= 1) {
+            shape.value = savedShape.value;
+        }
     }
     
     return shape;
@@ -545,6 +550,8 @@ function load0_0_5(server, gameState) {
     
     // Apply all prestige upgrades after loading to ensure effects are active
     server.applyAllPrestigeUpgrades();
+    server.skillShop.load(gameState.skills);
+    server.applySkillEffects();
     
     server.updateBalanceDisplay();
     server.setupShopUI();

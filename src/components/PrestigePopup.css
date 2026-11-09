@@ -797,3 +797,78 @@
     transition: none;
   }
 }
+
+/* ── Tabs + Skills ─────────────────────────────────────────────────── */
+
+.pt-tabs {
+  display: flex;
+  gap: 6px;
+  padding: 6px 14px;
+  border-bottom: 1px solid var(--pt-border);
+}
+
+.pt-tab {
+  padding: 6px 14px;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--pt-muted);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.pt-tab:hover {
+  color: inherit;
+  border-color: var(--pt-border);
+}
+
+.pt-tab.is-active {
+  color: inherit;
+  background: rgba(249, 115, 22, 0.16);
+  border-color: rgba(249, 115, 22, 0.55);
+}
+
+.pt-skills {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.pt-skills-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--pt-border);
+}
+
+.pt-skills-bar .pt-ghost-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.pt-skills-unlock {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  max-width: 520px;
+  margin: 0 auto;
+  padding: 24px 16px;
+  text-align: center;
+}
+
+.pt-skills-unlock-icon {
+  font-size: 3rem;
+}
+
+.pt-skills-unlock p {
+  color: var(--pt-muted);
+  line-height: 1.5;
+}

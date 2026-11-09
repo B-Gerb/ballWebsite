@@ -1,9 +1,9 @@
-import AShop from './AShop';
+import AShop from './AShop.js';
 import {
     linearValue,
     prestigeGainMultiplier,
     scaledPrice,
-} from '../prestigeEquations';
+} from '../prestigeEquations.js';
 
 class prestigeShop extends AShop{
     constructor() {

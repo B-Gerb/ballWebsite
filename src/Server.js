@@ -5,6 +5,8 @@ import CircleBoard from './circleboard/CircleBoard';
 import baseUpgradeShop from './shops/baseUpgradeShop';
 import clickShop from './shops/clickShop';
 import prestigeShop from './shops/prestigeShop';
+import SkillShop, { SKILLS_UNLOCK_COST } from './shops/skillShop';
+import { SKILL_NODES } from './data/skillTree';
 import ClickerObject from './clicking/ClickerObject';
 import { PRESTIGE_EQUATIONS } from './prestigeEquations';
 
@@ -125,6 +127,8 @@ class Server {
         this.baseUpgradeShop = new baseUpgradeShop();
         this.clickShop = new clickShop();
         this.prestigeUpgradeShop = new prestigeShop();
+        // Skills: the permanent layer above prestige (survives prestiges).
+        this.skillShop = new SkillShop();
         
         // Permanent prestige state and run-only state.
         this.prestigeStats = {
@@ -210,6 +214,7 @@ class Server {
             }
         };
         this.applyAllPrestigeUpgrades();
+        this.applySkillEffects();
         this.temporaryMultipliersActiveFrames = {};
 
         // DOM elements
@@ -957,6 +962,57 @@ class Server {
         });
     }
 
+    // Push skill effects into the systems that use them (call after any
+    // skill change and whenever the board is rebuilt).
+    applySkillEffects() {
+        const effects = this.skillShop.effects();
+        this.circleBoard.fusionChance = effects.fusionChance;
+    }
+
+    unlockSkills() {
+        const success = this.skillShop.unlock(this.prestigeUpgradeShop);
+        if (success) this.saveGameState();
+        return success;
+    }
+
+    buySkillPoint() {
+        const success = this.skillShop.buySkillPoint(this.prestigeUpgradeShop);
+        if (success) this.saveGameState();
+        return success;
+    }
+
+    buySkill(skillId) {
+        const success = this.skillShop.buy(skillId);
+        if (success) {
+            this.applySkillEffects();
+            this.saveGameState();
+        }
+        return success;
+    }
+
+    getSkillData() {
+        const skills = this.skillShop;
+        return {
+            unlocked: skills.unlocked,
+            unlockCost: SKILLS_UNLOCK_COST,
+            skillPoints: skills.skillPoints,
+            skillPointPrice: skills.skillPointPrice(),
+            collisionBank: skills.collisionBank,
+            effects: skills.effects(),
+            skills: SKILL_NODES.map((node) => {
+                const cost = skills.nextCost(node.id);
+                return {
+                    id: node.id,
+                    level: skills.level(node.id),
+                    maxLevel: node.maxLevel,
+                    available: skills.isAvailable(node.id),
+                    cost,
+                    canAfford: skills.canAfford(cost),
+                };
+            }),
+        };
+    }
+
     // Get prestige shop data for UI (compatible with PrestigePopup)
     getPrestigeShopData() {
         const preview = this.calculatePrestigePreview();
@@ -964,6 +1020,7 @@ class Server {
             balance: this.prestigeUpgradeShop.getBalance(),
             ...preview,
             prestige: this.prestigeStats,
+            skills: this.getSkillData(),
             upgrades: this.prestigeUpgradeShop.items.map(item => ({
                 name: item.name,
                 level: item.level,
@@ -1098,6 +1155,7 @@ class Server {
                 totalCollisions: this.circleBoard.getTotalShapeCollisions(),
                 totalWallHits: this.run.totalWallHits
             },
+            skills: this.skillShop.toJSON(),
             version: '0.0.7',
             seed: this.seed,
         };
@@ -1132,6 +1190,7 @@ class Server {
     // Reset the complete account, including permanent prestige progress.
     resetAllProgress(seed=null) {
         this.prestigeUpgradeShop.resetShop();
+        this.skillShop.reset();
         this.prestigeStats = {
             lifetimePoints: 0,
             lastAward: null,
@@ -1229,6 +1288,7 @@ class Server {
             totalWallHits: 0
         };
         this.applyAllPrestigeUpgrades();
+        this.applySkillEffects();
         // Update displays
         this.updateBalanceDisplay();
         this.setupShopUI();
@@ -1335,6 +1395,10 @@ class Server {
 
                         // Update balances based on shape collisions
                         this.run.totalWallHits += stats.total.totalWallHits;
+                        // Collisions fund skill levels once Skills are unlocked.
+                        if (this.skillShop.unlocked) {
+                            this.skillShop.addCollisions(stats.total.totalShapeCollisions);
+                        }
                         for (const [shapeType, shapeStats] of Object.entries(stats)) {
                             if(shapeType === 'total') continue;
                             const shapeName = shapeType.toLowerCase();
@@ -1360,7 +1424,7 @@ class Server {
                             switch (shapeType) {
                                 case 'Circle':
                                 {
-                                    const wallHitPoints = shapeStats.totalWallHits
+                                    const wallHitPoints = shapeStats.wallHitValue
                                         * totalValueMultiplier
                                         * this.multipliers.prestigeMultipliers.circleWallValue;
                                     this.baseUpgradeShop.addBalance(wallHitPoints);
@@ -1369,7 +1433,7 @@ class Server {
                                 }
                                 case 'Square':
                                 {
-                                    const collisionPoints = shapeStats.totalShapeCollisions * totalValueMultiplier;
+                                    const collisionPoints = shapeStats.collisionValue * totalValueMultiplier;
                                     this.baseUpgradeShop.addBalance(collisionPoints);
                                     this.addPointsAndCheckPrestige(collisionPoints);
                                     break;

@@ -3,6 +3,7 @@ import Circle from './circle.js';
 import Square from './square.js';
 import Triangle from './triangle.js';
 import CollisionResponse from './CollisionResponse.js';
+import { fuseShapes } from './fusion.js';
 
 /**
  * The board always simulates in a fixed logical coordinate space of
@@ -11,6 +12,12 @@ import CollisionResponse from './CollisionResponse.js';
  * Resizing the window therefore never changes physics, speeds or saves.
  */
 export const LOGICAL_SIZE = 800;
+
+/** Fusion limits, in base (unscaled) units per frame / size. */
+export const FUSION_LIMITS = {
+    maxSpeed: 30,
+    maxBaseSize: { Circle: 60, Square: 100, Triangle: 110 },
+};
 
 class CircleBoard {
     constructor(canvasElement) {
@@ -49,6 +56,10 @@ class CircleBoard {
 
         this.isRunning = true;
         this.rng = seedrandom();
+        // Chance (0-1) that a same-type collision fuses the pair (Shape Fusion skill).
+        // Rolled on its own RNG so fusion never shifts the seeded spawn sequence.
+        this.fusionChance = 0;
+        this.fusionRng = Math.random;
         
         // Collision tracking for time
         this.wallHits = 0;
@@ -375,7 +386,14 @@ class CircleBoard {
     updatePhysics(speedMultipliers = {}) {
         if (!this.isRunning) return {total: { totalWallHits: 0, totalShapeCollisions: 0 }};
 
-        const returnValues = {total: { totalWallHits: 0, totalShapeCollisions: 0 }};
+        const returnValues = {total: { totalWallHits: 0, totalShapeCollisions: 0, fusions: 0 }};
+        // Per-type counts (how many hits) and values (what they are worth:
+        // a fused shape counts once but is worth all the shapes inside it).
+        const statsFor = (name) => (returnValues[name] ??= {
+            totalWallHits: 0, totalShapeCollisions: 0, wallHitValue: 0, collisionValue: 0,
+        });
+        const fusing = new Set();
+        const fusions = [];
         
         // Track collisions for this frame
         let totalWallHits = 0;
@@ -389,13 +407,9 @@ class CircleBoard {
             if(CollisionResponse.handleContainerCollision(shape, this.container)){
 
                 totalWallHits++;
-                if(shape.getName() in returnValues){
-                    returnValues[shape.getName()].totalWallHits += 1;
-                }
-                else{
-                    returnValues[shape.getName()] = {totalWallHits: 0, totalShapeCollisions: 0};
-                    returnValues[shape.getName()].totalWallHits = 1;  
-                }
+                const shapeStats = statsFor(shape.getName());
+                shapeStats.totalWallHits += 1;
+                shapeStats.wallHitValue += shape.value ?? 1;
             }
             const cells = this.getShapeCells(shape, grid);
             cells.forEach(cell => {
@@ -416,6 +430,7 @@ class CircleBoard {
                     const shapeA = cell[j];
                     const shapeB = cell[k];
                     if(shapeA.id === shapeB.id) continue; // Skip self-collision
+                    if (fusing.has(shapeA) || fusing.has(shapeB)) continue; // already merged this frame
                     const pairKey = shapeA.id < shapeB.id ? 
                     `${shapeA.id}-${shapeB.id}` : 
                     `${shapeB.id}-${shapeA.id}`;
@@ -424,15 +439,24 @@ class CircleBoard {
                         if (CollisionResponse.handleCollision(shapeA, shapeB)) {
                             totalShapeCollisions++;
                             this.totalShapeCollisions++;
-                            if(!(shapeA.getName() in returnValues)){
-                                returnValues[shapeA.getName()] = {totalWallHits: 0, totalShapeCollisions: 0};
+                            const statsA = statsFor(shapeA.getName());
+                            statsA.totalShapeCollisions += 1;
+                            statsA.collisionValue += shapeA.value ?? 1;
+                            const statsB = statsFor(shapeB.getName());
+                            statsB.totalShapeCollisions += 1;
+                            statsB.collisionValue += shapeB.value ?? 1;
+
+                            if (this.fusionChance > 0
+                                && shapeA.getName() === shapeB.getName()
+                                && !fusing.has(shapeA) && !fusing.has(shapeB)
+                                && this.fusionRng() < this.fusionChance) {
+                                const fused = this.fuse(shapeA, shapeB);
+                                if (fused) {
+                                    fusing.add(shapeA);
+                                    fusing.add(shapeB);
+                                    fusions.push(fused);
+                                }
                             }
-                            returnValues[shapeA.getName()].totalShapeCollisions += 1;
-                            
-                            if(!(shapeB.getName() in returnValues)){
-                                returnValues[shapeB.getName()] = {totalWallHits: 0, totalShapeCollisions: 0};
-                            }
-                            returnValues[shapeB.getName()].totalShapeCollisions += 1;
                         }
                     }
                     }
@@ -440,12 +464,18 @@ class CircleBoard {
 
             }
         
+        if (fusions.length) {
+            this.shapes = this.shapes.filter(shape => !fusing.has(shape));
+            this.shapes.push(...fusions);
+        }
+
         this.shapes.forEach(shape => {
             // Update shape position and velocity
             shape.update(speedMultipliers[shape.getName().toLowerCase()] || 1);
         });
         returnValues.total.totalWallHits = totalWallHits;
         returnValues.total.totalShapeCollisions = totalShapeCollisions;
+        returnValues.total.fusions = fusions.length;
         
         // Update the collision statistics
         if (this.wallHitsStack.length >= 120) {
@@ -471,6 +501,17 @@ class CircleBoard {
     }
 
     
+    /** Fuse two same-type shapes into a new one (null if over the size cap). */
+    fuse(shapeA, shapeB) {
+        const fused = fuseShapes(shapeA, shapeB, {
+            scaleFactor: this.scaleFactor,
+            maxSpeed: FUSION_LIMITS.maxSpeed * this.scaleFactor,
+            maxBaseSize: FUSION_LIMITS.maxBaseSize[shapeA.getName()] ?? Infinity,
+        });
+        if (fused) fused.id = this.counter++;
+        return fused;
+    }
+
     /**
      * Render the current state without updating physics
      */
