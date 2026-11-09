@@ -1,4 +1,4 @@
-import AShop from './AShop';
+import AShop from './AShop.js';
 
 class baseUpgradeShop extends AShop {
     constructor() {

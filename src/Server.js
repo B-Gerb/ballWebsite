@@ -7,6 +7,9 @@ import clickShop from './shops/clickShop';
 import prestigeShop from './shops/prestigeShop';
 import SkillShop, { SKILLS_UNLOCK_COST } from './shops/skillShop';
 import { SKILL_NODES } from './data/skillTree';
+import { STORE_SECTIONS } from './data/shopCatalog';
+import { createStoreRow, createStoreSection, refreshStoreRow } from './shops/storeView';
+import { formatNumber } from './components/formatNumber';
 import ClickerObject from './clicking/ClickerObject';
 import { PRESTIGE_EQUATIONS } from './prestigeEquations';
 
@@ -429,163 +432,101 @@ class Server {
         this.updatePrestigeFocusButton();
 
     }
-    updateBaseUpgradeShopAppearance() {
-        const buttons = document.querySelectorAll('.baseUpgrade-shop-item-button');
-        
-        buttons.forEach(button => {
-            const itemName = button.querySelector('h3').textContent;
-            
-            const item = this.baseUpgradeShop.getItem(itemName)[0];
-            if (item) {
-                const canAfford = this.baseUpgradeShop.balance >= this.baseUpgradeShop.itemCost(item, 1)[0];
-                
-                if (canAfford) {
-                    button.classList.remove('cannot-afford');
-                } else {
-                    button.classList.add('cannot-afford');
-                }
-            }
-        });
+    /** Live cost + affordability for one store row of either shop. */
+    storeRowState(item, shop) {
+        const cost = shop.itemCost(item, 1)[0];
+        return { item, cost, canAfford: shop.balance >= cost };
     }
-    updateClickShopAppearance() {
-        const buttons = document.querySelectorAll('.click-shop-item-button');
-        buttons.forEach(button => {
-            const itemName = button.querySelector('h3').textContent;
-            
-            const item = this.clickShop.getItem(itemName);
-            if (item) {
-                const canAfford = this.clickShop.balance >= this.clickShop.itemCost(item, 1)[0];
-                
-                if (canAfford) {
-                    button.classList.remove('cannot-afford');
-                } else {
-                    button.classList.add('cannot-afford');
-                }
-            }
+
+    refreshStoreRows(selector, lookup, shop) {
+        document.querySelectorAll(selector).forEach((row) => {
+            const item = lookup(row.dataset.itemName);
+            if (item) refreshStoreRow(row, this.storeRowState(item, shop));
         });
     }
 
+    updateBaseUpgradeShopAppearance() {
+        this.refreshStoreRows(
+            '.baseUpgrade-shop-item-button',
+            (name) => {
+                // getItem throws for items not in the shop (e.g. right after a reset).
+                try { return this.baseUpgradeShop.getItem(name)[0]; } catch { return null; }
+            },
+            this.baseUpgradeShop,
+        );
+    }
+
+    updateClickShopAppearance() {
+        this.refreshStoreRows(
+            '.click-shop-item-button',
+            (name) => this.clickShop.getItem(name),
+            this.clickShop,
+        );
+    }
+
+    updateStoreBalances() {
+        const container = this.elements.shopContainer;
+        if (!container) return;
+        const balance = container.querySelector('[data-store-balance="balance"]');
+        const click = container.querySelector('[data-store-balance="click"]');
+        if (balance) balance.textContent = formatNumber(this.baseUpgradeShop.getBalance());
+        if (click) click.textContent = formatNumber(this.clickShop.getBalance());
+    }
 
     updateButtonAppearance() {
         this.updateBaseUpgradeShopAppearance();
         this.updateClickShopAppearance();
+        this.updateStoreBalances();
     }
-    // Setup shop UI elements
-    // For ClickingShop and CircleBoardShop
+
+    // Build the Cookie-Clicker-style store: balances on top, then one
+    // section of big rows per shop (Circles, Squares, Triangles, Clicker).
     setupShopUI() {
         const shopContainer = this.elements.shopContainer;
         if (!shopContainer) {
             console.error('Shop container element not found');
             return;
         }
-        
-        // Clear existing content
-        shopContainer.innerHTML = '';
-        
-        // Create Balance Shop section
-        const balanceShopSection = document.createElement('div');
-        balanceShopSection.className = 'shop-section';
-        balanceShopSection.innerHTML = `
-            <div class="shop-tabs" role="tablist" aria-label="Upgrade menus">
-                <button type="button" class="shop-tab is-active" role="tab" aria-selected="true">
-                    Balance Shop
-                </button>
-            </div>
+        shopContainer.innerHTML = `
+            <header class="store-header">
+                <h2 class="store-title">Store</h2>
+                <div class="store-balances">
+                    <span class="store-balance"><span aria-hidden="true">🪙</span>
+                        <strong data-store-balance="balance">0</strong><small>balance</small></span>
+                    <span class="store-balance"><span aria-hidden="true">👆</span>
+                        <strong data-store-balance="click">0</strong><small>clicks</small></span>
+                </div>
+            </header>
         `;
-        shopContainer.appendChild(balanceShopSection);
         this.setupPrestigeAccess();
-        
-        // Add shop items organized by category
-        for (const [shopName, shop] of Object.entries(this.baseUpgradeShop.items)) {
-            // Create category header
-            const categoryHeader = document.createElement('h3');
-            categoryHeader.textContent = shopName;
-            const categoryDetails = document.createElement('details');
-            categoryDetails.open = true;
-            const categorySummary = document.createElement('summary');
-            categorySummary.textContent = shopName;
-            categoryDetails.appendChild(categorySummary);
 
-            // Create grid container for this category
-            const categoryGrid = document.createElement('div');
-            categoryGrid.className = 'shop-items-grid';
-            
-            for (const item of shop) {
-                const button = document.createElement('button');
-                button.className = `shop-item-button baseUpgrade-shop-item-button ${shopName}-shop-item-button`;
-                
-                const canAfford = this.baseUpgradeShop.balance >= this.baseUpgradeShop.itemCost(item, 1)[0];
-                if (!canAfford) {
-                    button.classList.add('cannot-afford');
-                }
-                
-                button.innerHTML = `
-                    <h3 class="base-upgrade-itemNames">${item.name}</h3>
-                    <p>Level: <span id="${item.name.replace(/\s+/g, '-')}-level">${item.level}</span></p>
-                    <p>Cost: <span id="${item.name.replace(/\s+/g, '-')}-cost">${item.price.toFixed(2)}</span></p>
-                `;
-                
-                button.dataset.itemName = item.name;
-                button.dataset.shopCategory = shopName;
-                
-                button.addEventListener('click', () => {
-                    this.buyItemBShop(item.name);
-                    const levelSpan = button.querySelector(`#${item.name.replace(/\s+/g, '-')}-level`);
-                    const costSpan = button.querySelector(`#${item.name.replace(/\s+/g, '-')}-cost`);
-                    
-                    if (levelSpan) levelSpan.textContent = item.level;
-                    if (costSpan) costSpan.textContent = item.price.toFixed(2);
-                    this.updateButtonAppearance();
+        const addSection = (key, items, rowClass, shop, buy) => {
+            const meta = STORE_SECTIONS[key] ?? { title: key, currency: 'balance', accent: '#94a3b8' };
+            const section = createStoreSection(meta.title, meta.accent);
+            const currencyIcon = meta.currency === 'click' ? '👆' : '🪙';
+            for (const item of items) {
+                const row = createStoreRow({
+                    item,
+                    className: rowClass,
+                    currencyIcon,
+                    ...this.storeRowState(item, shop),
+                    onBuy: () => {
+                        buy(item.name);
+                        this.updateButtonAppearance();
+                    },
                 });
-                
-                categoryGrid.appendChild(button);
+                section.appendChild(row);
             }
-            
-            categoryDetails.appendChild(categoryGrid);
-            balanceShopSection.appendChild(categoryDetails);
+            shopContainer.appendChild(section);
+        };
+
+        for (const [key, items] of Object.entries(this.baseUpgradeShop.items)) {
+            addSection(key, items, 'baseUpgrade-shop-item-button', this.baseUpgradeShop,
+                (name) => this.buyItemBShop(name));
         }
-
-        // Create Click Shop section
-        const clickShopSection = document.createElement('div');
-        clickShopSection.className = 'shop-section';
-        clickShopSection.innerHTML = '<h2>Click Shop</h2>';
-        
-        const clickShopGrid = document.createElement('div');
-        clickShopGrid.className = 'shop-items-grid';
-
-        this.clickShop.items.forEach(item => {
-            const button = document.createElement('button');
-            button.className = 'shop-item-button click-shop-item-button';
-            
-            const canAfford = this.clickShop.balance >= this.clickShop.itemCost(item, 1)[0];
-            if (!canAfford) {
-                button.classList.add('cannot-afford');
-            }
-
-            button.innerHTML = `
-                <h3 class="base-upgrade-itemNames">${item.name}</h3>
-                <p>Level: <span id="${item.name.replace(/\s+/g, '-')}-level">${item.level}</span></p>
-                <p>Cost: <span id="${item.name.replace(/\s+/g, '-')}-cost">${item.price.toFixed(2)}</span></p>
-            `;
-            
-            button.addEventListener('click', () => {
-                const success = this.buyItemCShop(item.name);
-                
-                if (success) {
-                    const levelSpan = button.querySelector(`#${item.name.replace(/\s+/g, '-')}-level`);
-                    const costSpan = button.querySelector(`#${item.name.replace(/\s+/g, '-')}-cost`);
-                    
-                    if (levelSpan) levelSpan.textContent = item.level;
-                    if (costSpan) costSpan.textContent = item.price.toFixed(2);
-                    this.updateButtonAppearance();
-                }
-            });
-            
-            clickShopGrid.appendChild(button);
-        });
-        
-        clickShopSection.appendChild(clickShopGrid);
-        shopContainer.appendChild(clickShopSection);
+        addSection('clickShop', this.clickShop.items, 'click-shop-item-button', this.clickShop,
+            (name) => this.buyItemCShop(name));
+        this.updateStoreBalances();
     }
 
     /** Prestige entry point that sits under the clicker (layout via CSS). */
