@@ -20,12 +20,16 @@ test('every regular-shop item has a store icon and description', () => {
   }
 });
 
-test('every store icon is a drawn SVG, not an emoji', async () => {
-  const { storeIcon } = await import('../src/shops/storeIcons.js');
-  for (const [name, entry] of Object.entries(SHOP_CATALOG)) {
-    const svg = storeIcon(entry.icon);
-    assert.match(svg, /^<svg[\s\S]*<\/svg>$/, `${name} has no drawn icon`);
-    assert.notEqual(svg, storeIcon('no-such-icon'), `${name} uses an unknown icon key "${entry.icon}"`);
-    assert.doesNotMatch(entry.icon, /\p{Extended_Pictographic}/u, `${name} still uses an emoji`);
+test('every icon is plain text symbols, never an emoji', async () => {
+  const { PRESTIGE_NODES } = await import('../src/data/prestigeTree.js');
+  const { SKILL_NODES } = await import('../src/data/skillTree.js');
+  const icons = [
+    ...Object.entries(SHOP_CATALOG).map(([name, entry]) => [name, entry.icon]),
+    ...PRESTIGE_NODES.map((node) => [node.id, node.icon]),
+    ...SKILL_NODES.map((node) => [node.id, node.icon]),
+  ];
+  for (const [name, icon] of icons) {
+    assert.ok(typeof icon === 'string' && icon.length > 0 && icon.length <= 3, `${name} needs a short text icon`);
+    assert.doesNotMatch(icon, /\p{Extended_Pictographic}/u, `${name} uses an emoji icon "${icon}"`);
   }
 });

@@ -7,10 +7,9 @@ import clickShop from './shops/clickShop';
 import prestigeShop from './shops/prestigeShop';
 import SkillShop, { SKILLS_UNLOCK_COST } from './shops/skillShop';
 import { SKILL_NODES } from './data/skillTree';
-import { STORE_BUY_AMOUNTS, STORE_SECTIONS } from './data/shopCatalog';
+import { CURRENCY_ICONS, STORE_BUY_AMOUNTS, STORE_SECTIONS } from './data/shopCatalog';
 import { createStoreRow, createStoreSection, refreshStoreRow } from './shops/storeView';
 import { formatNumber } from './components/formatNumber';
-import { storeIcon } from './shops/storeIcons';
 import { activeBoosts, boostForItem, formatDuration } from './shops/boosts';
 import ClickerObject from './clicking/ClickerObject';
 import { PRESTIGE_EQUATIONS } from './prestigeEquations';
@@ -545,9 +544,9 @@ class Server {
                     `).join('')}
                 </div>
                 <div class="store-balances">
-                    <span class="store-balance">${storeIcon('coin', 20)}
+                    <span class="store-balance"><span class="store-symbol" aria-hidden="true">${CURRENCY_ICONS.balance}</span>
                         <strong data-store-balance="balance">0</strong><small>balance</small></span>
-                    <span class="store-balance">${storeIcon('cursor', 20)}
+                    <span class="store-balance"><span class="store-symbol" aria-hidden="true">${CURRENCY_ICONS.click}</span>
                         <strong data-store-balance="click">0</strong><small>clicks</small></span>
                 </div>
                 <div class="store-boosts" data-store-boosts aria-label="Active boosts" hidden></div>
@@ -562,7 +561,7 @@ class Server {
         const addSection = (key, items, rowClass, shop, buy) => {
             const meta = STORE_SECTIONS[key] ?? { title: key, currency: 'balance', accent: '#94a3b8' };
             const section = createStoreSection(meta.title, meta.accent);
-            const currencyIcon = storeIcon(meta.currency === 'click' ? 'cursor' : 'coin', 16);
+            const currencyIcon = CURRENCY_ICONS[meta.currency] ?? CURRENCY_ICONS.balance;
             for (const item of items) {
                 const row = createStoreRow({
                     item,
@@ -602,7 +601,7 @@ class Server {
                 aria-label="Prestige locked. Earn 1 prestige point to unlock"
                 title="Earn 1 prestige point to unlock Prestige"
             >
-                <span class="prestige-focus-icon">${storeIcon('lock', 20)}</span>
+                <span class="prestige-focus-icon" aria-hidden="true">⊘</span>
                 <span class="prestige-focus-label">Prestige</span>
             </button>
         `;
@@ -636,11 +635,7 @@ class Server {
             ? 'Open Prestige'
             : 'Earn 1 prestige point to unlock Prestige';
         const icon = button.querySelector('.prestige-focus-icon');
-        const iconKey = unlocked ? 'unlock' : 'lock';
-        if (icon && icon.dataset.icon !== iconKey) {
-            icon.dataset.icon = iconKey;
-            icon.innerHTML = storeIcon(iconKey, 20);
-        }
+        if (icon) icon.textContent = unlocked ? '✦' : '⊘';
     }
                     
            

@@ -1,7 +1,6 @@
 import { catalogEntry } from '../data/shopCatalog.js';
 import { formatNumber } from '../components/formatNumber.js';
 import { formatDuration } from './boosts.js';
-import { storeIcon } from './storeIcons.js';
 
 /**
  * Cookie-Clicker-style store rows for the regular shop (plain DOM, since
@@ -10,7 +9,7 @@ import { storeIcon } from './storeIcons.js';
  *   ┌──────┬──────────────────────────────┬─────┐
  *   │ icon │ Name                         │  12 │  ← level, big and faint
  *   │      │ what it does                 │     │
- *   │      │ (coin) 1.23K for 10 (green/red)│     │
+ *   │      │ ¤ 1.23K for 10 (green / red)  │     │
  *   │      │ ▓▓▓▓▓░░ ×1.5 · 0:23  (boosts) │     │
  *   └──────┴──────────────────────────────┴─────┘
  */
@@ -30,22 +29,20 @@ export function createStoreSection(title, accent) {
   return section;
 }
 
-/** `currencyIcon` is SVG markup (see storeIcons.js). */
+/** `currencyIcon` is a text symbol (see CURRENCY_ICONS). */
 export function createStoreRow({ item, className, amount = 1, cost, canAfford, maxed, boost, currencyIcon, onBuy }) {
   const { icon, description } = catalogEntry(item.name);
   const row = el('button', `store-row ${className}`);
   row.type = 'button';
   row.dataset.itemName = item.name;
 
-  const iconWell = row.appendChild(el('span', 'store-row-icon'));
-  iconWell.setAttribute('aria-hidden', 'true');
-  iconWell.innerHTML = storeIcon(icon, 44);
+  row.appendChild(el('span', 'store-row-icon', icon)).setAttribute('aria-hidden', 'true');
 
   const body = el('span', 'store-row-body');
   body.appendChild(el('span', 'store-row-name', item.name));
   if (description) body.appendChild(el('span', 'store-row-desc', description));
   const price = el('span', 'store-row-price');
-  price.appendChild(el('span', 'store-row-coin')).innerHTML = currencyIcon;
+  price.appendChild(el('span', 'store-row-coin', currencyIcon)).setAttribute('aria-hidden', 'true');
   price.appendChild(el('span', 'store-row-cost'));
   price.appendChild(el('span', 'store-row-amount'));
   body.appendChild(price);

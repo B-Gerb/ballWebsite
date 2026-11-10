@@ -29,7 +29,7 @@ export const SKILL_NODES = [
   {
     id: 'shape-fusion',
     label: 'Shape Fusion',
-    icon: '🧬',
+    icon: '⊕',
     branch: 'fusion',
     requires: [],
     description:

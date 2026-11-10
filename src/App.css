@@ -226,8 +226,8 @@ canvas {
 }
 
 .prestige-focus-icon {
-    display: inline-flex;
-    line-height: 0;
+    font-family: 'Segoe UI Symbol', 'DejaVu Sans', sans-serif;
+    line-height: 1;
 }
 
 /* ── Store (regular shop), Cookie-Clicker style ─────────────────────
@@ -405,11 +405,17 @@ canvas {
     place-items: center;
     width: 56px;
     height: 56px;
-    line-height: 0;
-    background: #ead7b0;
+    /* glyphs, not emoji: tint with the section accent */
+    font-family: 'Segoe UI Symbol', 'DejaVu Sans', 'Noto Sans Symbols 2', sans-serif;
+    font-size: 1.55rem;
+    font-weight: bold;
+    letter-spacing: -0.05em;
+    line-height: 1;
+    white-space: nowrap;
+    color: var(--accent, #94a3b8);
+    background: #2a190c;
     border: 2px solid var(--ink);
     border-radius: 8px;
-    box-shadow: inset 0 -4px 0 rgba(28, 17, 8, 0.18);
 }
 
 .store-row-body {
@@ -442,9 +448,10 @@ canvas {
     text-shadow: 0 2px 0 var(--ink);
 }
 
-.store-row-coin {
-    display: inline-flex;
-    line-height: 0;
+.store-row-coin,
+.store-symbol {
+    font-family: 'Segoe UI Symbol', 'DejaVu Sans', sans-serif;
+    color: #f5c542;
 }
 
 /* ── boost countdown (temporary click-shop boosts) ───────────────── */

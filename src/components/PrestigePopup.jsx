@@ -165,7 +165,7 @@ function DetailsPanel({ selected, onClose, onPurchase }) {
         <ul className="pt-requirements">
           {selected.requirements.map((req) => (
             <li key={req.id} className={req.met ? 'is-met' : ''}>
-              {req.met ? '✔' : '✖'} {req.label}
+              {req.met ? '✓' : '✗'} {req.label}
               {req.level > 1 ? ` — level ${req.current}/${req.level}` : ''}
             </li>
           ))}
@@ -320,7 +320,7 @@ const PrestigePopup = ({
         style={{ '--branch': branchOf(node).color }}
         title={node.label}
       >
-        <span className="pt-card-icon" aria-hidden="true">{state.unlocked ? node.icon : '🔒'}</span>
+        <span className="pt-card-icon" aria-hidden="true">{state.unlocked ? node.icon : '?'}</span>
         <span className="pt-card-label">{node.label}</span>
         <span className="pt-card-meta">
           <span className="pt-card-level">{levelText(item, maxed)}</span>
@@ -422,7 +422,7 @@ const PrestigePopup = ({
               aria-pressed={tab === 'upgrades'}
               onClick={() => setTab('upgrades')}
             >
-              ✨ Upgrades
+              ✦ Upgrades
             </button>
             <button
               type="button"
@@ -430,7 +430,7 @@ const PrestigePopup = ({
               aria-pressed={tab === 'skills'}
               onClick={() => { setTab('skills'); setSelectedId(null); }}
             >
-              {prestigeShop?.skills?.unlocked ? '🧬' : '🔒'} Skills
+              {prestigeShop?.skills?.unlocked ? '⊕' : '⊘'} Skills
             </button>
           </nav>
         )}

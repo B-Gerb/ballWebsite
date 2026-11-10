@@ -16,13 +16,13 @@ const costText = (cost) => {
     : `${formatNumber(cost.amount)} collisions`;
 };
 const shortCostText = (cost) =>
-  !cost ? '' : cost.currency === 'skillPoints' ? `${cost.amount} SP` : `${formatNumber(cost.amount)} 💥`;
+  !cost ? '' : cost.currency === 'skillPoints' ? `${cost.amount} SP` : `${formatNumber(cost.amount)} ×`;
 
 function UnlockPanel({ skills, prestigeBalance, onUnlock }) {
   const affordable = prestigeBalance >= skills.unlockCost;
   return (
     <section className="pt-skills-unlock" aria-label="Unlock skills">
-      <span className="pt-skills-unlock-icon" aria-hidden="true">🧬</span>
+      <span className="pt-skills-unlock-icon" aria-hidden="true">⊕</span>
       <h3>Skills</h3>
       <p>
         Skills are a permanent layer above prestige. Unlock them once, buy skill points with
