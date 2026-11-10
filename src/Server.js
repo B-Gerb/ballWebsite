@@ -10,6 +10,8 @@ import { SKILL_NODES } from './data/skillTree';
 import { STORE_BUY_AMOUNTS, STORE_SECTIONS } from './data/shopCatalog';
 import { createStoreRow, createStoreSection, refreshStoreRow } from './shops/storeView';
 import { formatNumber } from './components/formatNumber';
+import { storeIcon } from './shops/storeIcons';
+import { activeBoosts, boostForItem, formatDuration } from './shops/boosts';
 import ClickerObject from './clicking/ClickerObject';
 import { PRESTIGE_EQUATIONS } from './prestigeEquations';
 
@@ -439,6 +441,10 @@ class Server {
      * (1, 10, 100 or 'max'). Never asks for more levels than an item has left.
      */
     storeRowState(item, shop) {
+        return { ...this.storeRowPrice(item, shop), boost: boostForItem(this.temporaryMultipliersActiveFrames, item.name) };
+    }
+
+    storeRowPrice(item, shop) {
         const room = item.maxLevel != null ? item.maxLevel - item.level : Infinity;
         if (room <= 0) return { item, amount: 0, cost: 0, canAfford: false, maxed: true };
 
@@ -498,10 +504,25 @@ class Server {
         if (click) click.textContent = formatNumber(this.clickShop.getBalance());
     }
 
+    /** Header strip of running boosts, so their timers show without scrolling. */
+    updateStoreBoosts() {
+        const strip = this.elements.shopContainer?.querySelector('[data-store-boosts]');
+        if (!strip) return;
+        const boosts = activeBoosts(this.temporaryMultipliersActiveFrames);
+        strip.hidden = boosts.length === 0;
+        strip.innerHTML = boosts.map((boost) => `
+            <span class="store-boost" style="--left: ${boost.fraction}">
+                <span class="store-boost-label">${boost.label} <b>×${formatNumber(boost.multiplier)}</b></span>
+                <span class="store-boost-time">${formatDuration(boost.secondsLeft)}</span>
+            </span>
+        `).join('');
+    }
+
     updateButtonAppearance() {
         this.updateBaseUpgradeShopAppearance();
         this.updateClickShopAppearance();
         this.updateStoreBalances();
+        this.updateStoreBoosts();
     }
 
     // Build the Cookie-Clicker-style store: balances on top, then one
@@ -524,11 +545,12 @@ class Server {
                     `).join('')}
                 </div>
                 <div class="store-balances">
-                    <span class="store-balance"><span aria-hidden="true">🪙</span>
+                    <span class="store-balance">${storeIcon('coin', 20)}
                         <strong data-store-balance="balance">0</strong><small>balance</small></span>
-                    <span class="store-balance"><span aria-hidden="true">👆</span>
+                    <span class="store-balance">${storeIcon('cursor', 20)}
                         <strong data-store-balance="click">0</strong><small>clicks</small></span>
                 </div>
+                <div class="store-boosts" data-store-boosts aria-label="Active boosts" hidden></div>
             </header>
         `;
         shopContainer.querySelectorAll('.store-amount').forEach((button) => {
@@ -540,7 +562,7 @@ class Server {
         const addSection = (key, items, rowClass, shop, buy) => {
             const meta = STORE_SECTIONS[key] ?? { title: key, currency: 'balance', accent: '#94a3b8' };
             const section = createStoreSection(meta.title, meta.accent);
-            const currencyIcon = meta.currency === 'click' ? '👆' : '🪙';
+            const currencyIcon = storeIcon(meta.currency === 'click' ? 'cursor' : 'coin', 16);
             for (const item of items) {
                 const row = createStoreRow({
                     item,
@@ -580,7 +602,7 @@ class Server {
                 aria-label="Prestige locked. Earn 1 prestige point to unlock"
                 title="Earn 1 prestige point to unlock Prestige"
             >
-                <span class="prestige-focus-icon" aria-hidden="true">🔒</span>
+                <span class="prestige-focus-icon">${storeIcon('lock', 20)}</span>
                 <span class="prestige-focus-label">Prestige</span>
             </button>
         `;
@@ -614,7 +636,11 @@ class Server {
             ? 'Open Prestige'
             : 'Earn 1 prestige point to unlock Prestige';
         const icon = button.querySelector('.prestige-focus-icon');
-        if (icon) icon.textContent = unlocked ? '🔓' : '🔒';
+        const iconKey = unlocked ? 'unlock' : 'lock';
+        if (icon && icon.dataset.icon !== iconKey) {
+            icon.dataset.icon = iconKey;
+            icon.innerHTML = storeIcon(iconKey, 20);
+        }
     }
                     
            
@@ -736,6 +762,25 @@ class Server {
         return success;
     }
 
+    /**
+     * Start a temporary boost, or top up a running one: its duration
+     * stacks and the multiplier becomes the item's current value.
+     * `total` is what the store's countdown bar measures against.
+     */
+    startBoost(key, field, multiplier, frames) {
+        const multipliers = this.multipliers.temporaryMultipliers;
+        const active = this.temporaryMultipliersActiveFrames[key];
+        if (active) {
+            multipliers[field] /= active.multiplier;
+            active.frames += frames;
+            active.total = active.frames;
+            active.multiplier = multiplier;
+        } else {
+            this.temporaryMultipliersActiveFrames[key] = { multiplier, frames, total: frames, name: key };
+        }
+        multipliers[field] *= multiplier;
+    }
+
     // `amount` bulk-bought temporary boosts stack their duration (10 s each).
     applyItemEffectCShop(item, amount = 1) {
         switch (item.name) {
@@ -744,60 +789,14 @@ class Server {
                 break;
                 
             case "Temporary Click Value Multiplier":
-                if('tclickValue' in this.temporaryMultipliersActiveFrames){
-                    this.multipliers.temporaryMultipliers.clickValue /= this.temporaryMultipliersActiveFrames.tclickValue.multiplier;
-                    this.multipliers.temporaryMultipliers.clickValue *= item.getValue();
-                    this.temporaryMultipliersActiveFrames.tclickValue.frames += 600 * amount; // 10 seconds each
-                    this.temporaryMultipliersActiveFrames.tclickValue.multiplier = item.getValue();
-                }
-                else{
-                    this.multipliers.temporaryMultipliers.clickValue *= item.getValue();
-                    this.temporaryMultipliersActiveFrames.tclickValue = {
-                        multiplier: item.getValue(),
-                        frames: 600 * amount, // 10 seconds each
-                        name: "tclickValue"
-                    };
-                }
-
+                this.startBoost('tclickValue', 'clickValue', item.getValue(), 600 * amount); // 10 s each
                 break;
-                
             case "Temporary Ball Value Multiplier":
-                if('tcircleValue' in this.temporaryMultipliersActiveFrames){
-                    this.multipliers.temporaryMultipliers.shapeValue /= this.temporaryMultipliersActiveFrames.tcircleValue.multiplier;
-                    this.multipliers.temporaryMultipliers.shapeValue *= item.getValue();
-                    this.temporaryMultipliersActiveFrames.tcircleValue.frames += 600 * amount; // 10 seconds each
-                    this.temporaryMultipliersActiveFrames.tcircleValue.multiplier = item.getValue();
-                }
-
-                else{
-                    this.multipliers.temporaryMultipliers.shapeValue *= item.getValue();
-
-                    this.temporaryMultipliersActiveFrames.tcircleValue = {
-                        multiplier: item.getValue(),
-                        frames: 600 * amount, // 10 seconds each
-                        name: "tcircleValue"
-                    };
-                }
-
+                this.startBoost('tcircleValue', 'shapeValue', item.getValue(), 600 * amount);
                 break;
             case "Temporary Speed Multiplier":
-                if('tcircleSpeed' in this.temporaryMultipliersActiveFrames){
-                    this.multipliers.temporaryMultipliers.shapeSpeed /= this.temporaryMultipliersActiveFrames.tcircleSpeed.multiplier;
-                    this.multipliers.temporaryMultipliers.shapeSpeed *= item.getValue();
-                    this.temporaryMultipliersActiveFrames.tcircleSpeed.frames += 600 * amount; // 10 seconds each
-                    this.temporaryMultipliersActiveFrames.tcircleSpeed.multiplier = item.getValue();
-                }
-                else{
-                    this.multipliers.temporaryMultipliers.shapeSpeed *= item.getValue();
-
-                    this.temporaryMultipliersActiveFrames.tcircleSpeed = {
-                        multiplier: item.getValue(),
-                        frames: 600 * amount, // 10 seconds each
-                        name: "tcircleSpeed"
-                    };
-                }
+                this.startBoost('tcircleSpeed', 'shapeSpeed', item.getValue(), 600 * amount);
                 break;
-
         }
         
         // Re-derive scale factor + container and move shapes into it.

@@ -19,3 +19,13 @@ test('every regular-shop item has a store icon and description', () => {
     }
   }
 });
+
+test('every store icon is a drawn SVG, not an emoji', async () => {
+  const { storeIcon } = await import('../src/shops/storeIcons.js');
+  for (const [name, entry] of Object.entries(SHOP_CATALOG)) {
+    const svg = storeIcon(entry.icon);
+    assert.match(svg, /^<svg[\s\S]*<\/svg>$/, `${name} has no drawn icon`);
+    assert.notEqual(svg, storeIcon('no-such-icon'), `${name} uses an unknown icon key "${entry.icon}"`);
+    assert.doesNotMatch(entry.icon, /\p{Extended_Pictographic}/u, `${name} still uses an emoji`);
+  }
+});
