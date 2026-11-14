@@ -56,11 +56,11 @@ test('Supercharge only speeds up the struck shape, even after it hits others', (
 test('permanent speed upgrades only apply to shapes bought after them', () => {
   const board = makeBoard();
   const old = add(board, Circle.create(200, 400, 10, 'a', 1, 0, 10));
-  board.updatePhysics({}, { circle: 1 });
+  board.updatePhysics({}, { spawnSpeed: { circle: 1 } });
   const fresh = add(board, Circle.create(600, 400, 10, 'b', 1, 0, 10));
   const oldX = old.center.x;
   const freshX = fresh.center.x;
-  board.updatePhysics({}, { circle: 2 });
+  board.updatePhysics({}, { spawnSpeed: { circle: 2 } });
   assert.equal(old.speedMultiplier, 1);
   assert.equal(fresh.speedMultiplier, 2);
   assert.ok(Math.abs(old.center.x - oldX - 1) < 1e-9, 'old shape moves at its old speed');
@@ -71,7 +71,7 @@ test('temporary boosts still speed up every shape', () => {
   const board = makeBoard();
   const shape = add(board, Circle.create(200, 400, 10, 'a', 1, 0, 10));
   const x = shape.center.x;
-  board.updatePhysics({ circle: 3 }, { circle: 1 });
+  board.updatePhysics({ circle: 3 }, { spawnSpeed: { circle: 1 } });
   assert.ok(Math.abs(shape.center.x - x - 3) < 1e-9);
 });
 
@@ -83,7 +83,7 @@ test('a fused shape keeps the better speed multiplier of its parents', () => {
   const b = add(board, Circle.create(405, 400, 10, 'b', 1, 0, 10));
   a.speedMultiplier = 1.5;
   b.speedMultiplier = 1.2;
-  board.updatePhysics({}, { circle: 3 });
+  board.updatePhysics({}, { spawnSpeed: { circle: 3 } });
   assert.equal(board.shapes.length, 1);
   assert.equal(board.shapes[0].speedMultiplier, 1.5);
 });

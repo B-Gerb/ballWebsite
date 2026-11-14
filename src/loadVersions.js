@@ -249,6 +249,11 @@ function createShape(savedShape, id) {
         if (Number.isFinite(savedShape.speedMultiplier) && savedShape.speedMultiplier > 0) {
             shape.speedMultiplier = savedShape.speedMultiplier;
         }
+        // Lighter mass locked in after a black hole (mass itself is rebuilt from size).
+        if (Number.isFinite(savedShape.massScale) && savedShape.massScale > 0) {
+            shape.massScale = savedShape.massScale;
+            shape.mass *= shape.massScale;
+        }
     }
     
     return shape;
@@ -407,12 +412,8 @@ function loadPrestigeShop(server, gameState) {
         prestigeShop.items.forEach(savedItem => {
             const item = server.prestigeUpgradeShop.items.find(i => i.name === savedItem.name);
             if (item) {
-                const maxLevel = Number.isFinite(item.maxLevel) ? item.maxLevel : Infinity;
-                item.level = Math.min(
-                    maxLevel,
-                    nonNegativeInteger(savedItem.level)
-                );
-                item.price = nonNegativeFinite(savedItem.price, item.price);
+                // Prices come from the level and today's price curve, not the save.
+                server.prestigeUpgradeShop.restoreLevel(item, savedLevel(item, savedItem));
                 // Note: dependencies are typically static, but we could restore them if needed
                 if (savedItem.dependencies) {
                     item.dependencies = savedItem.dependencies;
@@ -568,6 +569,9 @@ function load0_0_5(server, gameState) {
     server.skillShop.load(gameState.skills);
     server.runLevels.load(gameState.runLevels);
     server.applySkillEffects();
+    // Black holes / supernovas this run, and the add-shape prices they raised.
+    server.cosmos.load(gameState.cosmos);
+    server.baseUpgradeShop.setAddShapePriceMultiplier(server.cosmos.addShapePriceMultiplier);
     
     server.updateBalanceDisplay();
     server.setupShopUI();

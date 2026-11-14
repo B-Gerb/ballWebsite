@@ -33,7 +33,7 @@ class AShop {
     itemCost(item, amount) {
         let cost = 0;
         let currentPrice = item.price;
-        const costScalingMultiplier = item.costScalingMultiplier ?? 1;
+        const costScalingMultiplier = (item.costScalingMultiplier ?? 1) * (item.priceMultiplier ?? 1);
         for (let i = 0; i < amount; ++i) {
             cost += currentPrice * costScalingMultiplier;
             currentPrice = this.nextPrice(item, currentPrice, item.level + i);
@@ -47,7 +47,7 @@ class AShop {
     maxAffordable(item, limit = 10000) {
         const room = item.maxLevel != null ? Math.max(0, item.maxLevel - item.level) : Infinity;
         const cap = Math.min(room, limit);
-        const scaling = item.costScalingMultiplier ?? 1;
+        const scaling = (item.costScalingMultiplier ?? 1) * (item.priceMultiplier ?? 1);
         let count = 0;
         let cost = 0;
         let price = item.price;

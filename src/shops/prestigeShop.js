@@ -1,3 +1,17 @@
+/**
+ * Prestige upgrade curves
+ *
+ * - Unlocks (maxLevel 1): flat price.
+ * - 10-level stat upgrades: linear value (+0.05..+0.25 per level) with price
+ *   growth softened to ×1.4–×1.8 per level (+0.5 × level), so late levels
+ *   stay worth buying. Cheap/weak stats grow slowest; Mass Collision Value
+ *   (the strongest) grows ×1.8.
+ * - Cosmos (late game, 5k–50k start): steep ×2.5–×3 per level.
+ *     blackHoleThreshold / supernovaThreshold / skillPointCost: 1 − 0.1·level
+ *     cosmicMultiplier: +0.5·level added to the ×9 per-event money multiplier
+ *     grandCurrency: 1.5^level global money multiplier
+ * Prestige award itself is sublinear in run points: see prestigeEquations.js.
+ */
 import AShop from './AShop.js';
 import {
     linearValue,
@@ -50,7 +64,7 @@ class prestigeShop extends AShop{
                 price: 35,
                 maxLevel: 10,
                 level: 0,
-                priceEquation: scaledPrice(2, 0.5),
+                priceEquation: scaledPrice(1.6, 0.5),
                 valueEquation: linearValue(1, 0.25),
                 effectKey: 'squareValue'
             },
@@ -59,7 +73,7 @@ class prestigeShop extends AShop{
                 price: 45,
                 maxLevel: 10,
                 level: 0,
-                priceEquation: scaledPrice(1.8, 0.5),
+                priceEquation: scaledPrice(1.6, 0.5),
                 valueEquation: linearValue(1, 0.1),
                 effectKey: 'triangleSize'
             },
@@ -68,7 +82,7 @@ class prestigeShop extends AShop{
                 price: 50,
                 maxLevel: 10,
                 level: 0,
-                priceEquation: scaledPrice(1.8, 0.5),
+                priceEquation: scaledPrice(1.6, 0.5),
                 valueEquation: linearValue(1, 0.25),
                 effectKey: 'triangleSpeed'
             },
@@ -77,7 +91,7 @@ class prestigeShop extends AShop{
                 price: 60,
                 maxLevel: 10,
                 level: 0,
-                priceEquation: scaledPrice(2, 0.5),
+                priceEquation: scaledPrice(1.65, 0.5),
                 valueEquation: linearValue(1, 0.25),
                 effectKey: 'triangleCollisionValue'
             },
@@ -86,7 +100,7 @@ class prestigeShop extends AShop{
                 price: 45,
                 maxLevel: 10,
                 level: 0,
-                priceEquation: scaledPrice(1.8, 0.5),
+                priceEquation: scaledPrice(1.6, 0.5),
                 valueEquation: linearValue(1, 0.1),
                 effectKey: 'squareSize'
             },
@@ -95,7 +109,7 @@ class prestigeShop extends AShop{
                 price: 50,
                 maxLevel: 10,
                 level: 0,
-                priceEquation: scaledPrice(1.8, 0.5),
+                priceEquation: scaledPrice(1.6, 0.5),
                 valueEquation: linearValue(1, 0.25),
                 effectKey: 'squareSpeed'
             },
@@ -104,7 +118,7 @@ class prestigeShop extends AShop{
                 price: 60,
                 maxLevel: 10,
                 level: 0,
-                priceEquation: scaledPrice(2, 0.5),
+                priceEquation: scaledPrice(1.65, 0.5),
                 valueEquation: linearValue(1, 0.25),
                 effectKey: 'squareCollisionValue'
             },
@@ -113,7 +127,7 @@ class prestigeShop extends AShop{
                 price: 40,
                 maxLevel: 10,
                 level: 0,
-                priceEquation: scaledPrice(1.7, 0.5),
+                priceEquation: scaledPrice(1.55, 0.5),
                 valueEquation: linearValue(1, 0.2),
                 effectKey: 'clickValue'
             },
@@ -122,7 +136,7 @@ class prestigeShop extends AShop{
                 price: 75,
                 maxLevel: 10,
                 level: 0,
-                priceEquation: scaledPrice(2, 0.5),
+                priceEquation: scaledPrice(1.65, 0.5),
                 valueEquation: linearValue(1, 0.25),
                 effectKey: 'clickUpgradeEffectiveness'
             },
@@ -131,7 +145,7 @@ class prestigeShop extends AShop{
                 price: 50,
                 maxLevel: 10,
                 level: 0,
-                priceEquation: scaledPrice(1.8, 0.5),
+                priceEquation: scaledPrice(1.6, 0.5),
                 valueEquation: linearValue(1, 0.05),
                 effectKey: 'circleCostScaling'
             },
@@ -140,7 +154,7 @@ class prestigeShop extends AShop{
                 price: 50,
                 maxLevel: 10,
                 level: 0,
-                priceEquation: scaledPrice(1.8, 0.5),
+                priceEquation: scaledPrice(1.6, 0.5),
                 valueEquation: linearValue(1, 0.05),
                 effectKey: 'squareCostScaling'
             },
@@ -149,7 +163,7 @@ class prestigeShop extends AShop{
                 price: 50,
                 maxLevel: 10,
                 level: 0,
-                priceEquation: scaledPrice(1.8, 0.5),
+                priceEquation: scaledPrice(1.6, 0.5),
                 valueEquation: linearValue(1, 0.05),
                 effectKey: 'triangleCostScaling'
             },
@@ -158,7 +172,7 @@ class prestigeShop extends AShop{
                 price: 100,
                 maxLevel: 10,
                 level: 0,
-                priceEquation: scaledPrice(2, 0.5),
+                priceEquation: scaledPrice(1.7, 0.5),
                 valueEquation: linearValue(1, 0.25),
                 effectKey: 'currencyMultiplier'
             },
@@ -167,7 +181,7 @@ class prestigeShop extends AShop{
                 price: 125,
                 maxLevel: 10,
                 level: 0,
-                priceEquation: scaledPrice(2, 0.5),
+                priceEquation: scaledPrice(1.7, 0.5),
                 valueEquation: linearValue(1, 0.25),
                 effectKey: 'globalSpeed'
             },
@@ -176,7 +190,7 @@ class prestigeShop extends AShop{
                 price: 125,
                 maxLevel: 10,
                 level: 0,
-                priceEquation: scaledPrice(2, 0.5),
+                priceEquation: scaledPrice(1.7, 0.5),
                 valueEquation: linearValue(1, 0.1),
                 effectKey: 'globalSize'
             },
@@ -185,7 +199,7 @@ class prestigeShop extends AShop{
                 price: 150,
                 maxLevel: 10,
                 level: 0,
-                priceEquation: scaledPrice(2, 0.5),
+                priceEquation: scaledPrice(1.75, 0.5),
                 valueEquation: prestigeGainMultiplier,
                 effectKey: 'prestigeGain'
             },
@@ -194,7 +208,7 @@ class prestigeShop extends AShop{
                 price: 175,
                 maxLevel: 10,
                 level: 0,
-                priceEquation: scaledPrice(2, 0.5),
+                priceEquation: scaledPrice(1.7, 0.5),
                 valueEquation: linearValue(1, 0.2),
                 effectKey: 'speedCollisionValue'
             },
@@ -203,7 +217,7 @@ class prestigeShop extends AShop{
                 price: 175,
                 maxLevel: 10,
                 level: 0,
-                priceEquation: scaledPrice(2, 0.5),
+                priceEquation: scaledPrice(1.7, 0.5),
                 valueEquation: linearValue(1, 0.2),
                 effectKey: 'sizeCollisionValue'
             },
@@ -212,9 +226,55 @@ class prestigeShop extends AShop{
                 price: 250,
                 maxLevel: 10,
                 level: 0,
-                priceEquation: scaledPrice(2.5, 0.5),
+                priceEquation: scaledPrice(1.8, 0.5),
                 valueEquation: linearValue(1, 0.25),
                 effectKey: 'massCollisionValue'
+            },
+            // ── Cosmos: late-game black hole / supernova upgrades ──
+            {
+                name: "Event Horizon Theory",
+                price: 5000,
+                maxLevel: 5,
+                level: 0,
+                priceEquation: scaledPrice(2.75),
+                valueEquation: linearValue(1, -0.1),
+                effectKey: 'blackHoleThreshold'
+            },
+            {
+                name: "Stellar Physics",
+                price: 5000,
+                maxLevel: 5,
+                level: 0,
+                priceEquation: scaledPrice(2.75),
+                valueEquation: linearValue(1, -0.1),
+                effectKey: 'supernovaThreshold'
+            },
+            {
+                name: "Cosmic Dividend",
+                price: 20000,
+                maxLevel: 5,
+                level: 0,
+                priceEquation: scaledPrice(3),
+                valueEquation: linearValue(0, 0.5),
+                effectKey: 'cosmicMultiplier'
+            },
+            {
+                name: "Skill Mentor",
+                price: 15000,
+                maxLevel: 5,
+                level: 0,
+                priceEquation: scaledPrice(2.75),
+                valueEquation: linearValue(1, -0.1),
+                effectKey: 'skillPointCost'
+            },
+            {
+                name: "Grand Multiplier",
+                price: 50000,
+                maxLevel: 10,
+                level: 0,
+                priceEquation: scaledPrice(2.5),
+                valueEquation: (level) => 1.5 ** level,
+                effectKey: 'grandCurrency'
             },
         ];
 

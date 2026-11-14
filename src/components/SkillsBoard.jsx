@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { SKILL_BRANCHES, SKILL_NODES } from '../data/skillTree';
+import { MAX_RANK, SKILL_BRANCHES, SKILL_NODES, choiceScale, describeBaseAt } from '../data/skillTree';
 import NodeGraph from './whiteboard/NodeGraph.jsx';
 import { formatNumber } from './formatNumber.js';
 
@@ -9,6 +9,7 @@ const NODES_BY_ID = new Map(SKILL_NODES.map((node) => [node.id, node]));
 
 const branchOf = (node) => SKILL_BRANCHES[node.branch] ?? { label: 'Skill', color: '#94a3b8' };
 
+const pointsText = (amount) => `${amount} SP`;
 const costText = (cost) => (cost ? `${cost.amount} skill point${cost.amount === 1 ? '' : 's'}` : '—');
 
 function UnlockPanel({ skills, prestigeBalance, onUnlock }) {
@@ -36,8 +37,9 @@ function UnlockPanel({ skills, prestigeBalance, onUnlock }) {
 }
 
 function SkillDetails({ state, picks, onClose, onBuy }) {
-  const { node, unlocked, cost, available, canAfford } = state;
+  const { node, unlocked, rank, maxRank, cost, available, canAfford } = state;
   const branch = branchOf(node);
+  const maxed = unlocked && rank >= maxRank;
   return (
     <aside className="pt-details" aria-label={`${node.label} details`}>
       <div className="pt-details-head">
@@ -48,10 +50,22 @@ function SkillDetails({ state, picks, onClose, onBuy }) {
       <p className="pt-details-description">{node.description}</p>
 
       <dl className="pt-effects">
+        {unlocked && (
+          <div>
+            <dt>Rank</dt>
+            <dd>{rank}/{maxRank}{rank > 1 ? ` · level-bar picks +${(rank - 1) * 25}%` : ''}</dd>
+          </div>
+        )}
         <div>
-          <dt>Base</dt>
-          <dd>{node.describeBase}</dd>
+          <dt>{unlocked ? 'Base now' : 'Base'}</dt>
+          <dd>{describeBaseAt(node, rank)}</dd>
         </div>
+        {unlocked && !maxed && (
+          <div>
+            <dt>Rank {rank + 1}</dt>
+            <dd>{describeBaseAt(node, rank + 1)} · picks +{rank * 25}%</dd>
+          </div>
+        )}
       </dl>
 
       <div className="pt-skill-choices">
@@ -64,7 +78,7 @@ function SkillDetails({ state, picks, onClose, onBuy }) {
                 <span className="pt-skill-choice-icon" aria-hidden="true">{choice.icon}</span>
                 <span className="pt-skill-choice-text">
                   <strong>{choice.label}</strong>
-                  <small>{stacks > 0 ? choice.describe(stacks) : choice.description}</small>
+                  <small>{stacks > 0 ? choice.describe(stacks * choiceScale(state.rank ?? 1)) : choice.description}</small>
                 </span>
                 <span className="pt-skill-choice-stacks">{stacks}/{choice.maxStacks}</span>
               </li>
@@ -74,14 +88,24 @@ function SkillDetails({ state, picks, onClose, onBuy }) {
         <p className="pt-details-hint">Picks this run reset when you prestige.</p>
       </div>
 
-      {!unlocked && (
+      {!unlocked ? (
         <div className="pt-buy">
           <div className="pt-cost">
             <span>Cost</span>
             <strong className={canAfford ? '' : 'is-short'}>{costText(cost)}</strong>
           </div>
           <button className="pt-buy-button" onClick={onBuy} disabled={!available || !canAfford}>
-            {!available ? 'Locked' : !canAfford ? 'Need a skill point' : 'Unlock skill'}
+            {!available ? 'Locked' : !canAfford ? 'Need more skill points' : 'Unlock skill'}
+          </button>
+        </div>
+      ) : (
+        <div className="pt-buy">
+          <div className="pt-cost">
+            <span>Next rank</span>
+            <strong className={maxed || canAfford ? '' : 'is-short'}>{maxed ? '—' : costText(cost)}</strong>
+          </div>
+          <button className="pt-buy-button" onClick={onBuy} disabled={maxed || !canAfford}>
+            {maxed ? 'Max rank' : `Rank up · ${pointsText(cost?.amount ?? 0)}`}
           </button>
         </div>
       )}
@@ -101,10 +125,15 @@ function SkillsBoard({ skills, prestigeBalance, onUnlock, onBuySkillPoint, onBuy
     (skills?.skills ?? []).forEach((s) => {
       const node = NODES_BY_ID.get(s.id);
       if (!node) return;
+      const rank = s.rank ?? (s.unlocked ? 1 : 0);
+      const maxRank = s.maxRank ?? MAX_RANK;
+      const maxed = s.unlocked && rank >= maxRank;
       map.set(s.id, {
         ...s,
+        rank,
+        maxRank,
         node,
-        status: !s.available ? 'locked' : s.unlocked ? 'maxed' : s.canAfford ? 'affordable' : 'unaffordable',
+        status: !s.available ? 'locked' : maxed ? 'maxed' : s.canAfford ? 'affordable' : 'unaffordable',
       });
     });
     return map;
@@ -138,8 +167,8 @@ function SkillsBoard({ skills, prestigeBalance, onUnlock, onBuySkillPoint, onBuy
         <span className="pt-card-label">{node.label}</span>
         <span className="pt-card-meta">
           {state.unlocked
-            ? <span className="pt-card-level">{pickCount(node)} picks</span>
-            : <span className="pt-card-cost">{state.cost?.amount ?? 1} SP</span>}
+            ? <span className="pt-card-level">R{state.rank}/{state.maxRank} · {pickCount(node)} picks</span>
+            : <span className="pt-card-cost">{pointsText(state.cost?.amount ?? 1)}</span>}
         </span>
       </div>
     );
@@ -168,7 +197,10 @@ function SkillsBoard({ skills, prestigeBalance, onUnlock, onBuySkillPoint, onBuy
           gap={NODE_GAP}
           layout="radial"
           renderNode={renderNode}
-          nodeLabel={(node) => `${node.label}, ${states.get(node.id).unlocked ? 'unlocked' : 'locked'}`}
+          nodeLabel={(node) => {
+            const state = states.get(node.id);
+            return `${node.label}, ${state.unlocked ? `rank ${state.rank} of ${state.maxRank}` : 'locked'}`;
+          }}
           edgeClassName={(edge) => `pt-link ${states.get(edge.to)?.unlocked ? 'is-owned' : 'is-ready'}`}
           edgeStyle={(edge) => ({ '--branch': branchOf(edge.toNode).color })}
           selectedId={selectedId}

@@ -71,6 +71,7 @@ class Triangle {
             value: this.value,
             massBonus: this.massBonus ?? 1,
             speedMultiplier: this.speedMultiplier,
+            massScale: this.massScale,
         };
     }
 

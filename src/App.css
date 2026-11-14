@@ -736,3 +736,131 @@ canvas {
   opacity: 0.55;
   transform: none;
 }
+/* ── Store tabs + Cosmos (black holes & supernovas) ─────────────── */
+.store-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px;
+    padding: 3px;
+    background: rgba(0, 0, 0, 0.35);
+    border: 1px solid var(--ink);
+    border-radius: 8px;
+}
+
+.store-tab {
+    flex: 1 1 auto;
+    padding: 5px 10px;
+    font: inherit;
+    font-size: 0.9rem;
+    font-weight: bold;
+    color: #e3cfa6;
+    background: transparent;
+    border: 0;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+.store-tab:hover {
+    color: #fff;
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.store-tab.is-active {
+    color: #f5f3ff;
+    background: #5b21b6;
+    box-shadow: 0 2px 0 var(--ink);
+}
+
+.store-tab:focus-visible {
+    outline: 2px solid #c4b5fd;
+    outline-offset: 2px;
+}
+
+.cosmos-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 12px;
+    color: #ede9fe;
+    background: linear-gradient(160deg, #1e1b4b, #0f0a1f);
+    border: 1px solid var(--ink);
+    border-radius: 10px;
+}
+
+.cosmos-summary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 14px;
+    font-weight: bold;
+}
+
+.cosmos-stat--money {
+    margin-left: auto;
+    color: #fde68a;
+}
+
+.cosmos-meter {
+    display: grid;
+    grid-template-columns: minmax(90px, auto) 1fr;
+    gap: 2px 10px;
+    align-items: center;
+    font-size: 0.85rem;
+}
+
+.cosmos-meter-bar {
+    height: 10px;
+    overflow: hidden;
+    background: rgba(255, 255, 255, 0.12);
+    border-radius: 999px;
+}
+
+.cosmos-meter-fill {
+    display: block;
+    width: 0;
+    height: 100%;
+    background: linear-gradient(90deg, #7c3aed, #c4b5fd);
+    border-radius: inherit;
+    transition: width 0.2s linear;
+}
+
+[data-meter="supernova"] .cosmos-meter-fill {
+    background: linear-gradient(90deg, #f59e0b, #fef08a);
+}
+
+.cosmos-meter-text {
+    grid-column: 2;
+    color: #c4b5fd;
+    font-size: 0.75rem;
+}
+
+.cosmos-hint {
+    margin: 0;
+    color: #a5b4fc;
+    font-size: 0.75rem;
+    line-height: 1.4;
+}
+
+.cosmos-upgrades {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.cosmos-row-effect {
+    color: #86efac;
+    font-size: 0.75rem;
+}
+
+.cosmos-row-effect:empty {
+    display: none;
+}
+
+.cosmos-row-cost {
+    white-space: pre;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .cosmos-meter-fill {
+        transition: none;
+    }
+}

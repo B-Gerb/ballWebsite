@@ -1,19 +1,24 @@
-import { SKILL_NODES, skillEffects } from '../data/skillTree.js';
+import { MAX_RANK, SKILL_NODES, skillEffects } from '../data/skillTree.js';
 import { normalizeRequirement } from '../components/whiteboard/graphLayout.js';
+
+export { MAX_RANK };
 
 /** One-time prestige-point price of opening the Skills tab. */
 export const SKILLS_UNLOCK_COST = 25000;
-/** Prestige-point price of the first skill point; doubles every purchase. */
+/** Prestige-point price of the first skill point; ×1.75 every purchase. */
 export const SKILL_POINT_BASE_PRICE = 2500;
-export const SKILL_POINT_PRICE_GROWTH = 2;
+export const SKILL_POINT_PRICE_GROWTH = 1.75;
 
 const nonNegative = (value) => (Number.isFinite(value) && value > 0 ? value : 0);
 const nonNegativeInteger = (value) => Math.floor(nonNegative(value));
 
 /**
- * Permanent skill progress: which skills are unlocked. Spends prestige points
- * through the prestige shop you pass in, so it never holds a second copy of
- * that balance. Run-only upgrades live in `RunLevels`.
+ * Permanent skill progress: which skills are unlocked and at what rank.
+ * Spends prestige points through the prestige shop you pass in, so it never
+ * holds a second copy of that balance. Run-only upgrades live in `RunLevels`.
+ *
+ * Ranks: 0 = locked, 1 = unlocked, up to MAX_RANK. Rank r -> r + 1 costs
+ * r + 1 skill points unless the node lists its own `rankCosts`.
  */
 class SkillShop {
   constructor(nodes = SKILL_NODES) {
@@ -26,16 +31,21 @@ class SkillShop {
     this.unlocked = false;
     this.skillPoints = 0;
     this.skillPointsBought = 0;
-    this.levels = {};
+    this.ranks = {};
   }
 
-  /** 1 when the skill is unlocked, else 0 (kept as a level for `requires`). */
+  /** 0 when locked, else 1..MAX_RANK. */
+  rank(id) {
+    return this.ranks[id] ?? 0;
+  }
+
+  /** 1 when the skill is unlocked, else 0 (the level `requires` checks). */
   level(id) {
-    return this.levels[id] ?? 0;
+    return this.rank(id) > 0 ? 1 : 0;
   }
 
   isSkillUnlocked(id) {
-    return this.level(id) > 0;
+    return this.rank(id) > 0;
   }
 
   unlockedSkillIds() {
@@ -49,12 +59,14 @@ class SkillShop {
     return true;
   }
 
-  skillPointPrice() {
-    return SKILL_POINT_BASE_PRICE * SKILL_POINT_PRICE_GROWTH ** this.skillPointsBought;
+  /** Prestige points for the next skill point; `priceMultiplier` is a discount (e.g. 0.7). */
+  skillPointPrice(priceMultiplier = 1) {
+    const multiplier = Number.isFinite(priceMultiplier) && priceMultiplier > 0 ? priceMultiplier : 1;
+    return Math.round(SKILL_POINT_BASE_PRICE * SKILL_POINT_PRICE_GROWTH ** this.skillPointsBought * multiplier);
   }
 
-  buySkillPoint(prestigeShop) {
-    const price = this.skillPointPrice();
+  buySkillPoint(prestigeShop, priceMultiplier = 1) {
+    const price = this.skillPointPrice(priceMultiplier);
     if (!this.unlocked || prestigeShop.getBalance() < price) return false;
     prestigeShop.removeBalance(price);
     this.skillPointsBought += 1;
@@ -69,37 +81,57 @@ class SkillShop {
     return (node.requires ?? []).map(normalizeRequirement).every((req) => this.level(req.id) >= req.level);
   }
 
-  /** Skill points needed to unlock, or null when already unlocked / unknown. */
+  /** Skill points for the next unlock / rank-up, or null at max rank / unknown. */
   nextCost(id) {
     const node = this.byId.get(id);
-    if (!node || this.isSkillUnlocked(id)) return null;
-    return { currency: 'skillPoints', amount: node.unlockCost ?? 1 };
+    if (!node) return null;
+    const rank = this.rank(id);
+    if (rank >= MAX_RANK) return null;
+    const amount = rank === 0 ? node.unlockCost ?? 1 : node.rankCosts?.[rank - 1] ?? rank + 1;
+    return { currency: 'skillPoints', amount };
   }
 
   canAfford(cost) {
     return Boolean(cost) && this.skillPoints >= cost.amount;
   }
 
-  /** Unlock a skill with skill points. */
+  /** Unlock a locked skill, or rank up an unlocked one, with skill points. */
   buy(id) {
     const cost = this.nextCost(id);
     if (!this.unlocked || !this.isAvailable(id) || !this.canAfford(cost)) return false;
     this.skillPoints -= cost.amount;
-    this.levels[id] = 1;
+    this.ranks[id] = this.rank(id) + 1;
     return true;
   }
 
-  /** Base effects of unlocked skills plus this run's level-bar picks. */
+  /** Everything the UI needs for one node. */
+  view(id) {
+    const cost = this.nextCost(id);
+    return {
+      id,
+      unlocked: this.isSkillUnlocked(id),
+      rank: this.rank(id),
+      maxRank: MAX_RANK,
+      available: this.isAvailable(id),
+      cost,
+      canAfford: this.canAfford(cost),
+    };
+  }
+
+  /** Base effects of unlocked skills (scaled by rank) plus this run's level-bar picks. */
   effects(picks = {}) {
-    return skillEffects((id) => this.isSkillUnlocked(id), picks, this.nodes);
+    return skillEffects((id) => this.rank(id), picks, this.nodes);
   }
 
   toJSON() {
+    const skills = {};
+    for (const id of Object.keys(this.ranks)) skills[id] = 1;
     return {
       unlocked: this.unlocked,
       skillPoints: this.skillPoints,
       skillPointsBought: this.skillPointsBought,
-      skills: { ...this.levels },
+      skills,
+      ranks: { ...this.ranks },
     };
   }
 
@@ -109,10 +141,13 @@ class SkillShop {
     this.unlocked = saved.unlocked === true;
     this.skillPoints = nonNegativeInteger(saved.skillPoints);
     this.skillPointsBought = nonNegativeInteger(saved.skillPointsBought);
-    // Older saves stored levels up to 20 (bought with collisions); any level
-    // now just means "unlocked". Their `collisionBank` is no longer used.
+    // `skills` means "unlocked". Older saves stored levels up to 20 there
+    // (bought with collisions); any level now just means rank 1. Their
+    // `collisionBank` is no longer used. Ranks above 1 live in `ranks`.
+    const savedRanks = saved.ranks && typeof saved.ranks === 'object' ? saved.ranks : {};
     for (const [id, level] of Object.entries(saved.skills ?? {})) {
-      if (this.byId.has(id) && nonNegativeInteger(level) > 0) this.levels[id] = 1;
+      if (!this.byId.has(id) || nonNegativeInteger(level) <= 0) continue;
+      this.ranks[id] = Math.min(MAX_RANK, Math.max(1, nonNegativeInteger(savedRanks[id])));
     }
   }
 }

@@ -7,7 +7,9 @@ import clickShop from './shops/clickShop';
 import prestigeShop from './shops/prestigeShop';
 import SkillShop, { SKILLS_UNLOCK_COST } from './shops/skillShop';
 import RunLevels from './shops/runLevels';
-import { SKILL_CHOICES, SKILL_NODES } from './data/skillTree';
+import Cosmos from './shops/cosmos';
+import { setupCosmosPanel, updateCosmosPanel } from './shops/cosmosView';
+import { SKILL_CHOICES, SKILL_NODES, choiceScale } from './data/skillTree';
 import { CURRENCY_ICONS, STORE_BUY_AMOUNTS, STORE_SECTIONS } from './data/shopCatalog';
 import { createStoreRow, createStoreSection, refreshStoreRow } from './shops/storeView';
 import { formatNumber } from './components/formatNumber';
@@ -16,6 +18,73 @@ import ClickerObject from './clicking/ClickerObject';
 import { PRESTIGE_EQUATIONS } from './prestigeEquations';
 
 // TODO: Import or define dependencies like CircleBoard, baseUpgradeShop, clickShop, prestigeShop, ClickerObject, etc.
+
+/** Every multiplier at its starting value (a fresh account or run). */
+function defaultMultipliers() {
+    return {
+        prestigeMultipliers: {
+            clickValue: 1,
+            clickUpgradeEffectiveness: 1,
+            circleWallValue: 1,
+            shapeValue: 1,
+            shapeSpeed: 1,
+            currencyMultiplier: 1,
+            globalSpeed: 1,
+            globalSize: 1,
+            speedCollisionValue: 1,
+            sizeCollisionValue: 1,
+            massCollisionValue: 1,
+            prestigeGain: 1,
+        // Cosmos branch (black holes / supernovas)
+        blackHoleThreshold: 1,
+        supernovaThreshold: 1,
+        cosmicMultiplierBonus: 0,
+        skillPointCost: 1,
+        grandCurrency: 1,
+            costScaling: {
+                circle: 1,
+                square: 1,
+                triangle: 1
+            },
+            shapes: {
+                circle: {
+                    speed: 1,
+                    value: 1,
+                    size: 1
+                },
+                square: {
+                    speed: 1,
+                    value: 1,
+                    size: 1
+                },
+                triangle: {
+                    speed: 1,
+                    value: 1,
+                    size: 1
+                }
+            }
+        },
+        temporaryMultipliers: {
+            clickValue: 1,
+            shapeValue: 1,
+            shapeSpeed: 1,
+            shapes: {
+                circle: {
+                    speed: 1,
+                    value: 1
+                },
+                square: {
+                    speed: 1,
+                    value: 1
+                },
+                triangle: {
+                    speed: 1,
+                    value: 1
+                }
+            }
+        }
+    };
+}
 
 function popUps(contents, isClass = false, spot, backDrop = true) {
     if(!isClass){
@@ -136,6 +205,10 @@ class Server {
         this.skillShop = new SkillShop();
         // The per-prestige level bar and its picks (reset every prestige).
         this.runLevels = new RunLevels();
+        // Black holes & supernovas this run (the store's Cosmos tab).
+        this.cosmos = new Cosmos();
+        this.storeTab = 'shop';
+        this.peakImpactSpeed = 0;
 
         // Permanent prestige state and run-only state.
         this.prestigeStats = {
@@ -163,63 +236,7 @@ class Server {
         this.isVisible = true;
         this.lastVisibleTime = performance.now();
 
-        this.multipliers = {
-            prestigeMultipliers: {
-                clickValue: 1,
-                clickUpgradeEffectiveness: 1,
-                circleWallValue: 1,
-                shapeValue: 1,
-                shapeSpeed: 1,
-                currencyMultiplier: 1,
-                globalSpeed: 1,
-                globalSize: 1,
-                speedCollisionValue: 1,
-                sizeCollisionValue: 1,
-                massCollisionValue: 1,
-                prestigeGain: 1,
-                costScaling: {
-                    circle: 1,
-                    square: 1,
-                    triangle: 1
-                },
-                shapes: {
-                    circle: {
-                        speed: 1,
-                        value: 1,
-                        size: 1
-                    },
-                    square: {
-                        speed: 1,
-                        value: 1,
-                        size: 1
-                    },
-                    triangle: {
-                        speed: 1,
-                        value: 1,
-                        size: 1
-                    }
-                }
-            },
-            temporaryMultipliers: {
-                clickValue: 1,
-                shapeValue: 1,
-                shapeSpeed: 1,
-                shapes: {
-                    circle: {
-                        speed: 1,
-                        value: 1
-                    },
-                    square: {
-                        speed: 1,
-                        value: 1
-                    },
-                    triangle: {
-                        speed: 1,
-                        value: 1
-                    }
-                }
-            }
-        };
+        this.multipliers = defaultMultipliers();
         this.applyAllPrestigeUpgrades();
         this.applySkillEffects();
         this.temporaryMultipliersActiveFrames = {};
@@ -285,8 +302,80 @@ class Server {
             * this.multipliers.prestigeMultipliers.clickValue
             * this.multipliers.prestigeMultipliers.clickUpgradeEffectiveness
             * this.multipliers.prestigeMultipliers.currencyMultiplier
+            * this.moneyMultiplier()
+            * (1 + this.cosmos.effect('clickValueBonus'))
         );
         return this.getSafeMultiplier(this.clickerValue) * clickMultiplier;
+    }
+
+    /** Black hole / supernova multipliers and the Grand Multiplier: on every kind of money. */
+    moneyMultiplier() {
+        return this.getSafeProduct(
+            this.cosmos.currencyMultiplier,
+            this.multipliers.prestigeMultipliers.grandCurrency,
+        );
+    }
+
+    /** Mass and impact speed that trigger the next black hole / supernova. */
+    cosmicThresholds() {
+        const effects = this.skillEffects ?? {};
+        const prestige = this.multipliers.prestigeMultipliers;
+        return {
+            blackHole: this.cosmos.blackHoleThreshold({
+                cut: effects.blackHoleThresholdCut, multiplier: prestige.blackHoleThreshold,
+            }),
+            supernova: this.cosmos.supernovaThreshold({
+                cut: effects.supernovaThresholdCut, multiplier: prestige.supernovaThreshold,
+            }),
+        };
+    }
+
+    /**
+     * Black hole or supernova: bank its currency and multiply money, wipe
+     * the board back to one circle (plus Hawking Radiation), make future
+     * shapes lighter/slower, and put Add Ball/Square/Triangle back to
+     * level 1 at the raised price.
+     */
+    triggerCosmicEvent(kind) {
+        if (!this.cosmos.record(kind, { bonus: this.cosmicEventBonus() })) return false;
+        this.circleBoard.clearShapes(kind);
+        this.circleBoard.addNewBalls(1 + this.cosmos.effect('startingCircles'));
+        this.baseUpgradeShop.resetAddShapeItems(this.cosmos.addShapePriceMultiplier);
+        this.peakImpactSpeed = 0;
+        this.setupShopUI();
+        this.saveGameState();
+        return true;
+    }
+
+    /** Extra money multiplier per event from skills and prestige (added to the ×9). */
+    cosmicEventBonus() {
+        return (this.skillEffects?.cosmicMultiplierBonus ?? 0)
+            + (this.multipliers.prestigeMultipliers.cosmicMultiplierBonus ?? 0);
+    }
+
+    /** After a physics step: has the board collapsed or gone supernova? */
+    checkCosmicEvents(stats) {
+        const thresholds = this.cosmicThresholds();
+        const impact = stats.total.maxImpactSpeed ?? 0;
+        // Peak since the last frame's decay, so the Cosmos tab can show how close you got.
+        this.peakImpactSpeed = Math.max(impact, this.peakImpactSpeed);
+        if (impact >= thresholds.supernova) return this.triggerCosmicEvent('supernova');
+        if (this.circleBoard.getTotalMass() >= thresholds.blackHole) return this.triggerCosmicEvent('blackHole');
+        return false;
+    }
+
+    buyCosmicUpgrade(id) {
+        const success = this.cosmos.buy(id);
+        if (success) {
+            this.updateButtonAppearance();
+            this.saveGameState();
+        }
+        return success;
+    }
+
+    setStoreTab(tab) {
+        this.storeTab = tab === 'cosmos' && this.cosmos.discovered ? 'cosmos' : 'shop';
+        this.setupShopUI();
     }
 
     earnClicks(count) {
@@ -572,6 +661,34 @@ class Server {
         this.updateClickShopAppearance();
         this.updateStoreBalances();
         this.updateStoreBoosts();
+        const panel = this.elements.shopContainer;
+        if (panel && this.storeTab === 'cosmos') updateCosmosPanel(panel, this.getCosmosData());
+    }
+
+    /** Everything the store's Cosmos tab shows. */
+    getCosmosData() {
+        const cosmos = this.cosmos;
+        return {
+            balance: { ...cosmos.balance },
+            counts: { ...cosmos.counts },
+            currencyMultiplier: this.moneyMultiplier(),
+            totalMass: this.circleBoard.getTotalMass(),
+            peakImpactSpeed: this.peakImpactSpeed,
+            thresholds: this.cosmicThresholds(),
+            nextEventMultiplier: this.cosmos.nextEventMultiplier(this.cosmicEventBonus()),
+            nextAddShapePriceJump: this.cosmos.nextAddShapePriceJump(),
+            upgrades: cosmos.upgrades.map((upgrade) => {
+                const cost = cosmos.cost(upgrade.id);
+                return {
+                    ...upgrade,
+                    level: cosmos.level(upgrade.id),
+                    cost,
+                    maxed: cost === null,
+                    available: cosmos.isAvailable(upgrade.id),
+                    canAfford: cosmos.isAvailable(upgrade.id) && cosmos.canAfford(cost),
+                };
+            }),
+        };
     }
 
     // Build the Cookie-Clicker-style store: balances on top, then one
@@ -585,6 +702,11 @@ class Server {
         shopContainer.innerHTML = `
             <header class="store-header">
                 <h2 class="store-title">Store</h2>
+                ${this.cosmos.discovered ? `
+                <nav class="store-tabs" aria-label="Store sections">
+                    <button type="button" class="store-tab" data-store-tab="shop">Shapes</button>
+                    <button type="button" class="store-tab" data-store-tab="cosmos">◉ Black Holes &amp; Supernovas</button>
+                </nav>` : ''}
                 <div class="store-amounts" role="group" aria-label="Buy amount">
                     <span class="store-amounts-label">Buy</span>
                     ${STORE_BUY_AMOUNTS.map((amount) => `
@@ -607,6 +729,21 @@ class Server {
             button.addEventListener('click', () => this.setStoreBuyAmount(amount === 'max' ? 'max' : Number(amount)));
         });
         this.setupPrestigeAccess();
+
+        // Cosmos tab: shows up after the first black hole or supernova.
+        if (!this.cosmos.discovered) this.storeTab = 'shop';
+        shopContainer.querySelectorAll('.store-tab').forEach((button) => {
+            const active = button.dataset.storeTab === this.storeTab;
+            button.classList.toggle('is-active', active);
+            button.setAttribute('aria-pressed', String(active));
+            button.addEventListener('click', () => this.setStoreTab(button.dataset.storeTab));
+        });
+        if (this.storeTab === 'cosmos') {
+            shopContainer.querySelector('.store-amounts').hidden = true;
+            setupCosmosPanel(shopContainer, this.getCosmosData(), (id) => this.buyCosmicUpgrade(id));
+            this.updateStoreBalances();
+            return;
+        }
 
         const addSection = (key, items, rowClass, shop, buy) => {
             const meta = STORE_SECTIONS[key] ?? { title: key, currency: 'balance', accent: '#94a3b8' };
@@ -976,6 +1113,26 @@ class Server {
             case "prestigeGain":
                 this.multipliers.prestigeMultipliers.prestigeGain = value;
                 break;
+
+            case "blackHoleThreshold":
+                this.multipliers.prestigeMultipliers.blackHoleThreshold = value;
+                break;
+
+            case "supernovaThreshold":
+                this.multipliers.prestigeMultipliers.supernovaThreshold = value;
+                break;
+
+            case "cosmicMultiplier":
+                this.multipliers.prestigeMultipliers.cosmicMultiplierBonus = value;
+                break;
+
+            case "skillPointCost":
+                this.multipliers.prestigeMultipliers.skillPointCost = value;
+                break;
+
+            case "grandCurrency":
+                this.multipliers.prestigeMultipliers.grandCurrency = value;
+                break;
         }
     }
 
@@ -1018,13 +1175,15 @@ class Server {
             const choice = SKILL_CHOICES.find((c) => c.id === id);
             if (!choice) return null;
             const stacks = runLevels.stacks(id);
+            // Ranked-up skills make every pick stronger.
+            const scale = choiceScale(this.skillShop.rank(choice.skillId));
             return {
                 id,
                 skillId: choice.skillId,
                 stacks,
                 maxStacks: choice.maxStacks,
-                now: stacks > 0 ? choice.describe(stacks) : null,
-                next: choice.describe(stacks + 1),
+                now: stacks > 0 ? choice.describe(stacks * scale) : null,
+                next: choice.describe((stacks + 1) * scale),
             };
         };
         return {
@@ -1045,7 +1204,10 @@ class Server {
     }
 
     buySkillPoint() {
-        const success = this.skillShop.buySkillPoint(this.prestigeUpgradeShop);
+        const success = this.skillShop.buySkillPoint(
+            this.prestigeUpgradeShop,
+            this.multipliers.prestigeMultipliers.skillPointCost,
+        );
         if (success) this.saveGameState();
         return success;
     }
@@ -1065,20 +1227,11 @@ class Server {
             unlocked: skills.unlocked,
             unlockCost: SKILLS_UNLOCK_COST,
             skillPoints: skills.skillPoints,
-            skillPointPrice: skills.skillPointPrice(),
+            skillPointPrice: skills.skillPointPrice(this.multipliers.prestigeMultipliers.skillPointCost),
             effects: this.skillEffects,
             runLevel: this.runLevels.level,
             picks: { ...this.runLevels.picks },
-            skills: SKILL_NODES.map((node) => {
-                const cost = skills.nextCost(node.id);
-                return {
-                    id: node.id,
-                    unlocked: skills.isSkillUnlocked(node.id),
-                    available: skills.isAvailable(node.id),
-                    cost,
-                    canAfford: skills.canAfford(cost),
-                };
-            }),
+            skills: SKILL_NODES.map((node) => skills.view(node.id)),
         };
     }
 
@@ -1107,7 +1260,8 @@ class Server {
         const totalCollisions = this.circleBoard.getTotalShapeCollisions();
         const basePrestigePoints = PRESTIGE_EQUATIONS.basePoints(totalPointsEarned);
         const collisionMultiplier = PRESTIGE_EQUATIONS.collisionMultiplier(totalCollisions);
-        const prestigeUpgradeMultiplier = this.multipliers.prestigeMultipliers.prestigeGain || 1;
+        const prestigeUpgradeMultiplier = (this.multipliers.prestigeMultipliers.prestigeGain || 1)
+            * (1 + this.cosmos.effect('prestigeGainBonus'));
         const estimatedAward = PRESTIGE_EQUATIONS.finalAward(
             totalPointsEarned,
             totalCollisions,
@@ -1226,6 +1380,7 @@ class Server {
             },
             skills: this.skillShop.toJSON(),
             runLevels: this.runLevels.toJSON(),
+            cosmos: this.cosmos.toJSON(),
             version: '0.0.7',
             seed: this.seed,
         };
@@ -1261,6 +1416,7 @@ class Server {
     resetAllProgress(seed=null) {
         this.prestigeUpgradeShop.resetShop();
         this.skillShop.reset();
+        this.cosmos = new Cosmos();
         this.prestigeStats = {
             lifetimePoints: 0,
             lastAward: null,
@@ -1287,63 +1443,7 @@ class Server {
         this.baseUpgradeShop.resetShop();
         this.clickShop.resetShop();
         this.triangleUnlocked = false;
-        this.multipliers = {
-            prestigeMultipliers: {
-                clickValue: 1,
-                clickUpgradeEffectiveness: 1,
-                circleWallValue: 1,
-                shapeValue: 1,
-                shapeSpeed: 1,
-                currencyMultiplier: 1,
-                globalSpeed: 1,
-                globalSize: 1,
-                speedCollisionValue: 1,
-                sizeCollisionValue: 1,
-                massCollisionValue: 1,
-                prestigeGain: 1,
-                costScaling: {
-                    circle: 1,
-                    square: 1,
-                    triangle: 1
-                },
-                shapes: {
-                    circle: {
-                        speed: 1,
-                        value: 1,
-                        size: 1
-                    },
-                    square: {
-                        speed: 1,
-                        value: 1,
-                        size: 1
-                    },
-                    triangle: {
-                        speed: 1,
-                        value: 1,
-                        size: 1
-                    }
-                }
-            },
-            temporaryMultipliers: {
-                clickValue: 1,
-                shapeValue: 1,
-                shapeSpeed: 1,
-                shapes: {
-                    circle: {
-                        speed: 1,
-                        value: 1
-                    },
-                    square: {
-                        speed: 1,
-                        value: 1
-                    },
-                    triangle: {
-                        speed: 1,
-                        value: 1
-                    }
-                }
-            }
-        };
+        this.multipliers = defaultMultipliers();
         this.temporaryMultipliersActiveFrames = {};
         if (this.clickerObject) {
             this.clickerObject.clickCount = 0;
@@ -1358,6 +1458,9 @@ class Server {
             totalWallHits: 0
         };
         this.runLevels.reset();
+        // Black holes / supernovas and their upgrades are run-only.
+        this.cosmos.reset();
+        this.peakImpactSpeed = 0;
         this.applyAllPrestigeUpgrades();
         this.applySkillEffects();
         // Update displays
@@ -1443,6 +1546,7 @@ class Server {
                     // it is bought, so it only affects shapes bought afterwards.
                     const speedMultipliers = {};
                     const spawnSpeedMultipliers = {};
+                    const spawnSpeedBonus = 1 + (this.skillEffects?.spawnSpeedBonus ?? 0);
                     for (const shapeName of ['circle', 'square', 'triangle']) {
                         const shapeMultipliers = this.multipliers.prestigeMultipliers.shapes[shapeName]
                             || { speed: 1, value: 1, size: 1 };
@@ -1456,14 +1560,26 @@ class Server {
                         spawnSpeedMultipliers[shapeName] = this.getSafeProduct(
                             this.multipliers.prestigeMultipliers.shapeSpeed,
                             this.multipliers.prestigeMultipliers.globalSpeed,
-                            shapeMultipliers.speed
+                            shapeMultipliers.speed,
+                            this.cosmos.spawnSpeedScale,
+                            spawnSpeedBonus
                         );
                     }
+                    const spawnMass = this.getSafeProduct(
+                        this.cosmos.spawnMassScale,
+                        1 + (this.skillEffects?.spawnMassBonus ?? 0)
+                    );
 
+                    // The supernova meter's peak fades a little every frame.
+                    this.peakImpactSpeed *= 0.995;
                     for (let i = 0; i < subIntervals; i++) {
 
 
-                        const stats = this.circleBoard.updatePhysics(speedMultipliers, spawnSpeedMultipliers);
+                        const stats = this.circleBoard.updatePhysics(speedMultipliers, {
+                            spawnSpeed: spawnSpeedMultipliers,
+                            spawnMass,
+                            substeps: subIntervals,
+                        });
 
                         // Update balances based on shape collisions
                         this.run.totalWallHits += stats.total.totalWallHits;
@@ -1490,14 +1606,16 @@ class Server {
                                 this.multipliers.temporaryMultipliers.shapeValue,
                                 shapeMultipliers.size,
                                 shapeMultipliers.value,
-                                temporaryShapeMultipliers.value
+                                temporaryShapeMultipliers.value,
+                                this.moneyMultiplier()
                             );
                             switch (shapeType) {
                                 case 'Circle':
                                 {
                                     const wallHitPoints = shapeStats.wallHitValue
                                         * totalValueMultiplier
-                                        * this.multipliers.prestigeMultipliers.circleWallValue;
+                                        * this.multipliers.prestigeMultipliers.circleWallValue
+                                        * (1 + this.cosmos.effect('circleWallBonus'));
                                     this.baseUpgradeShop.addBalance(wallHitPoints);
                                     this.addPointsAndCheckPrestige(wallHitPoints);
                                     break;
@@ -1505,13 +1623,16 @@ class Server {
                                 case 'Square':
                                 case 'Triangle':
                                 {
-                                    const collisionPoints = shapeStats.collisionValue * totalValueMultiplier;
+                                    const collisionPoints = shapeStats.collisionValue * totalValueMultiplier
+                                        * (1 + this.cosmos.effect('collisionValueBonus'));
                                     this.baseUpgradeShop.addBalance(collisionPoints);
                                     this.addPointsAndCheckPrestige(collisionPoints);
                                     break;
                                 }
                             }
                         }
+                        // A black hole / supernova wipes the board: stop this frame's substeps.
+                        if (this.checkCosmicEvents(stats)) break;
                     }
 
                     if (currentTime - this.lastUiUpdate >= 100) {

@@ -72,6 +72,33 @@ class baseUpgradeShop extends AShop {
         // });
 
     }
+    /** The "Add Ball / Square / Triangle" item of every shape section. */
+    addShapeItems() {
+        return Object.values(this.items).flat().filter((item) => item.name.startsWith('Add '));
+    }
+
+    /**
+     * Every add-shape item costs `multiplier` × its normal price (black holes
+     * and supernovas raise it). Used after an event and when loading a save.
+     */
+    setAddShapePriceMultiplier(multiplier = 1) {
+        const value = Number.isFinite(multiplier) && multiplier > 0 ? multiplier : 1;
+        for (const item of this.addShapeItems()) item.priceMultiplier = value;
+    }
+
+    /** Black hole / supernova: add-shape items go back to level 1 at the new price. */
+    resetAddShapeItems(multiplier = 1) {
+        const fresh = new baseUpgradeShop();
+        fresh.addSquaresToShop();
+        fresh.addTrianglesToShop();
+        for (const item of this.addShapeItems()) {
+            const [start] = fresh.getItem(item.name);
+            item.level = start.level;
+            item.price = start.price;
+        }
+        this.setAddShapePriceMultiplier(multiplier);
+    }
+
     getItem(itemName) {
         for(const shop in this.items) {
             const found =  this.items[shop].find(item => item.name === itemName);

@@ -23,6 +23,9 @@ export const FUSION_LIMITS = {
 /** What earns money for each shape: wall hits or shape-on-shape collisions. */
 export const SCORES_ON = { Circle: 'wall', Square: 'collision', Triangle: 'collision' };
 
+/** How long the black hole / supernova flash shows. */
+export const COSMIC_FLASH_FRAMES = 60;
+
 /** Chain lightning limits: strikes per bolt and how long a flash shows. */
 export const LIGHTNING_LIMITS = { maxChain: 12, maxFlashes: 40, flashFrames: 14 };
 
@@ -76,6 +79,7 @@ class CircleBoard {
         this.lightningChargeBonus = 0;
         this.lightningRng = Math.random;
         this.lightningFlashes = [];
+        this.cosmicFlash = null;
         
         // Collision tracking for time
         this.wallHits = 0;
@@ -410,14 +414,20 @@ class CircleBoard {
      * @param {Object} shop - Shop object for handling currency
      * @return {Object} Statistics for the current frame
      */
-    updatePhysics(speedMultipliers = {}, spawnSpeedMultipliers = {}) {
-        if (!this.isRunning) return {total: { totalWallHits: 0, totalShapeCollisions: 0 }};
+    updatePhysics(speedMultipliers = {}, { spawnSpeed = {}, spawnMass = 1, substeps = 1 } = {}) {
+        if (!this.isRunning) return {total: { totalWallHits: 0, totalShapeCollisions: 0, maxImpactSpeed: 0 }};
 
         // Upgrades only affect shapes bought after them: a shape locks in its
-        // own speed and permanent speed multiplier the first frame it exists.
-        for (const shape of this.shapes) this.lockInSpeed(shape, spawnSpeedMultipliers);
+        // own speed, permanent speed multiplier and mass scale the first frame it exists.
+        const spawn = { spawnSpeed, spawnMass };
+        for (const shape of this.shapes) this.lockInSpawnStats(shape, spawn);
 
-        const returnValues = {total: { totalWallHits: 0, totalShapeCollisions: 0, fusions: 0, lightningStrikes: 0 }};
+        // How far a shape really moves per frame (speedMultipliers are per substep).
+        const frameSpeedOf = (shape) =>
+            (speedMultipliers[shape.getName().toLowerCase()] || 1) * substeps * shape.speedMultiplier;
+        let maxImpactSpeed = 0;
+
+        const returnValues = {total: { totalWallHits: 0, totalShapeCollisions: 0, fusions: 0, lightningStrikes: 0, maxImpactSpeed: 0 }};
         // Per-type counts (how many hits) and values (what they are worth:
         // a fused shape counts once but is worth all the shapes inside it).
         const statsFor = (name) => (returnValues[name] ??= {
@@ -475,7 +485,15 @@ class CircleBoard {
                     `${shapeB.id}-${shapeA.id}`;
                     if (!proccessedCollisions.has(pairKey)) {
                         proccessedCollisions.add(pairKey);
+                        // Relative speed before the bounce (for supernovas).
+                        const kA = frameSpeedOf(shapeA);
+                        const kB = frameSpeedOf(shapeB);
+                        const impactSpeed = Math.hypot(
+                            shapeA.velocity.x * kA - shapeB.velocity.x * kB,
+                            shapeA.velocity.y * kA - shapeB.velocity.y * kB,
+                        );
                         if (CollisionResponse.handleCollision(shapeA, shapeB)) {
+                            if (impactSpeed > maxImpactSpeed) maxImpactSpeed = impactSpeed;
                             totalShapeCollisions++;
                             this.totalShapeCollisions++;
                             const statsA = statsFor(shapeA.getName());
@@ -515,7 +533,7 @@ class CircleBoard {
         }
 
         this.shapes.forEach(shape => {
-            this.lockInSpeed(shape, spawnSpeedMultipliers);
+            this.lockInSpawnStats(shape, spawn);
             // Collisions only change direction: speed never leaks between shapes.
             this.restoreOwnSpeed(shape);
             const multiplier = (speedMultipliers[shape.getName().toLowerCase()] || 1) * shape.speedMultiplier;
@@ -524,6 +542,7 @@ class CircleBoard {
         returnValues.total.totalWallHits = totalWallHits;
         returnValues.total.totalShapeCollisions = totalShapeCollisions;
         returnValues.total.fusions = fusions.length;
+        returnValues.total.maxImpactSpeed = maxImpactSpeed;
         
         // Update the collision statistics
         if (this.wallHitsStack.length >= 120) {
@@ -580,21 +599,42 @@ class CircleBoard {
             fused.id = this.counter++;
             fused.cruiseSpeed = Math.hypot(fused.velocity.x, fused.velocity.y);
             fused.speedMultiplier = Math.max(shapeA.speedMultiplier ?? 1, shapeB.speedMultiplier ?? 1);
+            fused.massScale = Math.max(shapeA.massScale ?? 1, shapeB.massScale ?? 1);
+            fused.mass *= fused.massScale;
         }
         return fused;
     }
 
     /**
-     * Give a new shape its own speed (`cruiseSpeed`, from its velocity) and
-     * the permanent speed multiplier in effect right now. Later upgrades
-     * never change these, so they only affect shapes bought after them.
+     * Give a new shape its own speed (`cruiseSpeed`, from its velocity), the
+     * permanent speed multiplier in effect right now and the current spawn
+     * mass scale (black holes make new shapes lighter). Later upgrades never
+     * change these, so they only affect shapes bought after them.
      */
-    lockInSpeed(shape, spawnSpeedMultipliers = {}) {
+    lockInSpawnStats(shape, { spawnSpeed = {}, spawnMass = 1 } = {}) {
         if (!(shape.cruiseSpeed >= 0)) shape.cruiseSpeed = Math.hypot(shape.velocity.x, shape.velocity.y);
         if (!(shape.speedMultiplier > 0)) {
-            const value = spawnSpeedMultipliers[shape.getName().toLowerCase()];
+            const value = spawnSpeed[shape.getName().toLowerCase()];
             shape.speedMultiplier = Number.isFinite(value) && value > 0 ? value : 1;
         }
+        if (!(shape.massScale > 0)) {
+            shape.massScale = Number.isFinite(spawnMass) && spawnMass > 0 ? spawnMass : 1;
+            shape.mass *= shape.massScale;
+        }
+    }
+
+    /** Sum of every shape's mass (what a black hole is measured against). */
+    getTotalMass() {
+        let total = 0;
+        for (const shape of this.shapes) total += shape.mass;
+        return total;
+    }
+
+    /** Black hole / supernova: remove every shape and play the event flash. */
+    clearShapes(kind = null) {
+        this.shapes = [];
+        this.lightningFlashes = [];
+        if (kind) this.cosmicFlash = { kind, life: COSMIC_FLASH_FRAMES };
     }
 
     /** Rescale the velocity back to the shape's own speed, keeping its direction. */
@@ -716,7 +756,44 @@ class CircleBoard {
         this.drawContainer();
         this.shapes.forEach(shape => shape.draw(this.ctx));
         this.drawLightning();
+        this.drawCosmicFlash();
+    }
 
+    /**
+     * Black hole: a dark disc that collapses into the centre.
+     * Supernova: a bright ring that blasts outward.
+     */
+    drawCosmicFlash() {
+        const flash = this.cosmicFlash;
+        if (!flash) return;
+        const ctx = this.ctx;
+        const t = 1 - flash.life / COSMIC_FLASH_FRAMES; // 0 → 1
+        const { x, y, radius } = this.container;
+        ctx.save();
+        if (flash.kind === 'blackHole') {
+            const r = Math.max(1, radius * (1 - t));
+            const gradient = ctx.createRadialGradient(x, y, 0, x, y, r);
+            gradient.addColorStop(0, `rgba(0, 0, 0, ${1 - t * 0.5})`);
+            gradient.addColorStop(0.7, `rgba(76, 29, 149, ${0.8 * (1 - t)})`);
+            gradient.addColorStop(1, 'rgba(76, 29, 149, 0)');
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.arc(x, y, r, 0, Math.PI * 2);
+            ctx.fill();
+        } else {
+            ctx.strokeStyle = `rgba(254, 240, 138, ${1 - t})`;
+            ctx.lineWidth = 30 * (1 - t) + 2;
+            ctx.beginPath();
+            ctx.arc(x, y, Math.max(1, radius * t), 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.fillStyle = `rgba(255, 255, 255, ${0.6 * (1 - t) ** 2})`;
+            ctx.beginPath();
+            ctx.arc(x, y, radius, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        ctx.restore();
+        flash.life -= 1;
+        if (flash.life <= 0) this.cosmicFlash = null;
     }
     /**
      * Match the canvas backing store to devicePixelRatio, recompute the
@@ -767,7 +844,7 @@ class CircleBoard {
                     shape.side = shape.baseSide * this.scaleFactor;
                 } else if (shape instanceof Triangle) {
                     shape.side = shape.baseSide * this.scaleFactor;
-                    shape.mass = (Math.sqrt(3) / 4) * shape.side * shape.side * (shape.massBonus ?? 1);
+                    shape.mass = (Math.sqrt(3) / 4) * shape.side * shape.side * (shape.massBonus ?? 1) * (shape.massScale ?? 1);
                 }
             });
         }
