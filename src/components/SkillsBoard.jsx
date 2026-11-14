@@ -9,14 +9,7 @@ const NODES_BY_ID = new Map(SKILL_NODES.map((node) => [node.id, node]));
 
 const branchOf = (node) => SKILL_BRANCHES[node.branch] ?? { label: 'Skill', color: '#94a3b8' };
 
-const costText = (cost) => {
-  if (!cost) return '—';
-  return cost.currency === 'skillPoints'
-    ? `${cost.amount} skill point${cost.amount === 1 ? '' : 's'}`
-    : `${formatNumber(cost.amount)} collisions`;
-};
-const shortCostText = (cost) =>
-  !cost ? '' : cost.currency === 'skillPoints' ? `${cost.amount} SP` : `${formatNumber(cost.amount)} ×`;
+const costText = (cost) => (cost ? `${cost.amount} skill point${cost.amount === 1 ? '' : 's'}` : '—');
 
 function UnlockPanel({ skills, prestigeBalance, onUnlock }) {
   const affordable = prestigeBalance >= skills.unlockCost;
@@ -26,8 +19,9 @@ function UnlockPanel({ skills, prestigeBalance, onUnlock }) {
       <h3>Skills</h3>
       <p>
         Skills are a permanent layer above prestige. Unlock them once, buy skill points with
-        prestige points, then use each skill point to unlock a skill. After that, collisions
-        level skills up.
+        prestige points, then use each skill point to unlock a skill. Every prestige run then
+        has a level bar: shape collisions fill it, and each level-up lets you pick an upgrade
+        for one of your skills.
       </p>
       <button type="button" className="pt-prestige-button" disabled={!affordable} onClick={onUnlock}>
         Unlock Skills · {formatNumber(skills.unlockCost)} prestige points
@@ -41,9 +35,8 @@ function UnlockPanel({ skills, prestigeBalance, onUnlock }) {
   );
 }
 
-function SkillDetails({ state, onClose, onBuy }) {
-  const { node, level, cost, available, canAfford } = state;
-  const maxed = level >= node.maxLevel;
+function SkillDetails({ state, picks, onClose, onBuy }) {
+  const { node, unlocked, cost, available, canAfford } = state;
   const branch = branchOf(node);
   return (
     <aside className="pt-details" aria-label={`${node.label} details`}>
@@ -54,55 +47,51 @@ function SkillDetails({ state, onClose, onBuy }) {
       </div>
       <p className="pt-details-description">{node.description}</p>
 
-      <div className="pt-level">
-        <div className="pt-level-row">
-          <span>Level</span>
-          <span>{level} / {node.maxLevel}</span>
-        </div>
-        <div className="pt-level-bar">
-          <div className="pt-level-fill" style={{ width: `${(level / node.maxLevel) * 100}%`, '--branch': branch.color }} />
-        </div>
-      </div>
-
       <dl className="pt-effects">
         <div>
-          <dt>Now</dt>
-          <dd>{node.describe(level)}</dd>
+          <dt>Base</dt>
+          <dd>{node.describeBase}</dd>
         </div>
-        {!maxed && (
-          <div>
-            <dt>Next</dt>
-            <dd className="pt-effect-next">{node.describe(level + 1)}</dd>
-          </div>
-        )}
       </dl>
 
-      <div className="pt-buy">
-        <div className="pt-cost">
-          <span>Cost</span>
-          <strong className={canAfford ? '' : 'is-short'}>{maxed ? '—' : costText(cost)}</strong>
-        </div>
-        <button
-          className="pt-buy-button"
-          onClick={onBuy}
-          disabled={!available || maxed || !canAfford}
-        >
-          {maxed
-            ? 'Maxed out'
-            : !available
-              ? 'Locked'
-              : !canAfford
-                ? cost.currency === 'skillPoints' ? 'Need a skill point' : 'Not enough collisions'
-                : level === 0 ? 'Unlock skill' : 'Level up'}
-        </button>
+      <div className="pt-skill-choices">
+        <h4>Level-bar upgrades</h4>
+        <ul>
+          {node.choices.map((choice) => {
+            const stacks = picks?.[choice.id] ?? 0;
+            return (
+              <li key={choice.id} className={stacks > 0 ? 'is-picked' : ''}>
+                <span className="pt-skill-choice-icon" aria-hidden="true">{choice.icon}</span>
+                <span className="pt-skill-choice-text">
+                  <strong>{choice.label}</strong>
+                  <small>{stacks > 0 ? choice.describe(stacks) : choice.description}</small>
+                </span>
+                <span className="pt-skill-choice-stacks">{stacks}/{choice.maxStacks}</span>
+              </li>
+            );
+          })}
+        </ul>
+        <p className="pt-details-hint">Picks this run reset when you prestige.</p>
       </div>
+
+      {!unlocked && (
+        <div className="pt-buy">
+          <div className="pt-cost">
+            <span>Cost</span>
+            <strong className={canAfford ? '' : 'is-short'}>{costText(cost)}</strong>
+          </div>
+          <button className="pt-buy-button" onClick={onBuy} disabled={!available || !canAfford}>
+            {!available ? 'Locked' : !canAfford ? 'Need a skill point' : 'Unlock skill'}
+          </button>
+        </div>
+      )}
     </aside>
   );
 }
 
 /**
  * The Skills tab: unlock panel until Skills are bought, then a radial skill
- * tree plus the skill-point / collision balances.
+ * tree plus the skill-point balance and this run's level.
  */
 function SkillsBoard({ skills, prestigeBalance, onUnlock, onBuySkillPoint, onBuySkill }) {
   const [selectedId, setSelectedId] = useState(null);
@@ -112,11 +101,10 @@ function SkillsBoard({ skills, prestigeBalance, onUnlock, onBuySkillPoint, onBuy
     (skills?.skills ?? []).forEach((s) => {
       const node = NODES_BY_ID.get(s.id);
       if (!node) return;
-      const maxed = s.level >= node.maxLevel;
       map.set(s.id, {
         ...s,
         node,
-        status: !s.available ? 'locked' : maxed ? 'maxed' : s.canAfford ? 'affordable' : 'unaffordable',
+        status: !s.available ? 'locked' : s.unlocked ? 'maxed' : s.canAfford ? 'affordable' : 'unaffordable',
       });
     });
     return map;
@@ -135,13 +123,13 @@ function SkillsBoard({ skills, prestigeBalance, onUnlock, onBuySkillPoint, onBuy
   }
 
   const canBuyPoint = prestigeBalance >= skills.skillPointPrice;
+  const pickCount = (node) => node.choices.reduce((sum, c) => sum + (skills.picks?.[c.id] ?? 0), 0);
 
   const renderNode = (node, { selected: isSelected }) => {
     const state = states.get(node.id);
-    const maxed = state.status === 'maxed';
     return (
       <div
-        className={['pt-card', `is-${state.status}`, state.level > 0 ? 'is-owned' : '', isSelected ? 'is-selected' : '']
+        className={['pt-card', `is-${state.status}`, state.unlocked ? 'is-owned' : '', isSelected ? 'is-selected' : '']
           .filter(Boolean).join(' ')}
         style={{ '--branch': branchOf(node).color }}
         title={node.label}
@@ -149,8 +137,9 @@ function SkillsBoard({ skills, prestigeBalance, onUnlock, onBuySkillPoint, onBuy
         <span className="pt-card-icon" aria-hidden="true">{node.icon}</span>
         <span className="pt-card-label">{node.label}</span>
         <span className="pt-card-meta">
-          <span className="pt-card-level">{maxed ? 'MAX' : `Lv ${state.level}/${node.maxLevel}`}</span>
-          {!maxed && <span className="pt-card-cost">{shortCostText(state.cost)}</span>}
+          {state.unlocked
+            ? <span className="pt-card-level">{pickCount(node)} picks</span>
+            : <span className="pt-card-cost">{state.cost?.amount ?? 1} SP</span>}
         </span>
       </div>
     );
@@ -164,8 +153,8 @@ function SkillsBoard({ skills, prestigeBalance, onUnlock, onBuySkillPoint, onBuy
           <strong>{skills.skillPoints}</strong>
         </div>
         <div className="pt-chip">
-          <span>Collisions</span>
-          <strong>{formatNumber(skills.collisionBank)}</strong>
+          <span>Run level</span>
+          <strong>{skills.runLevel}</strong>
         </div>
         <button type="button" className="pt-ghost-button" disabled={!canBuyPoint} onClick={onBuySkillPoint}>
           Buy skill point · {formatNumber(skills.skillPointPrice)} prestige
@@ -179,8 +168,8 @@ function SkillsBoard({ skills, prestigeBalance, onUnlock, onBuySkillPoint, onBuy
           gap={NODE_GAP}
           layout="radial"
           renderNode={renderNode}
-          nodeLabel={(node) => `${node.label}, level ${states.get(node.id).level}`}
-          edgeClassName={(edge) => `pt-link ${states.get(edge.to)?.level > 0 ? 'is-owned' : 'is-ready'}`}
+          nodeLabel={(node) => `${node.label}, ${states.get(node.id).unlocked ? 'unlocked' : 'locked'}`}
+          edgeClassName={(edge) => `pt-link ${states.get(edge.to)?.unlocked ? 'is-owned' : 'is-ready'}`}
           edgeStyle={(edge) => ({ '--branch': branchOf(edge.toNode).color })}
           selectedId={selectedId}
           onSelect={setSelectedId}
@@ -191,6 +180,7 @@ function SkillsBoard({ skills, prestigeBalance, onUnlock, onBuySkillPoint, onBuy
           <SkillDetails
             key={selected.id}
             state={selected}
+            picks={skills.picks}
             onClose={() => setSelectedId(null)}
             onBuy={() => onBuySkill?.(selected.id)}
           />

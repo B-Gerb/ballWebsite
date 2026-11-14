@@ -85,6 +85,8 @@ class Square {
             velocity: this.velocity,
             color: this.color,
             value: this.value,
+            massBonus: this.massBonus ?? 1,
+            speedMultiplier: this.speedMultiplier,
         };
     }
     static create(x, y, side, rotation, color, dx, dy, baseSide = side) {

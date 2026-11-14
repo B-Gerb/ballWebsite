@@ -3,7 +3,8 @@ import Circle from './circle.js';
 import Square from './square.js';
 import Triangle from './triangle.js';
 import CollisionResponse from './CollisionResponse.js';
-import { fuseShapes } from './fusion.js';
+import { applyMassBonus, fuseShapes } from './fusion.js';
+import { SHAPE_TIERS } from '../data/skillTree.js';
 
 /**
  * The board always simulates in a fixed logical coordinate space of
@@ -18,6 +19,12 @@ export const FUSION_LIMITS = {
     maxSpeed: 30,
     maxBaseSize: { Circle: 60, Square: 100, Triangle: 110 },
 };
+
+/** What earns money for each shape: wall hits or shape-on-shape collisions. */
+export const SCORES_ON = { Circle: 'wall', Square: 'collision', Triangle: 'collision' };
+
+/** Chain lightning limits: strikes per bolt and how long a flash shows. */
+export const LIGHTNING_LIMITS = { maxChain: 12, maxFlashes: 40, flashFrames: 14 };
 
 class CircleBoard {
     constructor(canvasElement) {
@@ -60,6 +67,15 @@ class CircleBoard {
         // Rolled on its own RNG so fusion never shifts the seeded spawn sequence.
         this.fusionChance = 0;
         this.fusionRng = Math.random;
+        // Other skill effects (see setSkillEffects). Lightning has its own RNG too.
+        this.fusionPromoteChance = 0;
+        this.fusionSpeedBonus = 0;
+        this.fusionMassBonus = 0;
+        this.lightningChance = 0;
+        this.lightningChainChance = 0;
+        this.lightningChargeBonus = 0;
+        this.lightningRng = Math.random;
+        this.lightningFlashes = [];
         
         // Collision tracking for time
         this.wallHits = 0;
@@ -118,6 +134,17 @@ class CircleBoard {
     }
     setSeed(seed){
         this.rng = seed;
+    }
+
+    /** Take the skill effects that act on the board (see skillTree EMPTY_EFFECTS). */
+    setSkillEffects(effects = {}) {
+        this.fusionChance = effects.fusionChance ?? 0;
+        this.fusionPromoteChance = effects.fusionPromoteChance ?? 0;
+        this.fusionSpeedBonus = effects.fusionSpeedBonus ?? 0;
+        this.fusionMassBonus = effects.fusionMassBonus ?? 0;
+        this.lightningChance = effects.lightningChance ?? 0;
+        this.lightningChainChance = effects.lightningChainChance ?? 0;
+        this.lightningChargeBonus = effects.lightningChargeBonus ?? 0;
     }
     
     // Calculate scale factor based on canvas size
@@ -383,10 +410,14 @@ class CircleBoard {
      * @param {Object} shop - Shop object for handling currency
      * @return {Object} Statistics for the current frame
      */
-    updatePhysics(speedMultipliers = {}) {
+    updatePhysics(speedMultipliers = {}, spawnSpeedMultipliers = {}) {
         if (!this.isRunning) return {total: { totalWallHits: 0, totalShapeCollisions: 0 }};
 
-        const returnValues = {total: { totalWallHits: 0, totalShapeCollisions: 0, fusions: 0 }};
+        // Upgrades only affect shapes bought after them: a shape locks in its
+        // own speed and permanent speed multiplier the first frame it exists.
+        for (const shape of this.shapes) this.lockInSpeed(shape, spawnSpeedMultipliers);
+
+        const returnValues = {total: { totalWallHits: 0, totalShapeCollisions: 0, fusions: 0, lightningStrikes: 0 }};
         // Per-type counts (how many hits) and values (what they are worth:
         // a fused shape counts once but is worth all the shapes inside it).
         const statsFor = (name) => (returnValues[name] ??= {
@@ -394,6 +425,13 @@ class CircleBoard {
         });
         const fusing = new Set();
         const fusions = [];
+        // Shapes that just earned money and rolled a lightning strike.
+        const lightningSources = [];
+        const rollLightning = (shape) => {
+            if (this.lightningChance > 0 && this.lightningRng() < this.lightningChance) {
+                lightningSources.push(shape);
+            }
+        };
         
         // Track collisions for this frame
         let totalWallHits = 0;
@@ -410,6 +448,7 @@ class CircleBoard {
                 const shapeStats = statsFor(shape.getName());
                 shapeStats.totalWallHits += 1;
                 shapeStats.wallHitValue += shape.value ?? 1;
+                if (SCORES_ON[shape.getName()] === 'wall') rollLightning(shape);
             }
             const cells = this.getShapeCells(shape, grid);
             cells.forEach(cell => {
@@ -445,6 +484,8 @@ class CircleBoard {
                             const statsB = statsFor(shapeB.getName());
                             statsB.totalShapeCollisions += 1;
                             statsB.collisionValue += shapeB.value ?? 1;
+                            if (SCORES_ON[shapeA.getName()] === 'collision') rollLightning(shapeA);
+                            if (SCORES_ON[shapeB.getName()] === 'collision') rollLightning(shapeB);
 
                             if (this.fusionChance > 0
                                 && shapeA.getName() === shapeB.getName()
@@ -469,9 +510,16 @@ class CircleBoard {
             this.shapes.push(...fusions);
         }
 
+        if (lightningSources.length) {
+            returnValues.total.lightningStrikes = this.strikeLightning(lightningSources, statsFor);
+        }
+
         this.shapes.forEach(shape => {
-            // Update shape position and velocity
-            shape.update(speedMultipliers[shape.getName().toLowerCase()] || 1);
+            this.lockInSpeed(shape, spawnSpeedMultipliers);
+            // Collisions only change direction: speed never leaks between shapes.
+            this.restoreOwnSpeed(shape);
+            const multiplier = (speedMultipliers[shape.getName().toLowerCase()] || 1) * shape.speedMultiplier;
+            shape.update(multiplier);
         });
         returnValues.total.totalWallHits = totalWallHits;
         returnValues.total.totalShapeCollisions = totalShapeCollisions;
@@ -501,15 +549,163 @@ class CircleBoard {
     }
 
     
-    /** Fuse two same-type shapes into a new one (null if over the size cap). */
+    /**
+     * Fuse two same-type shapes into a new one (null if over the size cap).
+     * With the Ascension pick it may upgrade into the next shape tier; if
+     * that would be too big it falls back to a normal fusion.
+     */
     fuse(shapeA, shapeB) {
-        const fused = fuseShapes(shapeA, shapeB, {
+        const name = shapeA.getName();
+        const tier = SHAPE_TIERS.indexOf(name);
+        const next = tier >= 0 ? SHAPE_TIERS[tier + 1] : undefined;
+        const options = {
             scaleFactor: this.scaleFactor,
             maxSpeed: FUSION_LIMITS.maxSpeed * this.scaleFactor,
-            maxBaseSize: FUSION_LIMITS.maxBaseSize[shapeA.getName()] ?? Infinity,
+            speedBonus: this.fusionSpeedBonus,
+            massBonus: this.fusionMassBonus,
+        };
+        let fused = null;
+        if (next && this.fusionPromoteChance > 0 && this.fusionRng() < this.fusionPromoteChance) {
+            fused = fuseShapes(shapeA, shapeB, {
+                ...options,
+                promoteTo: next,
+                maxBaseSize: FUSION_LIMITS.maxBaseSize[next] ?? Infinity,
+            });
+        }
+        fused ??= fuseShapes(shapeA, shapeB, {
+            ...options,
+            maxBaseSize: FUSION_LIMITS.maxBaseSize[name] ?? Infinity,
         });
-        if (fused) fused.id = this.counter++;
+        if (fused) {
+            fused.id = this.counter++;
+            fused.cruiseSpeed = Math.hypot(fused.velocity.x, fused.velocity.y);
+            fused.speedMultiplier = Math.max(shapeA.speedMultiplier ?? 1, shapeB.speedMultiplier ?? 1);
+        }
         return fused;
+    }
+
+    /**
+     * Give a new shape its own speed (`cruiseSpeed`, from its velocity) and
+     * the permanent speed multiplier in effect right now. Later upgrades
+     * never change these, so they only affect shapes bought after them.
+     */
+    lockInSpeed(shape, spawnSpeedMultipliers = {}) {
+        if (!(shape.cruiseSpeed >= 0)) shape.cruiseSpeed = Math.hypot(shape.velocity.x, shape.velocity.y);
+        if (!(shape.speedMultiplier > 0)) {
+            const value = spawnSpeedMultipliers[shape.getName().toLowerCase()];
+            shape.speedMultiplier = Number.isFinite(value) && value > 0 ? value : 1;
+        }
+    }
+
+    /** Rescale the velocity back to the shape's own speed, keeping its direction. */
+    restoreOwnSpeed(shape) {
+        const target = shape.cruiseSpeed;
+        if (!(target > 0)) return;
+        const speed = Math.hypot(shape.velocity.x, shape.velocity.y);
+        if (speed === 0) {
+            const angle = Math.random() * Math.PI * 2;
+            shape.velocity.x = Math.cos(angle) * target;
+            shape.velocity.y = Math.sin(angle) * target;
+        } else if (Math.abs(speed - target) > target * 1e-9) {
+            shape.velocity.x *= target / speed;
+            shape.velocity.y *= target / speed;
+        }
+    }
+
+    /**
+     * Chain lightning: each source strikes one random other shape that can
+     * earn money, which earns its value as if it had scored. With Forked
+     * Bolt the struck shape can strike again. Returns the number of strikes.
+     * Picking targets by random index keeps this O(strikes), not O(shapes).
+     */
+    strikeLightning(sources, statsFor) {
+        const shapes = this.shapes;
+        if (shapes.length < 2) return 0;
+        const maxSpeed = FUSION_LIMITS.maxSpeed * this.scaleFactor;
+        const pickTarget = (from) => {
+            for (let tries = 0; tries < 4; tries++) {
+                const shape = shapes[Math.floor(this.lightningRng() * shapes.length) % shapes.length];
+                if (shape !== from && SCORES_ON[shape.getName()]) return shape;
+            }
+            return null;
+        };
+
+        let strikes = 0;
+        for (const source of sources) {
+            let from = source;
+            for (let jump = 0; jump < LIGHTNING_LIMITS.maxChain; jump++) {
+                const target = pickTarget(from);
+                if (!target) break;
+                strikes += 1;
+                const stats = statsFor(target.getName());
+                if (SCORES_ON[target.getName()] === 'wall') stats.wallHitValue += target.value ?? 1;
+                else stats.collisionValue += target.value ?? 1;
+
+                if (this.lightningChargeBonus > 0) this.chargeShape(target, this.lightningChargeBonus, maxSpeed);
+                this.addLightningFlash(from, target);
+
+                from = target;
+                if (!(this.lightningChainChance > 0 && this.lightningRng() < this.lightningChainChance)) break;
+            }
+        }
+        return strikes;
+    }
+
+    /** Supercharge: a permanent bump in speed (up to the cap) and weight. */
+    chargeShape(shape, bonus, maxSpeed) {
+        const speed = shape.cruiseSpeed ?? Math.hypot(shape.velocity.x, shape.velocity.y);
+        if (speed > 0) {
+            const factor = Math.min(1 + bonus, maxSpeed / speed);
+            if (factor > 1) {
+                // Only the struck shape's own speed goes up.
+                shape.cruiseSpeed = speed * factor;
+                shape.velocity.x *= factor;
+                shape.velocity.y *= factor;
+            }
+        }
+        applyMassBonus(shape, 1 + bonus);
+    }
+
+    /** A short-lived jagged bolt between two shapes (drawn by render). */
+    addLightningFlash(from, to) {
+        const flashes = this.lightningFlashes;
+        if (flashes.length >= LIGHTNING_LIMITS.maxFlashes) flashes.shift();
+        const x1 = from.center.x, y1 = from.center.y;
+        const x2 = to.center.x, y2 = to.center.y;
+        const len = Math.hypot(x2 - x1, y2 - y1) || 1;
+        const nx = -(y2 - y1) / len, ny = (x2 - x1) / len;
+        const points = [{ x: x1, y: y1 }];
+        const segments = 5;
+        for (let i = 1; i < segments; i++) {
+            const t = i / segments;
+            const offset = (Math.random() - 0.5) * Math.min(40, len * 0.25);
+            points.push({ x: x1 + (x2 - x1) * t + nx * offset, y: y1 + (y2 - y1) * t + ny * offset });
+        }
+        points.push({ x: x2, y: y2 });
+        flashes.push({ points, life: LIGHTNING_LIMITS.flashFrames });
+    }
+
+    drawLightning() {
+        const flashes = this.lightningFlashes;
+        if (!flashes.length) return;
+        const ctx = this.ctx;
+        ctx.save();
+        ctx.lineJoin = 'round';
+        ctx.lineCap = 'round';
+        for (const flash of flashes) {
+            const alpha = flash.life / LIGHTNING_LIMITS.flashFrames;
+            ctx.beginPath();
+            flash.points.forEach((p, i) => (i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)));
+            ctx.strokeStyle = `rgba(56, 189, 248, ${0.35 * alpha})`;
+            ctx.lineWidth = 6 * this.scaleFactor;
+            ctx.stroke();
+            ctx.strokeStyle = `rgba(240, 249, 255, ${alpha})`;
+            ctx.lineWidth = 2 * this.scaleFactor;
+            ctx.stroke();
+            flash.life -= 1;
+        }
+        ctx.restore();
+        this.lightningFlashes = flashes.filter((flash) => flash.life > 0);
     }
 
     /**
@@ -519,7 +715,7 @@ class CircleBoard {
         this.ctx.clearRect(0, 0, this.logicalSize, this.logicalSize);
         this.drawContainer();
         this.shapes.forEach(shape => shape.draw(this.ctx));
-        
+        this.drawLightning();
 
     }
     /**
@@ -528,8 +724,12 @@ class CircleBoard {
      * container if it changed (a save made at an older canvas size, or a
      * changed baseReferenceSize). Safe to call on every window resize: when
      * only the DPR changes, the simulation is untouched.
+     *
+     * With `keepShapes`, existing shapes keep their size and speed (only their
+     * positions move into the new container); their base sizes are rewritten
+     * so they stay that size from now on.
      */
-    syncCanvasResolution() {
+    syncCanvasResolution({ keepShapes = false } = {}) {
         const dpr = Math.min(Math.max(globalThis.devicePixelRatio || 1, 1), 3);
         const backing = Math.round(this.logicalSize * dpr);
         if (this.canvas.width !== backing || this.canvas.height !== backing) {
@@ -552,6 +752,12 @@ class CircleBoard {
                 // Keep each shape at the same relative spot in the container.
                 shape.center.x = next.x + dx * sizeRatio;
                 shape.center.y = next.y + dy * sizeRatio;
+                if (keepShapes) {
+                    if (shape instanceof Circle) shape.baseRadius = shape.radius / this.scaleFactor;
+                    else shape.baseSide = shape.side / this.scaleFactor;
+                    return;
+                }
+                if (shape.cruiseSpeed >= 0) shape.cruiseSpeed *= sizeRatio;
                 shape.velocity.x *= sizeRatio;
                 shape.velocity.y *= sizeRatio;
 
@@ -561,13 +767,19 @@ class CircleBoard {
                     shape.side = shape.baseSide * this.scaleFactor;
                 } else if (shape instanceof Triangle) {
                     shape.side = shape.baseSide * this.scaleFactor;
-                    shape.mass = (Math.sqrt(3) / 4) * shape.side * shape.side;
+                    shape.mass = (Math.sqrt(3) / 4) * shape.side * shape.side * (shape.massBonus ?? 1);
                 }
             });
         }
 
         this.render();
         return this.scaleFactor;
+    }
+
+    /** "Decrease Large Circle Size": only shapes bought afterwards are bigger. */
+    setReferenceSize(size) {
+        this.baseReferenceSize = size;
+        return this.syncCanvasResolution({ keepShapes: true });
     }
 
     // Toggle simulation state

@@ -1,4 +1,4 @@
-import { SKILL_NODES } from '../data/skillTree.js';
+import { SKILL_NODES, skillEffects } from '../data/skillTree.js';
 import { normalizeRequirement } from '../components/whiteboard/graphLayout.js';
 
 /** One-time prestige-point price of opening the Skills tab. */
@@ -11,8 +11,9 @@ const nonNegative = (value) => (Number.isFinite(value) && value > 0 ? value : 0)
 const nonNegativeInteger = (value) => Math.floor(nonNegative(value));
 
 /**
- * Skill progress. Spends prestige points through the prestige shop you pass
- * in, so it never holds a second copy of that balance.
+ * Permanent skill progress: which skills are unlocked. Spends prestige points
+ * through the prestige shop you pass in, so it never holds a second copy of
+ * that balance. Run-only upgrades live in `RunLevels`.
  */
 class SkillShop {
   constructor(nodes = SKILL_NODES) {
@@ -25,12 +26,20 @@ class SkillShop {
     this.unlocked = false;
     this.skillPoints = 0;
     this.skillPointsBought = 0;
-    this.collisionBank = 0;
     this.levels = {};
   }
 
+  /** 1 when the skill is unlocked, else 0 (kept as a level for `requires`). */
   level(id) {
     return this.levels[id] ?? 0;
+  }
+
+  isSkillUnlocked(id) {
+    return this.level(id) > 0;
+  }
+
+  unlockedSkillIds() {
+    return this.nodes.filter((n) => this.isSkillUnlocked(n.id)).map((n) => n.id);
   }
 
   unlock(prestigeShop) {
@@ -53,50 +62,36 @@ class SkillShop {
     return true;
   }
 
-  addCollisions(amount) {
-    this.collisionBank += nonNegative(amount);
-  }
-
-  /** Every requirement is met (a bare id means "at least level 1"). */
+  /** Every requirement is met (a bare id means "unlocked"). */
   isAvailable(id) {
     const node = this.byId.get(id);
     if (!node) return false;
     return (node.requires ?? []).map(normalizeRequirement).every((req) => this.level(req.id) >= req.level);
   }
 
-  /** What the next level costs, or null when maxed / unknown. */
+  /** Skill points needed to unlock, or null when already unlocked / unknown. */
   nextCost(id) {
     const node = this.byId.get(id);
-    if (!node) return null;
-    const level = this.level(id);
-    if (level >= node.maxLevel) return null;
-    return level === 0
-      ? { currency: 'skillPoints', amount: node.unlockCost ?? 1 }
-      : { currency: 'collisions', amount: node.collisionCost(level) };
+    if (!node || this.isSkillUnlocked(id)) return null;
+    return { currency: 'skillPoints', amount: node.unlockCost ?? 1 };
   }
 
   canAfford(cost) {
-    if (!cost) return false;
-    return cost.currency === 'skillPoints'
-      ? this.skillPoints >= cost.amount
-      : this.collisionBank >= cost.amount;
+    return Boolean(cost) && this.skillPoints >= cost.amount;
   }
 
-  /** Unlock (skill points) or level up (collisions) a skill. */
+  /** Unlock a skill with skill points. */
   buy(id) {
     const cost = this.nextCost(id);
     if (!this.unlocked || !this.isAvailable(id) || !this.canAfford(cost)) return false;
-    if (cost.currency === 'skillPoints') this.skillPoints -= cost.amount;
-    else this.collisionBank -= cost.amount;
-    this.levels[id] = this.level(id) + 1;
+    this.skillPoints -= cost.amount;
+    this.levels[id] = 1;
     return true;
   }
 
-  /** Combined effects of every skill at its current level. */
-  effects() {
-    const total = { fusionChance: 0 };
-    for (const node of this.nodes) Object.assign(total, node.effect(this.level(node.id)));
-    return total;
+  /** Base effects of unlocked skills plus this run's level-bar picks. */
+  effects(picks = {}) {
+    return skillEffects((id) => this.isSkillUnlocked(id), picks, this.nodes);
   }
 
   toJSON() {
@@ -104,7 +99,6 @@ class SkillShop {
       unlocked: this.unlocked,
       skillPoints: this.skillPoints,
       skillPointsBought: this.skillPointsBought,
-      collisionBank: this.collisionBank,
       skills: { ...this.levels },
     };
   }
@@ -115,10 +109,10 @@ class SkillShop {
     this.unlocked = saved.unlocked === true;
     this.skillPoints = nonNegativeInteger(saved.skillPoints);
     this.skillPointsBought = nonNegativeInteger(saved.skillPointsBought);
-    this.collisionBank = nonNegative(saved.collisionBank);
+    // Older saves stored levels up to 20 (bought with collisions); any level
+    // now just means "unlocked". Their `collisionBank` is no longer used.
     for (const [id, level] of Object.entries(saved.skills ?? {})) {
-      const node = this.byId.get(id);
-      if (node) this.levels[id] = Math.min(node.maxLevel, nonNegativeInteger(level));
+      if (this.byId.has(id) && nonNegativeInteger(level) > 0) this.levels[id] = 1;
     }
   }
 }

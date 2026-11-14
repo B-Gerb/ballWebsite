@@ -6,11 +6,12 @@ import baseUpgradeShop from './shops/baseUpgradeShop';
 import clickShop from './shops/clickShop';
 import prestigeShop from './shops/prestigeShop';
 import SkillShop, { SKILLS_UNLOCK_COST } from './shops/skillShop';
-import { SKILL_NODES } from './data/skillTree';
+import RunLevels from './shops/runLevels';
+import { SKILL_CHOICES, SKILL_NODES } from './data/skillTree';
 import { CURRENCY_ICONS, STORE_BUY_AMOUNTS, STORE_SECTIONS } from './data/shopCatalog';
 import { createStoreRow, createStoreSection, refreshStoreRow } from './shops/storeView';
 import { formatNumber } from './components/formatNumber';
-import { activeBoosts, boostForItem, formatDuration } from './shops/boosts';
+import { BOOST_FIELDS, activeBoosts, boostForItem, formatDuration } from './shops/boosts';
 import ClickerObject from './clicking/ClickerObject';
 import { PRESTIGE_EQUATIONS } from './prestigeEquations';
 
@@ -133,7 +134,9 @@ class Server {
         this.prestigeUpgradeShop = new prestigeShop();
         // Skills: the permanent layer above prestige (survives prestiges).
         this.skillShop = new SkillShop();
-        
+        // The per-prestige level bar and its picks (reset every prestige).
+        this.runLevels = new RunLevels();
+
         // Permanent prestige state and run-only state.
         this.prestigeStats = {
             lifetimePoints: 0,
@@ -269,19 +272,66 @@ class Server {
         this.clickerObject.handleClick = () => {
             if(!this.circleBoard.isRunning) return;
             originalHandleClick.call(this.clickerObject); // for animation purposes
-                const clickMultiplier = this.getSafeMultiplier(
-                    this.multipliers.temporaryMultipliers.clickValue
-                    * this.multipliers.prestigeMultipliers.clickValue
-                    * this.multipliers.prestigeMultipliers.clickUpgradeEffectiveness
-                    * this.multipliers.prestigeMultipliers.currencyMultiplier
-                );
-                const clickPoints = this.getSafeMultiplier(this.clickerValue) * clickMultiplier;
-                this.clickShop.addBalance(clickPoints);
-                this.addPointsAndCheckPrestige(clickPoints);
+            this.earnClicks(1);
             this.updateBalanceDisplay();
             this.updateButtonAppearance();
         };
         this.clickerObject.setSeed(this.seed);    }
+
+    /** What one click earns, with every click multiplier. */
+    clickPoints() {
+        const clickMultiplier = this.getSafeMultiplier(
+            this.multipliers.temporaryMultipliers.clickValue
+            * this.multipliers.prestigeMultipliers.clickValue
+            * this.multipliers.prestigeMultipliers.clickUpgradeEffectiveness
+            * this.multipliers.prestigeMultipliers.currencyMultiplier
+        );
+        return this.getSafeMultiplier(this.clickerValue) * clickMultiplier;
+    }
+
+    earnClicks(count) {
+        if (!(count > 0)) return;
+        const points = this.clickPoints() * count;
+        this.clickShop.addBalance(points);
+        this.addPointsAndCheckPrestige(points);
+    }
+
+    /**
+     * Collision Click skill: each shape collision has a chance to press the
+     * clicker. Every collision click also nudges running boosts (Overclock)
+     * and extends them (Extended Play).
+     */
+    processCollisionClicks(collisions) {
+        const effects = this.skillEffects;
+        const chance = effects?.collisionClickChance ?? 0;
+        if (!(chance > 0) || !(collisions > 0)) return 0;
+        let clicks = 0;
+        for (let i = 0; i < collisions; i++) {
+            if (Math.random() < chance) clicks++;
+        }
+        if (clicks === 0) return 0;
+        this.earnClicks(clicks);
+        this.nudgeBoosts(effects.boostPowerPerClick * clicks, effects.boostFramesPerClick * clicks);
+        return clicks;
+    }
+
+    /** Raise every running boost's multiplier by `power` and add `frames` to it. */
+    nudgeBoosts(power = 0, frames = 0) {
+        const multipliers = this.multipliers.temporaryMultipliers;
+        for (const [key, entry] of Object.entries(this.temporaryMultipliersActiveFrames)) {
+            if (!(entry.frames > 0)) continue;
+            const field = BOOST_FIELDS[key];
+            if (field && power > 0 && entry.multiplier > 0) {
+                multipliers[field] /= entry.multiplier;
+                entry.multiplier += power;
+                multipliers[field] *= entry.multiplier;
+            }
+            if (frames > 0) {
+                entry.frames += frames;
+                entry.total = Math.max(entry.total ?? 0, entry.frames);
+            }
+        }
+    }
 
     getSafeMultiplier(value) {
         return Number.isFinite(value) && value >= 0 ? value : 1;
@@ -686,7 +736,7 @@ class Server {
                         break;
                         
                     case "Decrease Large Circle Size":
-                        this.circleBoard.baseReferenceSize = item[0].getValue();
+                        this.circleBoard.setReferenceSize(item[0].getValue());
                         break;
                 }
                 break;
@@ -941,8 +991,51 @@ class Server {
     // Push skill effects into the systems that use them (call after any
     // skill change and whenever the board is rebuilt).
     applySkillEffects() {
-        const effects = this.skillShop.effects();
-        this.circleBoard.fusionChance = effects.fusionChance;
+        this.skillEffects = this.skillShop.effects(this.runLevels.picks);
+        this.circleBoard.setSkillEffects(this.skillEffects);
+    }
+
+    /** Level-bar XP: shape collisions, once at least one skill is unlocked. */
+    addRunXp(collisions) {
+        if (!(collisions > 0) || this.skillShop.unlockedSkillIds().length === 0) return;
+        this.runLevels.addXp(collisions);
+    }
+
+    /** Take one of the choices offered by a level-up. */
+    chooseLevelUpgrade(choiceId) {
+        const success = this.runLevels.choose(choiceId, this.skillShop.unlockedSkillIds());
+        if (success) {
+            this.applySkillEffects();
+            this.saveGameState();
+        }
+        return success;
+    }
+
+    getRunLevelData() {
+        const runLevels = this.runLevels;
+        const unlockedSkills = this.skillShop.unlockedSkillIds();
+        const choiceView = (id) => {
+            const choice = SKILL_CHOICES.find((c) => c.id === id);
+            if (!choice) return null;
+            const stacks = runLevels.stacks(id);
+            return {
+                id,
+                skillId: choice.skillId,
+                stacks,
+                maxStacks: choice.maxStacks,
+                now: stacks > 0 ? choice.describe(stacks) : null,
+                next: choice.describe(stacks + 1),
+            };
+        };
+        return {
+            active: unlockedSkills.length > 0,
+            level: runLevels.level,
+            xp: runLevels.xp,
+            xpToNext: runLevels.xpToNext(),
+            pendingPicks: runLevels.pendingPicks,
+            offer: (runLevels.currentOffer(unlockedSkills) ?? []).map(choiceView).filter(Boolean),
+            picks: Object.keys(runLevels.picks).filter((id) => runLevels.stacks(id) > 0).map(choiceView).filter(Boolean),
+        };
     }
 
     unlockSkills() {
@@ -973,14 +1066,14 @@ class Server {
             unlockCost: SKILLS_UNLOCK_COST,
             skillPoints: skills.skillPoints,
             skillPointPrice: skills.skillPointPrice(),
-            collisionBank: skills.collisionBank,
-            effects: skills.effects(),
+            effects: this.skillEffects,
+            runLevel: this.runLevels.level,
+            picks: { ...this.runLevels.picks },
             skills: SKILL_NODES.map((node) => {
                 const cost = skills.nextCost(node.id);
                 return {
                     id: node.id,
-                    level: skills.level(node.id),
-                    maxLevel: node.maxLevel,
+                    unlocked: skills.isSkillUnlocked(node.id),
                     available: skills.isAvailable(node.id),
                     cost,
                     canAfford: skills.canAfford(cost),
@@ -1132,6 +1225,7 @@ class Server {
                 totalWallHits: this.run.totalWallHits
             },
             skills: this.skillShop.toJSON(),
+            runLevels: this.runLevels.toJSON(),
             version: '0.0.7',
             seed: this.seed,
         };
@@ -1263,6 +1357,7 @@ class Server {
             totalPointsEarned: 0,
             totalWallHits: 0
         };
+        this.runLevels.reset();
         this.applyAllPrestigeUpgrades();
         this.applySkillEffects();
         // Update displays
@@ -1337,44 +1432,44 @@ class Server {
                 // Update physics at fixed time steps
                 while (accumulator >= frameInterval) {
 
-                    // Calculate speed multipliers for each shape
+                    const shapeCount = this.circleBoard.shapes.length;
+                    // A single shape cannot collide with another shape, so
+                    // substeps are only needed as the board fills.
+                    const subIntervals = shapeCount < 25
+                        ? 1
+                        : Math.min(8, Math.max(2, Math.ceil(shapeCount / 75)));
+                    // Temporary boosts speed up every shape while they run.
+                    // Permanent prestige speed is locked into each shape when
+                    // it is bought, so it only affects shapes bought afterwards.
                     const speedMultipliers = {};
-                                        const shapeCount = this.circleBoard.shapes.length;
-                                        // A single shape cannot collide with another shape, so
-                                        // substeps are only needed as the board fills.
-                                        const subIntervals = shapeCount < 25
-                                            ? 1
-                                            : Math.min(8, Math.max(2, Math.ceil(shapeCount / 75)));
-                    for (const shape of this.circleBoard.shapes) {
-                        const shapeName = shape.getName().toLowerCase();
-
-
+                    const spawnSpeedMultipliers = {};
+                    for (const shapeName of ['circle', 'square', 'triangle']) {
                         const shapeMultipliers = this.multipliers.prestigeMultipliers.shapes[shapeName]
                             || { speed: 1, value: 1, size: 1 };
                         const temporaryShapeMultipliers =
                             this.multipliers.temporaryMultipliers.shapes[shapeName]
                             || { speed: 1, value: 1 };
-                        const totalSpeedMultiplier = this.getSafeProduct(
+                        speedMultipliers[shapeName] = this.getSafeProduct(
+                            this.multipliers.temporaryMultipliers.shapeSpeed,
+                            temporaryShapeMultipliers.speed
+                        ) / subIntervals;
+                        spawnSpeedMultipliers[shapeName] = this.getSafeProduct(
                             this.multipliers.prestigeMultipliers.shapeSpeed,
                             this.multipliers.prestigeMultipliers.globalSpeed,
-                            this.multipliers.temporaryMultipliers.shapeSpeed,
-                            shapeMultipliers.speed,
-                            temporaryShapeMultipliers.speed
+                            shapeMultipliers.speed
                         );
-                        speedMultipliers[shapeName] = totalSpeedMultiplier/subIntervals;
                     }
 
                     for (let i = 0; i < subIntervals; i++) {
 
 
-                        const stats = this.circleBoard.updatePhysics(speedMultipliers);
+                        const stats = this.circleBoard.updatePhysics(speedMultipliers, spawnSpeedMultipliers);
 
                         // Update balances based on shape collisions
                         this.run.totalWallHits += stats.total.totalWallHits;
-                        // Collisions fund skill levels once Skills are unlocked.
-                        if (this.skillShop.unlocked) {
-                            this.skillShop.addCollisions(stats.total.totalShapeCollisions);
-                        }
+                        // Collisions fill the level bar and can trigger collision clicks.
+                        this.addRunXp(stats.total.totalShapeCollisions);
+                        this.processCollisionClicks(stats.total.totalShapeCollisions);
                         for (const [shapeType, shapeStats] of Object.entries(stats)) {
                             if(shapeType === 'total') continue;
                             const shapeName = shapeType.toLowerCase();
@@ -1408,6 +1503,7 @@ class Server {
                                     break;
                                 }
                                 case 'Square':
+                                case 'Triangle':
                                 {
                                     const collisionPoints = shapeStats.collisionValue * totalValueMultiplier;
                                     this.baseUpgradeShop.addBalance(collisionPoints);

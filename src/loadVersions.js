@@ -32,6 +32,7 @@ function nonNegativeInteger(value, fallback = 0) {
 import Circle from './circleboard/circle.js';
 import Square from './circleboard/square.js';
 import Triangle from './circleboard/triangle.js';
+import { applyMassBonus } from './circleboard/fusion.js';
 function load(server) {
     const savedState = localStorage.getItem('circleBoardGameState');
     
@@ -239,6 +240,14 @@ function createShape(savedShape, id) {
         shape.id = id;
         if (Number.isFinite(savedShape.value) && savedShape.value >= 1) {
             shape.value = savedShape.value;
+        }
+        // Weight bonus from skills (Momentum, Supercharge); mass itself is rebuilt from size.
+        if (Number.isFinite(savedShape.massBonus) && savedShape.massBonus > 1) {
+            applyMassBonus(shape, savedShape.massBonus);
+        }
+        // Permanent speed multiplier locked in when the shape was bought.
+        if (Number.isFinite(savedShape.speedMultiplier) && savedShape.speedMultiplier > 0) {
+            shape.speedMultiplier = savedShape.speedMultiplier;
         }
     }
     
@@ -557,6 +566,7 @@ function load0_0_5(server, gameState) {
     // Apply all prestige upgrades after loading to ensure effects are active
     server.applyAllPrestigeUpgrades();
     server.skillShop.load(gameState.skills);
+    server.runLevels.load(gameState.runLevels);
     server.applySkillEffects();
     
     server.updateBalanceDisplay();

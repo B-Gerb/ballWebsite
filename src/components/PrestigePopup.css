@@ -872,3 +872,59 @@
   color: var(--pt-muted);
   line-height: 1.5;
 }
+
+/* Skill details: the level-bar upgrades a skill offers. */
+.pt-skill-choices h4 {
+  margin: 0 0 6px;
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--pt-muted);
+}
+
+.pt-skill-choices ul {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pt-skill-choices li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 10px;
+  background: rgba(10, 25, 41, 0.45);
+  border: 1px solid var(--pt-border);
+  border-radius: 9px;
+}
+
+.pt-skill-choices li.is-picked {
+  border-color: rgba(52, 211, 153, 0.45);
+}
+
+.pt-skill-choice-icon {
+  flex: 0 0 2.4em;
+  text-align: center;
+  color: var(--pt-gold);
+}
+
+.pt-skill-choice-text {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  line-height: 1.3;
+}
+
+.pt-skill-choice-text small {
+  color: var(--pt-muted);
+}
+
+.pt-skill-choice-stacks {
+  font-size: 0.75rem;
+  color: var(--pt-muted);
+  font-variant-numeric: tabular-nums;
+}

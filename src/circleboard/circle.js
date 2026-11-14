@@ -48,6 +48,8 @@ class Circle {
             velocity: this.velocity,
             color: this.color,
             value: this.value,
+            massBonus: this.massBonus ?? 1,
+            speedMultiplier: this.speedMultiplier,
             baseRadius: this.baseRadius
         };
     }

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Server from './Server';
 import PrestigePopup from './components/PrestigePopup';
+import RunLevelBar from './components/RunLevelBar';
 import './App.css';
 
 function App() {
@@ -131,6 +132,7 @@ function App() {
       <main className="layout">
         <section className="canvas-container" aria-label="Board">
           <canvas ref={canvasRef} id="bouncingBallsCanvas"></canvas>
+          <RunLevelBar serverRef={serverRef} />
           <canvas ref={clickerCanvasRef} id="clickerCanvas"></canvas>
         </section>
         {/* Filled by Server.setupPrestigeAccess */}

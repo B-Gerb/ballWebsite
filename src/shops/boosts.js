@@ -16,6 +16,13 @@ export const BOOSTS = [
   { key: 'tcircleSpeed', item: 'Temporary Speed Multiplier', label: 'Speed' },
 ];
 
+/** Which `temporaryMultipliers` field each boost key multiplies. */
+export const BOOST_FIELDS = {
+  tclickValue: 'clickValue',
+  tcircleValue: 'shapeValue',
+  tcircleSpeed: 'shapeSpeed',
+};
+
 export function activeBoosts(activeFrames) {
   if (!activeFrames) return [];
   return BOOSTS.flatMap(({ key, item, label }) => {

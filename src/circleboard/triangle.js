@@ -69,6 +69,8 @@ class Triangle {
             velocity: this.velocity,
             color: this.color,
             value: this.value,
+            massBonus: this.massBonus ?? 1,
+            speedMultiplier: this.speedMultiplier,
         };
     }
 

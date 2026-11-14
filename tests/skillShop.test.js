@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import prestigeShop from '../src/shops/prestigeShop.js';
 import SkillShop, { SKILLS_UNLOCK_COST } from '../src/shops/skillShop.js';
+import { EMPTY_EFFECTS, SKILL_NODES } from '../src/data/skillTree.js';
 
 const withPoints = (points) => {
   const shop = new prestigeShop();
@@ -48,73 +49,73 @@ test('skill points are bought with prestige points and get pricier', () => {
   assert.equal(skills.skillPoints, 2);
 });
 
-test('a skill is unlocked with a skill point, then levelled with collisions', () => {
+test('the tree has fusion, collision click and chain lightning, each with 3 choices', () => {
+  assert.deepEqual(SKILL_NODES.map((n) => n.id), ['shape-fusion', 'collision-click', 'chain-lightning']);
+  for (const node of SKILL_NODES) assert.equal(node.choices.length, 3, node.id);
+});
+
+test('a skill point unlocks a skill once, and that is all it costs', () => {
   const { skills, prestige } = unlockedSkills(2500);
   assert.deepEqual(skills.nextCost('shape-fusion'), { currency: 'skillPoints', amount: 1 });
   assert.equal(skills.buy('shape-fusion'), false, 'no skill point yet');
 
   skills.buySkillPoint(prestige);
   assert.ok(skills.buy('shape-fusion'));
-  assert.equal(skills.level('shape-fusion'), 1);
+  assert.ok(skills.isSkillUnlocked('shape-fusion'));
   assert.equal(skills.skillPoints, 0);
-
-  assert.deepEqual(skills.nextCost('shape-fusion'), { currency: 'collisions', amount: 100000 });
-  skills.addCollisions(99999);
+  assert.equal(skills.nextCost('shape-fusion'), null, 'nothing more to buy');
   assert.equal(skills.buy('shape-fusion'), false);
-  skills.addCollisions(1);
-  assert.ok(skills.buy('shape-fusion'));
-  assert.equal(skills.level('shape-fusion'), 2);
-  assert.equal(skills.collisionBank, 0);
-  assert.deepEqual(skills.nextCost('shape-fusion'), { currency: 'collisions', amount: 180000 });
+  assert.deepEqual(skills.unlockedSkillIds(), ['shape-fusion']);
 });
 
-test('fusion chance starts slight and grows with the skill level', () => {
-  const { skills, prestige } = unlockedSkills(2500);
-  assert.equal(skills.effects().fusionChance, 0);
+test('unlocked skills give their base effect and stack level-bar picks on top', () => {
+  const { skills, prestige } = unlockedSkills(2500 + 5000);
+  assert.deepEqual(skills.effects(), EMPTY_EFFECTS);
+
   skills.buySkillPoint(prestige);
   skills.buy('shape-fusion');
   assert.equal(skills.effects().fusionChance, 0.005);
-  skills.addCollisions(100000);
-  skills.buy('shape-fusion');
-  assert.equal(skills.effects().fusionChance, 0.0075);
+  assert.equal(skills.effects({ 'fusion-chance': 2 }).fusionChance, 0.01);
+
+  // Picks for a skill that isn't unlocked do nothing.
+  assert.equal(skills.effects({ 'click-chance': 5 }).collisionClickChance, 0);
+  skills.buySkillPoint(prestige);
+  skills.buy('collision-click');
+  assert.ok(Math.abs(skills.effects({ 'click-chance': 2 }).collisionClickChance - 0.02) < 1e-12);
 });
 
-test('skills that require another skill stay locked until it is levelled', () => {
+test('skills that require another skill stay locked until it is unlocked', () => {
   const tree = [
-    { id: 'root', requires: [], maxLevel: 5, unlockCost: 1, collisionCost: () => 10, effect: () => ({}) },
-    { id: 'leaf', requires: [{ id: 'root', level: 2 }], maxLevel: 1, unlockCost: 1, collisionCost: () => 10, effect: () => ({}) },
+    { id: 'root', requires: [], unlockCost: 1, base: {}, choices: [] },
+    { id: 'leaf', requires: ['root'], unlockCost: 1, base: {}, choices: [] },
   ];
   const prestige = withPoints(SKILLS_UNLOCK_COST + 1e9);
   const skills = new SkillShop(tree);
   skills.unlock(prestige);
   skills.buySkillPoint(prestige);
   skills.buySkillPoint(prestige);
-  assert.ok(skills.buy('root'));
   assert.equal(skills.isAvailable('leaf'), false);
   assert.equal(skills.buy('leaf'), false);
-  skills.addCollisions(10);
-  skills.buy('root');
+  assert.ok(skills.buy('root'));
   assert.ok(skills.isAvailable('leaf'));
   assert.ok(skills.buy('leaf'));
 });
 
-test('skill progress survives a save and ignores corrupted values', () => {
+test('skill progress survives a save, and old collision-bought levels mean "unlocked"', () => {
   const { skills, prestige } = unlockedSkills(2500);
   skills.buySkillPoint(prestige);
   skills.buy('shape-fusion');
-  skills.addCollisions(1234);
 
   const restored = new SkillShop();
   restored.load(JSON.parse(JSON.stringify(skills.toJSON())));
   assert.equal(restored.unlocked, true);
-  assert.equal(restored.level('shape-fusion'), 1);
-  assert.equal(restored.collisionBank, 1234);
+  assert.ok(restored.isSkillUnlocked('shape-fusion'));
   assert.equal(restored.skillPointPrice(), 5000);
 
-  const junk = new SkillShop();
-  junk.load({ unlocked: 'yes', skillPoints: -4, collisionBank: NaN, skills: { 'shape-fusion': 999, ghost: 3 } });
-  assert.equal(junk.skillPoints, 0);
-  assert.equal(junk.collisionBank, 0);
-  assert.equal(junk.level('shape-fusion'), 20, 'clamped to max level');
-  assert.equal(junk.level('ghost'), 0);
+  const old = new SkillShop();
+  old.load({ unlocked: true, skillPoints: -4, collisionBank: 1234, skills: { 'shape-fusion': 7, ghost: 3, 'chain-lightning': 0 } });
+  assert.equal(old.skillPoints, 0);
+  assert.equal(old.level('shape-fusion'), 1);
+  assert.equal(old.isSkillUnlocked('chain-lightning'), false);
+  assert.equal(old.level('ghost'), 0);
 });
