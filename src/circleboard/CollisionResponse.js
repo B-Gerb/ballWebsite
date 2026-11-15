@@ -1,3 +1,48 @@
+import { geometryOf } from './collisionGeometry.js';
+
+// Scratch space for findMTV (at most 4 + 4 axes) and projection results.
+const AXES = new Float64Array(16);
+let projMin = 0;
+let projMax = 0;
+
+/** Write `shape`'s SAT axes against `other` into AXES at `at`; returns the new end. */
+function pushAxes(shape, g, other, at) {
+    if (g.kind === 0) {
+        // Circle.axes(): unit vector from this centre towards the other's.
+        const dx = other.center.x - shape.center.x;
+        const dy = other.center.y - shape.center.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        if (distance === 0) return at;
+        AXES[at] = dx / distance;
+        AXES[at + 1] = dy / distance;
+        return at + 2;
+    }
+    const axes = g.axes;
+    const len = g.nAxes * 2;
+    for (let i = 0; i < len; i++) AXES[at + i] = axes[i];
+    return at + len;
+}
+
+/** shape.projection(axis) into projMin / projMax. */
+function project(shape, g, ax, ay) {
+    if (g.kind === 0) {
+        const centerProjection = shape.center.x * ax + shape.center.y * ay;
+        projMin = centerProjection - shape.radius;
+        projMax = centerProjection + shape.radius;
+        return;
+    }
+    const v = g.verts;
+    let min = Infinity;
+    let max = -Infinity;
+    for (let i = 0; i < v.length; i += 2) {
+        const p = v[i] * ax + v[i + 1] * ay;
+        min = Math.min(min, p);
+        max = Math.max(max, p);
+    }
+    projMin = min;
+    projMax = max;
+}
+
 class CollisionResponse {
     /*
         Handle the response between two colliding objects.
@@ -36,47 +81,69 @@ class CollisionResponse {
      * Find the Minimum Translation Vector (MTV) - the smallest vector to separate shapes
      * @param {Object} shapeA - First shape
      * @param {Object} shapeB - Second shape
+     * @param {Object} [out] - Optional { normal: {x, y}, magnitude } to fill in instead of allocating
      * @returns {Object|null} MTV object with normal and magnitude, or null if no collision
     */
-    static findMTV(shapeA, shapeB) {
-        const axes = new Set([...shapeA.axes(shapeB), ...shapeB.axes(shapeA)]);
-        
+    static findMTV(shapeA, shapeB, out = null) {
+        // Same separating-axis test as Circle/Square/Triangle .axes() and
+        // .projection(), on cached geometry and without per-pair allocations.
+        // Axes are A's then B's, in the shapes' own order, so the chosen
+        // axis (first strictly smallest overlap) is unchanged.
+        const ga = geometryOf(shapeA);
+        const gb = geometryOf(shapeB);
+        const cdx = shapeB.center.x - shapeA.center.x;
+        const cdy = shapeB.center.y - shapeA.center.y;
+
+        // Bounding circles apart: the centre-to-centre axis (a circle's axis)
+        // or one of the polygons' edge normals separates them, so SAT would
+        // say no collision too.
+        const reach = (ga.R + gb.R) * (1 + 1e-9) + 1e-9;
+        if (cdx * cdx + cdy * cdy > reach * reach) return null;
+
+        const n = pushAxes(shapeA, ga, shapeB, 0);
+        const count = pushAxes(shapeB, gb, shapeA, n);
+
         let minOverlap = Infinity;
-        let mtvAxis = null;
-        
-        for (const axis of axes) {
-            const projA = shapeA.projection(axis);
-            const projB = shapeB.projection(axis);
-            
+        let best = -1;
+        for (let i = 0; i < count; i += 2) {
+            const ax = AXES[i];
+            const ay = AXES[i + 1];
+            project(shapeA, ga, ax, ay);
+            const minA = projMin, maxA = projMax;
+            project(shapeB, gb, ax, ay);
+            const minB = projMin, maxB = projMax;
+
             // Check for separation
-            if (!(projA[1] > projB[0] && projB[1] > projA[0])) {
+            if (!(maxA > minB && maxB > minA)) {
                 return null;
             }
-            
-            // Calculate overlap
-            const overlap = Math.min(projA[1] - projB[0], projB[1] - projA[0]);
-            
+
+            const overlap = Math.min(maxA - minB, maxB - minA);
             if (overlap < minOverlap) {
                 minOverlap = overlap;
-                mtvAxis = axis;
+                best = i;
             }
         }
-        
-        if (!mtvAxis) return null;
-        
+
+        if (best < 0) return null;
+
+        let nx = AXES[best];
+        let ny = AXES[best + 1];
         // Ensure MTV points from shapeA to shapeB
-        const centerDiff = {
-            x: shapeB.center.x - shapeA.center.x,
-            y: shapeB.center.y - shapeA.center.y
-        };
-        
-        const dot = centerDiff.x * mtvAxis.x + centerDiff.y * mtvAxis.y;
+        const dot = cdx * nx + cdy * ny;
         if (dot < 0) {
-            mtvAxis = { x: -mtvAxis.x, y: -mtvAxis.y };
+            nx = -nx;
+            ny = -ny;
         }
-        
+
+        if (out) {
+            out.normal.x = nx;
+            out.normal.y = ny;
+            out.magnitude = minOverlap;
+            return out;
+        }
         return {
-            normal: mtvAxis,
+            normal: { x: nx, y: ny },
             magnitude: minOverlap
         };
     }
@@ -167,16 +234,16 @@ class CollisionResponse {
             }
             
         }
-        if(shape.getVertices()){
-            const vertices = shape.getVertices();
+        if(shape.getVertices){
+            const vertices = geometryOf(shape).verts;
             let maxOverlap = 0;
             let collisionNormalX = 0;
             let collisionNormalY = 0;
             let collisionDetected = false;
 
-            for (const vertex of vertices) {
-                const vx = vertex.x - container.x;
-                const vy = vertex.y - container.y;
+            for (let i = 0; i < vertices.length; i += 2) {
+                const vx = vertices[i] - container.x;
+                const vy = vertices[i + 1] - container.y;
                 const distance = Math.sqrt(vx * vx + vy * vy);
                 const overlap = distance - (container.radius - container.thickness);
                 if (overlap > maxOverlap){
