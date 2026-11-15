@@ -3,6 +3,7 @@ import Circle from './circle.js';
 import Square from './square.js';
 import Triangle from './triangle.js';
 import CollisionResponse from './CollisionResponse.js';
+import { SpatialGrid } from './spatialGrid.js';
 import { applyMassBonus, fuseShapes } from './fusion.js';
 import { SHAPE_TIERS } from '../data/skillTree.js';
 
@@ -127,6 +128,12 @@ class CircleBoard {
         };
         
         this.shapes = [];   
+
+        // Collision grid cells per side. 6 resolves collisions in the same
+        // order as always. null sizes cells from the shapes (about 13% faster
+        // when crowded, but the different order gives ~4% more collisions on a
+        // packed board), see bench/physics.bench.mjs --grid auto.
+        this.gridSize = 6;
         
         // Scale factor based on screen size
         this.scaleFactor = 1;
@@ -311,103 +318,6 @@ class CircleBoard {
     }
     
  
-    createSpatialGrid(size =4){
-        const bounds = {
-            x: this.container.x - this.container.radius,
-            y: this.container.y - this.container.radius,
-            width: this.container.radius * 2,
-            height: this.container.radius * 2
-
-        }
-        const widthBoxes = bounds.width / size;
-        const heightBoxes = bounds.height / size;
-        return {
-            cells: Array.from({ length: size**2}, () => []), // 4x4 grid
-            bounds: bounds,
-            widthBoxes: widthBoxes,
-            heightBoxes: heightBoxes,
-        }
-    }
-
-
-    getShapeCells(shape, grid) {
-        const cellSpots = [];
-        const gridSize = Math.sqrt(grid.cells.length); // Calculate grid size from cells array
-        
-        // Use bounding boxes
-        if(shape.getName() === "Circle"){
-            const radius = shape.radius;
-            const centerX = shape.center.x;
-            const centerY = shape.center.y;
-            
-            const startX = Math.max(grid.bounds.x, centerX- radius);
-            const endX = Math.min(grid.bounds.x + grid.bounds.width, centerX + radius);
-            const startY = Math.max(grid.bounds.y, centerY - radius);
-            const endY = Math.min(grid.bounds.y + grid.bounds.height, centerY + radius);
-
-        
-
-            // Calculate which grid cells the shape overlaps
-            const startCellX = Math.max(0, Math.floor((startX - grid.bounds.x) / grid.widthBoxes));
-            const endCellX = Math.min(gridSize - 1, Math.floor((endX - grid.bounds.x) / grid.widthBoxes));
-            const startCellY = Math.max(0, Math.floor((startY - grid.bounds.y) / grid.heightBoxes));
-            const endCellY = Math.min(gridSize - 1, Math.floor((endY - grid.bounds.y) / grid.heightBoxes));
-
-            // Ensure we have valid cell ranges
-            if (startCellX <= endCellX && startCellY <= endCellY) {
-                for (let cellX = startCellX; cellX <= endCellX; cellX++) {
-                    for (let cellY = startCellY; cellY <= endCellY; cellY++) {
-                        cellSpots.push({
-                            x: cellX,
-                            y: cellY
-                        });
-                    }
-                }
-            }
-        }
-        else{
-            const vertices = shape.getVertices();
-            let startX = Infinity;
-            let endX = -Infinity;
-            let startY = Infinity;
-            let endY = -Infinity;
-
-            for (const vertex of vertices) {
-                startX = Math.min(startX, vertex.x);
-                endX = Math.max(endX, vertex.x);
-                startY = Math.min(startY, vertex.y);
-                endY = Math.max(endY, vertex.y);
-                
-            }
-            // Ensure we stay within grid bounds
-            startX = Math.max(grid.bounds.x, startX);
-            endX = Math.min(grid.bounds.x + grid.bounds.width, endX);
-            startY = Math.max(grid.bounds.y, startY);
-            endY = Math.min(grid.bounds.y + grid.bounds.height, endY);
-            
-            // Calculate which grid cells the shape overlaps
-            const startCellX = Math.max(0, Math.floor((startX - grid.bounds.x) / grid.widthBoxes));
-            const endCellX = Math.min(gridSize - 1, Math.floor((endX - grid.bounds.x) / grid.widthBoxes));
-            const startCellY = Math.max(0, Math.floor((startY - grid.bounds.y) / grid.heightBoxes));
-            const endCellY = Math.min(gridSize - 1, Math.floor((endY - grid.bounds.y) / grid.heightBoxes));
-            
-            // Ensure we have valid cell ranges
-            if (startCellX <= endCellX && startCellY <= endCellY) {
-                for (let cellX = startCellX; cellX <= endCellX; cellX++) {
-                    for (let cellY = startCellY; cellY <= endCellY; cellY++) {
-                        cellSpots.push({
-                            x: cellX,
-                            y: cellY
-                        });
-                    }
-                }
-            }
-        }
-        return cellSpots;
-    }
-
-    
-    
     /**
      * Process physics for one frame
      * Separated from animation to allow server to control updates
@@ -423,8 +333,13 @@ class CircleBoard {
         for (const shape of this.shapes) this.lockInSpawnStats(shape, spawn);
 
         // How far a shape really moves per frame (speedMultipliers are per substep).
-        const frameSpeedOf = (shape) =>
-            (speedMultipliers[shape.getName().toLowerCase()] || 1) * substeps * shape.speedMultiplier;
+        const typeFrameSpeed = {};
+        const frameSpeedOf = (shape) => {
+            const name = shape.getName();
+            const typeSpeed = typeFrameSpeed[name]
+                ??= (speedMultipliers[name.toLowerCase()] || 1) * substeps;
+            return typeSpeed * shape.speedMultiplier;
+        };
         let maxImpactSpeed = 0;
 
         const returnValues = {total: { totalWallHits: 0, totalShapeCollisions: 0, fusions: 0, lightningStrikes: 0, maxImpactSpeed: 0 }};
@@ -446,83 +361,90 @@ class CircleBoard {
         // Track collisions for this frame
         let totalWallHits = 0;
         let totalShapeCollisions = 0;
-        const size = 6; // Size of the spatial grid
-
-        const grid = this.createSpatialGrid(size);
-
-        // Populate the spatial grid
-        this.shapes.forEach(shape => {
-            if(CollisionResponse.handleContainerCollision(shape, this.container)){
-
+        const shapes = this.shapes;
+        const container = this.container;
+        const bounds = {
+            x: container.x - container.radius,
+            y: container.y - container.radius,
+            width: container.radius * 2,
+            height: container.radius * 2,
+        };
+        // Wall bounces first, then place the shape in the grid.
+        const grid = (this.spatialGrid ??= new SpatialGrid()).build(shapes, bounds, this.gridSize, (shape) => {
+            if (CollisionResponse.handleContainerCollision(shape, container)) {
                 totalWallHits++;
                 const shapeStats = statsFor(shape.getName());
                 shapeStats.totalWallHits += 1;
                 shapeStats.wallHitValue += shape.value ?? 1;
                 if (SCORES_ON[shape.getName()] === 'wall') rollLightning(shape);
             }
-            const cells = this.getShapeCells(shape, grid);
-            cells.forEach(cell => {
-                const index = cell.x + cell.y * size;
-                if (index >= 0 && index < grid.cells.length) {
-                    grid.cells[index].push(shape);
-                } else {
-                    console.warn(`Grid index out of bounds: ${index}, cell: ${cell.x},${cell.y}, gridSize: ${size}`);
-                }
-            });
         });
-        const proccessedCollisions = new Set();
-        for (let i = 0; i < grid.cells.length; i++) {
-            const cell = grid.cells[i];
-            if (cell.length < 2) continue; // No collisions possible in this cell
-            for (let j = 0; j < cell.length-1; j++) {
-                for ( let k = j + 1; k < cell.length; k++) {
-                    const shapeA = cell[j];
-                    const shapeB = cell[k];
-                    if(shapeA.id === shapeB.id) continue; // Skip self-collision
-                    if (fusing.has(shapeA) || fusing.has(shapeB)) continue; // already merged this frame
-                    const pairKey = shapeA.id < shapeB.id ? 
-                    `${shapeA.id}-${shapeB.id}` : 
-                    `${shapeB.id}-${shapeA.id}`;
-                    if (!proccessedCollisions.has(pairKey)) {
-                        proccessedCollisions.add(pairKey);
-                        // Relative speed before the bounce (for supernovas).
-                        const kA = frameSpeedOf(shapeA);
-                        const kB = frameSpeedOf(shapeB);
-                        const impactSpeed = Math.hypot(
-                            shapeA.velocity.x * kA - shapeB.velocity.x * kB,
-                            shapeA.velocity.y * kA - shapeB.velocity.y * kB,
-                        );
-                        if (CollisionResponse.handleCollision(shapeA, shapeB)) {
-                            if (impactSpeed > maxImpactSpeed) maxImpactSpeed = impactSpeed;
-                            totalShapeCollisions++;
-                            this.totalShapeCollisions++;
-                            const statsA = statsFor(shapeA.getName());
-                            statsA.totalShapeCollisions += 1;
-                            statsA.collisionValue += shapeA.value ?? 1;
-                            const statsB = statsFor(shapeB.getName());
-                            statsB.totalShapeCollisions += 1;
-                            statsB.collisionValue += shapeB.value ?? 1;
-                            if (SCORES_ON[shapeA.getName()] === 'collision') rollLightning(shapeA);
-                            if (SCORES_ON[shapeB.getName()] === 'collision') rollLightning(shapeB);
 
-                            if (this.fusionChance > 0
-                                && shapeA.getName() === shapeB.getName()
-                                && !fusing.has(shapeA) && !fusing.has(shapeB)
-                                && this.fusionRng() < this.fusionChance) {
-                                const fused = this.fuse(shapeA, shapeB);
-                                if (fused) {
-                                    fusing.add(shapeA);
-                                    fusing.add(shapeB);
-                                    fusions.push(fused);
-                                }
-                            }
+        // Each pair is tested once, in the first cell both shapes are in.
+        const scratchMTV = { normal: { x: 0, y: 0 }, magnitude: 0 };
+        const { start, items, radius } = grid;
+        const cellCount = grid.size * grid.size;
+        for (let cell = 0; cell < cellCount; cell++) {
+            const from = start[cell];
+            const to = start[cell + 1];
+            if (to - from < 2) continue; // No collisions possible in this cell
+            for (let j = from; j < to - 1; j++) {
+                const a = items[j];
+                const shapeA = shapes[a];
+                const centerA = shapeA.center;
+                const radiusA = radius[a];
+                for (let k = j + 1; k < to; k++) {
+                    const b = items[k];
+                    const shapeB = shapes[b];
+                    // Bounding circles apart: cannot touch (findMTV does the same check).
+                    const dx = shapeB.center.x - centerA.x;
+                    const dy = shapeB.center.y - centerA.y;
+                    const reach = (radiusA + radius[b]) * (1 + 1e-9) + 1e-9;
+                    if (dx * dx + dy * dy > reach * reach) continue;
+                    if (grid.ownerCell(a, b) !== cell) continue; // tested in an earlier cell
+                    if(shapeA.id === shapeB.id) continue; // Skip self-collision
+                    if (fusing.size && (fusing.has(shapeA) || fusing.has(shapeB))) continue; // already merged this frame
+                    const mtv = CollisionResponse.findMTV(shapeA, shapeB, scratchMTV);
+                    if (!mtv) continue;
+
+                    // Relative speed before the bounce (for supernovas).
+                    const kA = frameSpeedOf(shapeA);
+                    const kB = frameSpeedOf(shapeB);
+                    const impactSpeed = Math.hypot(
+                        shapeA.velocity.x * kA - shapeB.velocity.x * kB,
+                        shapeA.velocity.y * kA - shapeB.velocity.y * kB,
+                    );
+                    CollisionResponse.applyCollision(shapeA, shapeB, mtv.normal, 1.0);
+                    CollisionResponse.separateShapes(shapeA, shapeB, mtv);
+
+                    if (impactSpeed > maxImpactSpeed) maxImpactSpeed = impactSpeed;
+                    totalShapeCollisions++;
+                    this.totalShapeCollisions++;
+                    const statsA = statsFor(shapeA.getName());
+                    statsA.totalShapeCollisions += 1;
+                    statsA.collisionValue += shapeA.value ?? 1;
+                    const statsB = statsFor(shapeB.getName());
+                    statsB.totalShapeCollisions += 1;
+                    statsB.collisionValue += shapeB.value ?? 1;
+                    if (SCORES_ON[shapeA.getName()] === 'collision') rollLightning(shapeA);
+                    if (SCORES_ON[shapeB.getName()] === 'collision') rollLightning(shapeB);
+
+                    if (this.fusionChance > 0
+                        && shapeA.getName() === shapeB.getName()
+                        && !fusing.has(shapeA) && !fusing.has(shapeB)
+                        && this.fusionRng() < this.fusionChance) {
+                        const fused = this.fuse(shapeA, shapeB);
+                        if (fused) {
+                            fusing.add(shapeA);
+                            fusing.add(shapeB);
+                            fusions.push(fused);
+                            break; // shapeA is gone: its other pairs are skipped anyway
                         }
                     }
-                    }
                 }
-
             }
-        
+        }
+
         if (fusions.length) {
             this.shapes = this.shapes.filter(shape => !fusing.has(shape));
             this.shapes.push(...fusions);
