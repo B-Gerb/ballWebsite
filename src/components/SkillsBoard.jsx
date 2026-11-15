@@ -117,7 +117,29 @@ function SkillDetails({ state, picks, onClose, onBuy }) {
  * The Skills tab: unlock panel until Skills are bought, then a radial skill
  * tree plus the skill-point balance and this run's level.
  */
-function SkillsBoard({ skills, prestigeBalance, onUnlock, onBuySkillPoint, onBuySkill }) {
+/** "Reset skills" with a confirm step, since it locks every skill at once. */
+function ResetSkillsButton({ spent, onReset }) {
+  const [confirming, setConfirming] = useState(false);
+  if (confirming) {
+    return (
+      <span className="pt-skills-reset">
+        <span>Lock every skill and refund {spent} SP?</span>
+        <button type="button" className="pt-prestige-button" onClick={() => { onReset?.(); setConfirming(false); }}>
+          Reset
+        </button>
+        <button type="button" className="pt-ghost-button" onClick={() => setConfirming(false)}>Cancel</button>
+      </span>
+    );
+  }
+  return (
+    <button type="button" className="pt-ghost-button" disabled={!(spent > 0)} onClick={() => setConfirming(true)}
+      title="Lock every skill and get back all the skill points you spent on them">
+      Reset skills · refund {spent} SP
+    </button>
+  );
+}
+
+function SkillsBoard({ skills, prestigeBalance, onUnlock, onBuySkillPoint, onBuySkill, onResetSkills }) {
   const [selectedId, setSelectedId] = useState(null);
 
   const states = useMemo(() => {
@@ -188,6 +210,7 @@ function SkillsBoard({ skills, prestigeBalance, onUnlock, onBuySkillPoint, onBuy
         <button type="button" className="pt-ghost-button" disabled={!canBuyPoint} onClick={onBuySkillPoint}>
           Buy skill point · {formatNumber(skills.skillPointPrice)} prestige
         </button>
+        <ResetSkillsButton spent={skills.spentSkillPoints ?? 0} onReset={onResetSkills} />
       </div>
       <div className={`pt-board ${selected ? 'has-selection' : ''}`}>
         <NodeGraph

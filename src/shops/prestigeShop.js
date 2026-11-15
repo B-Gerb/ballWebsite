@@ -10,6 +10,10 @@
  *     blackHoleThreshold / supernovaThreshold / skillPointCost: 1 − 0.1·level
  *     cosmicMultiplier: +0.5·level added to the ×9 per-event money multiplier
  *     grandCurrency: 1.5^level global money multiplier
+ * - Fun (cheap, 15–40 start, ×1.6–×1.7): simple run-start and luck perks.
+ *     headStart: +2 circles per level   startingCash: 100·5^(level−1) money
+ *     luckyClicks: 5% per level         goldenChance: 2% per level
+ *     boostDuration: 1 + 0.5·level
  * Prestige award itself is sublinear in run points: see prestigeEquations.js.
  */
 import AShop from './AShop.js';
@@ -275,6 +279,52 @@ class prestigeShop extends AShop{
                 priceEquation: scaledPrice(2.5),
                 valueEquation: (level) => 1.5 ** level,
                 effectKey: 'grandCurrency'
+            },
+            // ── Fun: cheap, simple perks ───────────────────────────
+            {
+                name: "Head Start",
+                price: 15,
+                maxLevel: 5,
+                level: 0,
+                priceEquation: scaledPrice(1.6, 0.5),
+                valueEquation: linearValue(0, 2),
+                effectKey: 'headStart'
+            },
+            {
+                name: "Starting Cash",
+                price: 20,
+                maxLevel: 5,
+                level: 0,
+                priceEquation: scaledPrice(1.7, 0.5),
+                valueEquation: (level) => (level > 0 ? 100 * 5 ** (level - 1) : 0),
+                effectKey: 'startingCash'
+            },
+            {
+                name: "Lucky Clicks",
+                price: 25,
+                maxLevel: 5,
+                level: 0,
+                priceEquation: scaledPrice(1.6, 0.5),
+                valueEquation: linearValue(0, 0.05),
+                effectKey: 'luckyClicks'
+            },
+            {
+                name: "Golden Shapes",
+                price: 40,
+                maxLevel: 5,
+                level: 0,
+                priceEquation: scaledPrice(1.7, 0.5),
+                valueEquation: linearValue(0, 0.02),
+                effectKey: 'goldenChance'
+            },
+            {
+                name: "Long Boosts",
+                price: 30,
+                maxLevel: 4,
+                level: 0,
+                priceEquation: scaledPrice(1.6, 0.5),
+                valueEquation: linearValue(1, 0.5),
+                effectKey: 'boostDuration'
             },
         ];
 

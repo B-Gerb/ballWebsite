@@ -105,6 +105,32 @@ class SkillShop {
   }
 
   /** Everything the UI needs for one node. */
+  /** Skill points it took to reach `rank` on a node (unlock + every rank-up). */
+  costToRank(node, rank) {
+    let total = 0;
+    for (let r = 0; r < rank; r++) {
+      total += r === 0 ? node.unlockCost ?? 1 : node.rankCosts?.[r - 1] ?? r + 1;
+    }
+    return total;
+  }
+
+  /** Skill points currently invested in skills. */
+  spentSkillPoints() {
+    return this.nodes.reduce((sum, node) => sum + this.costToRank(node, this.rank(node.id)), 0);
+  }
+
+  /**
+   * Respec: lock every skill and refund every skill point spent on them.
+   * Skill points already bought stay bought (their price does not drop).
+   * Returns the number of points refunded.
+   */
+  resetSkills() {
+    const refund = this.spentSkillPoints();
+    this.ranks = {};
+    this.skillPoints += refund;
+    return refund;
+  }
+
   view(id) {
     const cost = this.nextCost(id);
     return {

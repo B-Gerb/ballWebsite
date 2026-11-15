@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import Cosmos from '../src/shops/cosmos.js';
+import Cosmos, { BLACK_HOLE_MASS, SUPERNOVA_SPEED } from '../src/shops/cosmos.js';
 
 test('a black hole gives 1 black hole, ×9 money, ÷10 mass for new shapes and ×10 add-shape prices', () => {
   const cosmos = new Cosmos();
@@ -73,22 +73,24 @@ test('outside bonuses (skills, prestige) add to the ×9 of an event', () => {
 
 test('Event Horizon halves the black hole mass; outside cuts and multipliers stack on top', () => {
   const cosmos = new Cosmos();
-  assert.equal(cosmos.blackHoleThreshold(), 100000);
+  assert.equal(cosmos.blackHoleThreshold(), BLACK_HOLE_MASS);
   cosmos.record('blackHole');
+  const afterEvent = cosmos.blackHoleThreshold();
   cosmos.buy('event-horizon');
-  assert.equal(cosmos.blackHoleThreshold(), 50000);
+  assert.ok(Math.abs(cosmos.blackHoleThreshold() - afterEvent / 2) < 1e-6);
   // A 10% skill cut and a ×0.8 prestige multiplier.
-  assert.ok(Math.abs(cosmos.blackHoleThreshold({ cut: 0.1, multiplier: 0.8 }) - 36000) < 1e-6);
+  assert.ok(Math.abs(cosmos.blackHoleThreshold({ cut: 0.1, multiplier: 0.8 }) - (afterEvent / 2) * 0.9 * 0.8) < 1e-6);
   // Cuts are capped at 90%.
-  assert.ok(Math.abs(cosmos.blackHoleThreshold({ cut: 5 }) - 5000) < 1e-6);
+  assert.ok(Math.abs(cosmos.blackHoleThreshold({ cut: 5 }) - (afterEvent / 2) * 0.1) < 1e-6);
 });
 
 test('Chain Reaction lowers the supernova speed', () => {
   const cosmos = new Cosmos();
-  assert.equal(cosmos.supernovaThreshold(), 60);
+  assert.equal(cosmos.supernovaThreshold(), SUPERNOVA_SPEED);
   cosmos.record('supernova');
+  const afterEvent = cosmos.supernovaThreshold();
   cosmos.buy('chain-reaction');
-  assert.ok(Math.abs(cosmos.supernovaThreshold() - 36) < 1e-9);
+  assert.ok(Math.abs(cosmos.supernovaThreshold() - afterEvent * 0.6) < 1e-9);
 });
 
 test('a save restores the run, and prestige clears everything but the discovered tab', () => {
@@ -139,4 +141,16 @@ test('the money multiplier never overflows to Infinity', () => {
   const copy = new Cosmos();
   copy.load(JSON.parse(JSON.stringify(cosmos.toJSON())));
   assert.equal(copy.currencyMultiplier, cosmos.currencyMultiplier, 'survives a save');
+});
+
+test('each event makes the next of its kind only ~3× harder (thresholds follow √ of the spawn scale)', () => {
+  const cosmos = new Cosmos();
+  const mass = cosmos.blackHoleThreshold();
+  const speed = cosmos.supernovaThreshold();
+  cosmos.record('blackHole');
+  // New shapes weigh ÷10, but the threshold also drops ÷√10.
+  assert.ok(Math.abs(cosmos.blackHoleThreshold() - mass / Math.sqrt(10)) < 1e-6);
+  assert.equal(cosmos.supernovaThreshold(), speed, 'a black hole does not move the supernova threshold');
+  cosmos.record('supernova');
+  assert.ok(Math.abs(cosmos.supernovaThreshold() - speed / Math.sqrt(10)) < 1e-9);
 });

@@ -19,6 +19,9 @@ import { PRESTIGE_EQUATIONS } from './prestigeEquations';
 
 // TODO: Import or define dependencies like CircleBoard, baseUpgradeShop, clickShop, prestigeShop, ClickerObject, etc.
 
+/** Lucky Clicks: a lucky click is worth this many clicks. */
+const LUCKY_CLICK_VALUE = 10;
+
 /** Every multiplier at its starting value (a fresh account or run). */
 function defaultMultipliers() {
     return {
@@ -41,6 +44,12 @@ function defaultMultipliers() {
         cosmicMultiplierBonus: 0,
         skillPointCost: 1,
         grandCurrency: 1,
+        // Fun branch
+        headStart: 0,
+        startingCash: 0,
+        luckyClicks: 0,
+        goldenChance: 0,
+        boostDuration: 1,
             costScaling: {
                 circle: 1,
                 square: 1,
@@ -378,9 +387,23 @@ class Server {
         this.setupShopUI();
     }
 
+    /**
+     * Lucky Clicks: each click has a chance to be worth ×10, i.e. 9 extra
+     * clicks. Rolled one by one for small counts, expected value for huge ones.
+     */
+    luckyClickBonus(count) {
+        const chance = this.multipliers.prestigeMultipliers.luckyClicks || 0;
+        if (!(chance > 0)) return 0;
+        if (count > 1000) return count * chance * (LUCKY_CLICK_VALUE - 1);
+        let lucky = 0;
+        for (let i = 0; i < count; i++) if (Math.random() < chance) lucky++;
+        if (lucky > 0) this.clickerObject?.flashLucky?.();
+        return lucky * (LUCKY_CLICK_VALUE - 1);
+    }
+
     earnClicks(count) {
         if (!(count > 0)) return;
-        const points = this.clickPoints() * count;
+        const points = this.clickPoints() * (count + this.luckyClickBonus(count));
         this.clickShop.addBalance(points);
         this.addPointsAndCheckPrestige(points);
     }
@@ -949,7 +972,9 @@ class Server {
      * stacks and the multiplier becomes the item's current value.
      * `total` is what the store's countdown bar measures against.
      */
-    startBoost(key, field, multiplier, frames) {
+    startBoost(key, field, multiplier, baseFrames) {
+        // Long Boosts prestige upgrade.
+        const frames = Math.round(baseFrames * (this.multipliers.prestigeMultipliers.boostDuration || 1));
         const multipliers = this.multipliers.temporaryMultipliers;
         const active = this.temporaryMultipliersActiveFrames[key];
         if (active) {
@@ -1133,6 +1158,19 @@ class Server {
             case "grandCurrency":
                 this.multipliers.prestigeMultipliers.grandCurrency = value;
                 break;
+
+            // Fun branch: Head Start and Starting Cash are read when a run starts.
+            case "headStart":
+            case "startingCash":
+            case "luckyClicks":
+            case "boostDuration":
+                this.multipliers.prestigeMultipliers[item.effectKey] = value;
+                break;
+
+            case "goldenChance":
+                this.multipliers.prestigeMultipliers.goldenChance = value;
+                this.circleBoard.goldenChance = value;
+                break;
         }
     }
 
@@ -1221,12 +1259,23 @@ class Server {
         return success;
     }
 
+    /** Respec: lock every skill and get back the skill points spent on them. */
+    resetSkills() {
+        const refunded = this.skillShop.resetSkills();
+        if (refunded > 0) {
+            this.applySkillEffects();
+            this.saveGameState();
+        }
+        return refunded > 0;
+    }
+
     getSkillData() {
         const skills = this.skillShop;
         return {
             unlocked: skills.unlocked,
             unlockCost: SKILLS_UNLOCK_COST,
             skillPoints: skills.skillPoints,
+            spentSkillPoints: skills.spentSkillPoints(),
             skillPointPrice: skills.skillPointPrice(this.multipliers.prestigeMultipliers.skillPointCost),
             effects: this.skillEffects,
             runLevel: this.runLevels.level,
@@ -1463,6 +1512,8 @@ class Server {
         this.peakImpactSpeed = 0;
         this.applyAllPrestigeUpgrades();
         this.applySkillEffects();
+        // Starting Cash prestige upgrade.
+        this.baseUpgradeShop.addBalance(this.multipliers.prestigeMultipliers.startingCash || 0);
         // Update displays
         this.updateBalanceDisplay();
         this.setupShopUI();
@@ -1470,7 +1521,8 @@ class Server {
         // Start animation and physics loop
         this.circleBoard.isRunning = true;  // Make sure isRunning flag is set to true
         this.handleResize();
-        this.circleBoard.addNewBalls(1);
+        // One circle, plus Head Start's extras.
+        this.circleBoard.addNewBalls(1 + (this.multipliers.prestigeMultipliers.headStart || 0));
 
         this.startGame();
         

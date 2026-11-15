@@ -90,6 +90,7 @@ function App() {
   const handleUnlockSkills = () => runSkillAction((server) => server.unlockSkills());
   const handleBuySkillPoint = () => runSkillAction((server) => server.buySkillPoint());
   const handleBuySkill = (skillId) => runSkillAction((server) => server.buySkill(skillId));
+  const handleResetSkills = () => runSkillAction((server) => server.resetSkills());
 
   const handlePrestige = () => {
     const server = serverRef.current;
@@ -158,6 +159,7 @@ function App() {
           onUnlockSkills={handleUnlockSkills}
           onBuySkillPoint={handleBuySkillPoint}
           onBuySkill={handleBuySkill}
+          onResetSkills={handleResetSkills}
         />
       )}
     </div>

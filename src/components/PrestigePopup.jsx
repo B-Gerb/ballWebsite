@@ -208,6 +208,7 @@ const PrestigePopup = ({
   onUnlockSkills,
   onBuySkillPoint,
   onBuySkill,
+  onResetSkills,
 }) => {
   const [selectedId, setSelectedId] = useState(null);
   const [tab, setTab] = useState('upgrades');
@@ -442,6 +443,7 @@ const PrestigePopup = ({
             onUnlock={onUnlockSkills}
             onBuySkillPoint={onBuySkillPoint}
             onBuySkill={onBuySkill}
+            onResetSkills={onResetSkills}
           />
         ) : mode === 'buffs' ? (
           <section className="pt-buffs-panel" aria-label="Active prestige buffs">

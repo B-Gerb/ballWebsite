@@ -4,6 +4,9 @@ import seedrandom from 'seedrandom';
 export const CLICKER_LOGICAL_WIDTH = 300;
 export const CLICKER_LOGICAL_HEIGHT = 180;
 
+/** How long the Lucky Clicks "×10!" stays up. */
+const LUCKY_FLASH_MS = 700;
+
 class ClickerObject {
     constructor(canvasElement) {
         // Use the provided canvas element directly
@@ -146,6 +149,27 @@ class ClickerObject {
         this.ctx.strokeStyle = '#000';
         this.ctx.stroke();
 
+        // Lucky Clicks: a short gold "×10!" over the clicker.
+        if (this.luckyUntil && performance.now() < this.luckyUntil) {
+            const left = (this.luckyUntil - performance.now()) / LUCKY_FLASH_MS;
+            this.ctx.save();
+            this.ctx.globalAlpha = Math.min(1, left * 2);
+            this.ctx.font = `bold ${Math.round(radius * 0.7)}px sans-serif`;
+            this.ctx.textAlign = 'center';
+            this.ctx.textBaseline = 'middle';
+            this.ctx.lineWidth = 4;
+            this.ctx.strokeStyle = '#1c1108';
+            this.ctx.fillStyle = '#fbbf24';
+            const y = centerY - radius * (1.2 - left * 0.4);
+            this.ctx.strokeText('×10!', centerX, y);
+            this.ctx.fillText('×10!', centerX, y);
+            this.ctx.restore();
+        }
+    }
+
+    /** Show the Lucky Clicks flash. */
+    flashLucky() {
+        this.luckyUntil = performance.now() + LUCKY_FLASH_MS;
     }
     
     // Animation loop for the clicker

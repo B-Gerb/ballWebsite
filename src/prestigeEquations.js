@@ -61,6 +61,16 @@ export const describePrestigeEffect = (effectKey, value) => {
             return `×${value.toFixed(2)} skill point cost`;
         case 'grandCurrency':
             return `×${value.toFixed(2)} grand currency multiplier`;
+        case 'headStart':
+            return `+${value} circles at the start of every run`;
+        case 'startingCash':
+            return `start every run with ¤${value}`;
+        case 'luckyClicks':
+            return `${(value * 100).toFixed(0)}% of clicks worth ×10`;
+        case 'goldenChance':
+            return `${(value * 100).toFixed(0)}% of new shapes are gold (×5)`;
+        case 'boostDuration':
+            return `×${value.toFixed(1)} boost duration`;
         default:
             return String(value);
     }

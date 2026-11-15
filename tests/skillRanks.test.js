@@ -184,3 +184,24 @@ test('new effect keys default to 0, and choice ids are globally unique', () => {
   const ids = SKILL_CHOICES.map((c) => c.id);
   assert.equal(new Set(ids).size, ids.length);
 });
+
+test('resetting skills refunds every skill point spent on unlocks and ranks', () => {
+  const shop = new SkillShop();
+  shop.unlocked = true;
+  shop.skillPoints = 20;
+  assert.ok(shop.buy('shape-fusion')); // 1
+  assert.ok(shop.buy('shape-fusion')); // rank 2: 2
+  assert.ok(shop.buy('shape-fusion')); // rank 3: 3
+  assert.ok(shop.buy('gravity-well')); // needs shape-fusion: 3
+  assert.equal(shop.skillPoints, 20 - 9);
+  assert.equal(shop.spentSkillPoints(), 9);
+  shop.skillPointsBought = 4;
+  const priceBefore = shop.skillPointPrice();
+
+  assert.equal(shop.resetSkills(), 9);
+  assert.equal(shop.skillPoints, 20);
+  assert.equal(shop.spentSkillPoints(), 0);
+  assert.deepEqual(shop.unlockedSkillIds(), []);
+  assert.equal(shop.skillPointPrice(), priceBefore, 'buying skill points does not get cheaper');
+  assert.equal(shop.resetSkills(), 0, 'nothing to refund twice');
+});

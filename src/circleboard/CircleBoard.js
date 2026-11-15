@@ -20,6 +20,21 @@ export const FUSION_LIMITS = {
     maxBaseSize: { Circle: 60, Square: 100, Triangle: 110 },
 };
 
+/**
+ * Biggest a shape may be, as a fraction of the arena radius (radius for
+ * circles, side for squares/triangles). Measured on screen, so size
+ * upgrades, a shrunken arena or fusion can never make a shape take over
+ * the board. `spawn` caps newly bought shapes, `fusion` caps fused ones.
+ */
+export const SHAPE_SIZE_LIMITS = {
+    spawn: { Circle: 0.07, Square: 0.12, Triangle: 0.13 },
+    fusion: { Circle: 0.12, Square: 0.2, Triangle: 0.22 },
+};
+
+/** Golden Shapes: value multiplier and colour. */
+export const GOLDEN_VALUE = 5;
+export const GOLDEN_COLOR = '#fbbf24';
+
 /** What earns money for each shape: wall hits or shape-on-shape collisions. */
 export const SCORES_ON = { Circle: 'wall', Square: 'collision', Triangle: 'collision' };
 
@@ -80,6 +95,8 @@ class CircleBoard {
         this.lightningRng = Math.random;
         this.lightningFlashes = [];
         this.cosmicFlash = null;
+        // Golden Shapes prestige upgrade: chance a newly bought shape is gold (×5 value).
+        this.goldenChance = 0;
         
         // Collision tracking for time
         this.wallHits = 0;
@@ -136,6 +153,28 @@ class CircleBoard {
         
 
     }
+    /** Largest base size (before scaleFactor) a shape type may have right now. */
+    maxBaseSize(type, kind = 'spawn') {
+        const fraction = SHAPE_SIZE_LIMITS[kind]?.[type];
+        const onScreen = fraction && this.container.radius > 0 ? fraction * this.container.radius : Infinity;
+        const fixed = kind === 'fusion' ? (FUSION_LIMITS.maxBaseSize[type] ?? Infinity) : Infinity;
+        return Math.min(fixed, onScreen / (this.scaleFactor || 1));
+    }
+
+    /** Golden Shapes: maybe turn a newly bought shape gold. Own RNG keeps spawns seeded. */
+    maybeGolden(shape) {
+        if (this.goldenChance > 0 && Math.random() < this.goldenChance) {
+            shape.value = (shape.value ?? 1) * GOLDEN_VALUE;
+            shape.color = GOLDEN_COLOR;
+            shape.golden = true;
+        }
+        return shape;
+    }
+
+    capBaseSize(type, size) {
+        return Math.min(size, this.maxBaseSize(type, 'spawn'));
+    }
+
     setSeed(seed){
         this.rng = seed;
     }
@@ -189,7 +228,7 @@ class CircleBoard {
     }
     
     createBall() {
-        const radius = this.shapeInfo['Circle'].baseMinBallSize + (this.rng() * (this.shapeInfo['Circle'].baseMaxBallSize - this.shapeInfo['Circle'].baseMinBallSize));
+        const radius = this.capBaseSize('Circle', this.shapeInfo['Circle'].baseMinBallSize + (this.rng() * (this.shapeInfo['Circle'].baseMaxBallSize - this.shapeInfo['Circle'].baseMinBallSize)));
         const speed = this.shapeInfo['Circle'].baseMinBallSpeed + (this.rng() * (this.shapeInfo['Circle'].baseMaxBallSpeed - this.shapeInfo['Circle'].baseMinBallSpeed));
            
         const angle = this.rng() * Math.PI * 2;
@@ -218,7 +257,7 @@ class CircleBoard {
         }
         ball.id = this.counter++;
             
-        return ball;
+        return this.maybeGolden(ball);
     }
 
     addNewSquares(amount = 1) {
@@ -228,7 +267,7 @@ class CircleBoard {
         }
     }
     createSquare() {
-        const side = this.shapeInfo['Square'].baseMinSide + (this.rng() * (this.shapeInfo['Square'].baseMaxSide - this.shapeInfo['Square'].baseMinSide));
+        const side = this.capBaseSize('Square', this.shapeInfo['Square'].baseMinSide + (this.rng() * (this.shapeInfo['Square'].baseMaxSide - this.shapeInfo['Square'].baseMinSide)));
         const speed = this.shapeInfo['Square'].baseMinSpeed + (this.rng() * (this.shapeInfo['Square'].baseMaxSpeed - this.shapeInfo['Square'].baseMinSpeed));
         const angle = this.rng() * Math.PI * 2;
         const maxDistance = this.container.radius - side - this.container.thickness - 5 * this.scaleFactor;
@@ -253,7 +292,7 @@ class CircleBoard {
         }
 
         square.id = this.counter++;
-        return square;
+        return this.maybeGolden(square);
     }
 
     addNewTriangles(amount = 1) {
@@ -262,7 +301,7 @@ class CircleBoard {
 
     createTriangle() {
         const info = this.shapeInfo.Triangle;
-        const side = info.baseMinSide + this.rng() * (info.baseMaxSide - info.baseMinSide);
+        const side = this.capBaseSize('Triangle', info.baseMinSide + this.rng() * (info.baseMaxSide - info.baseMinSide));
         const speed = info.baseMinSpeed + this.rng() * (info.baseMaxSpeed - info.baseMinSpeed);
         const angle = this.rng() * Math.PI * 2;
         const distance = this.rng() * Math.max(0, this.container.radius - side - this.container.thickness) * 0.9;
@@ -278,7 +317,7 @@ class CircleBoard {
             side,
         );
         triangle.id = this.counter++;
-        return triangle;
+        return this.maybeGolden(triangle);
     }
 
     
@@ -588,12 +627,12 @@ class CircleBoard {
             fused = fuseShapes(shapeA, shapeB, {
                 ...options,
                 promoteTo: next,
-                maxBaseSize: FUSION_LIMITS.maxBaseSize[next] ?? Infinity,
+                maxBaseSize: this.maxBaseSize(next, 'fusion'),
             });
         }
         fused ??= fuseShapes(shapeA, shapeB, {
             ...options,
-            maxBaseSize: FUSION_LIMITS.maxBaseSize[name] ?? Infinity,
+            maxBaseSize: this.maxBaseSize(name, 'fusion'),
         });
         if (fused) {
             fused.id = this.counter++;

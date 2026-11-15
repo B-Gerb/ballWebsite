@@ -27,10 +27,16 @@ export const COSMIC_EVENTS = {
   supernova: { currency: 'supernovas', label: 'Supernova', icon: '✷' },
 };
 
-/** Total shape mass (logical units) that collapses into a black hole. */
-export const BLACK_HOLE_MASS = 100000;
-/** Relative speed (logical units per frame) of one collision that goes supernova. */
-export const SUPERNOVA_SPEED = 60;
+/** Total shape mass (logical units) that collapses into the first black hole. */
+export const BLACK_HOLE_MASS = 60000;
+/** Relative speed (logical units per frame) of one collision that goes supernova (the first one). */
+export const SUPERNOVA_SPEED = 45;
+/**
+ * After each event its threshold follows the new spawn scale to this power:
+ * shapes get ÷10 mass/speed but the threshold drops ÷√10, so each event of a
+ * kind is about 3× harder than the last instead of 10×.
+ */
+export const THRESHOLD_FOLLOWS_SCALE = 0.5;
 /** Money multiplier each event grants before bonuses. */
 export const EVENT_CURRENCY_MULTIPLIER = 9;
 /** Mass (black hole) or speed (supernova) of shapes bought afterwards. */
@@ -40,7 +46,7 @@ export const EVENT_ADD_SHAPE_PRICE = 10;
 /** Upper bound for the accumulated multipliers (well below Number.MAX_VALUE). */
 export const MAX_MULTIPLIER = 1e300;
 /** Thresholds never drop below this fraction of the base. */
-export const MIN_THRESHOLD_FRACTION = 0.01;
+export const MIN_THRESHOLD_FRACTION = 1e-6;
 
 const nonNegative = (value) => (Number.isFinite(value) && value > 0 ? value : 0);
 const nonNegativeInteger = (value) => Math.floor(nonNegative(value));
@@ -137,13 +143,15 @@ class Cosmos {
    */
   blackHoleThreshold({ cut = 0, multiplier = 1 } = {}) {
     return this.threshold(BLACK_HOLE_MASS,
-      BLACK_HOLE_THRESHOLD_STEP ** this.effect('blackHoleThresholdLevels'), cut, multiplier);
+      BLACK_HOLE_THRESHOLD_STEP ** this.effect('blackHoleThresholdLevels')
+        * this.spawnMassScale ** THRESHOLD_FOLLOWS_SCALE, cut, multiplier);
   }
 
   /** Relative collision speed that makes a supernova (same options). */
   supernovaThreshold({ cut = 0, multiplier = 1 } = {}) {
     return this.threshold(SUPERNOVA_SPEED,
-      SUPERNOVA_THRESHOLD_STEP ** this.effect('supernovaThresholdLevels'), cut, multiplier);
+      SUPERNOVA_THRESHOLD_STEP ** this.effect('supernovaThresholdLevels')
+        * this.spawnSpeedScale ** THRESHOLD_FOLLOWS_SCALE, cut, multiplier);
   }
 
   threshold(base, upgradeFactor, cut, multiplier) {

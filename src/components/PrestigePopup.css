@@ -928,3 +928,12 @@
   color: var(--pt-muted);
   font-variant-numeric: tabular-nums;
 }
+
+/* Respec confirm, inline in the skills bar. */
+.pt-skills-reset {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+}
